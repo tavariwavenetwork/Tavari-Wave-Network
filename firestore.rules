@@ -1,0 +1,204 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() { return request.auth != null; }
+    function isEmailVerified() { 
+      return isSignedIn() && (request.auth.token.email_verified == true || isCipher()); 
+    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    function isCipher() {
+      return isSignedIn() && (
+        request.auth.uid == '3yV3rfcUzob5v9ltfVcMw0PL6tQ2' ||
+        request.auth.token.email == 'support@tavariwave.network' ||
+        request.auth.token.email == 'contact.cga.usa@gmail.com' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'cipher')
+      );
+    }
+
+    function isSuspended(data) {
+      return 'suspended' in data && data.suspended == true;
+    }
+
+    function isBanned(data) {
+      return 'banned' in data && data.banned == true;
+    }
+
+    function isStatusActive(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid)) && 
+             !isSuspended(get(/databases/$(database)/documents/users/$(uid)).data) && 
+             !isBanned(get(/databases/$(database)/documents/users/$(uid)).data);
+    }
+
+    // --- VALIDATION HELPERS ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'role', 'email']) &&
+             data.uid is string &&
+             data.role in ['user', 'cipher'] &&
+             (!('suspended' in data) || data.suspended is bool) &&
+             (!('banned' in data) || data.banned is bool);
+    }
+
+    function isValidInvestment(data) {
+      return data.keys().hasAll(['user_id', 'amount', 'plan_name', 'status', 'created_at']) &&
+             data.user_id is string &&
+             data.amount is number &&
+             data.plan_name is string;
+    }
+
+    function isAdditiveUpdate(field, incoming_data, existing_data) {
+      return !(field in incoming_data) || 
+             !(field in existing_data) || 
+             incoming_data[field] >= existing_data[field];
+    }
+
+    function isSafeIncomingUpdate(incoming_data, existing_data) {
+      return isAdditiveUpdate('funding_balance', incoming_data, existing_data) &&
+             isAdditiveUpdate('available_balance', incoming_data, existing_data) &&
+             isAdditiveUpdate('referral_earnings', incoming_data, existing_data) &&
+             isAdditiveUpdate('active_referrals', incoming_data, existing_data) &&
+             isAdditiveUpdate('referrals_count', incoming_data, existing_data);
+    }
+
+    // --- COLLECTIONS ---
+
+    match /users/{userId} {
+      allow get: if isSignedIn(); 
+      allow list: if true; // Required for unauthenticated referral code checking during signup
+      allow create: if isOwner(userId) && isSignedIn() && (incoming().get('role', 'user') == 'user' || isCipher()); 
+      allow update: if (isCipher() || 
+                       (isOwner(userId) && 
+                        !isSuspended(incoming()) && !isSuspended(existing()) && 
+                        !isBanned(incoming()) && !isBanned(existing()) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly([
+                          'name', 'username', 'email', 'phone', 'photoURL', 'transfer_pin', 'transaction_pin', 
+                          'push_notifications', 'available_balance', 'funding_balance', 'total_earnings', 
+                          'total_invested', 'roi_cycle_start', 'referral_earnings', 'active_referrals', 
+                          'referrals_count', 'withdraw_methods', 'last_rebook', 'roi_disabled', 
+                          'withdrawals_frozen', 'transfers_frozen', 'email_verified', 'public_id',
+                          'referral_code', 'referral_link', 'referred_by', 'created_at', 'last_active_at'
+                        ])) ||
+                       (isSignedIn() && existing().referred_by == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
+                       (isSignedIn() && !isOwner(userId) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['funding_balance', 'available_balance', 'referral_earnings', 'active_referrals', 'referrals_count']) && 
+                        isSafeIncomingUpdate(incoming(), existing())
+                       )
+                      );
+      
+      match /beneficiaries/{benId} {
+        allow get, list: if isSignedIn() && (request.auth.uid == userId || isCipher());
+        allow write: if isSignedIn() && (request.auth.uid == userId || isCipher()) && isStatusActive(userId);
+      }
+    }
+
+    match /transactions/{id} {
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (
+        isCipher() || 
+        incoming().user_id == request.auth.uid || 
+        ('sender_id' in incoming() && incoming().sender_id == request.auth.uid)
+      );
+      allow update, delete: if isCipher();
+    }
+
+    match /notifications/{id} {
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && (
+        isCipher() || 
+        incoming().user_id == request.auth.uid || 
+        ('sender_id' in incoming() && incoming().sender_id == request.auth.uid) ||
+        (exists(/databases/$(database)/documents/users/$(incoming().user_id)) && 
+         'referred_by' in get(/databases/$(database)/documents/users/$(incoming().user_id)).data &&
+         get(/databases/$(database)/documents/users/$(incoming().user_id)).data.referred_by == request.auth.uid)
+      );
+      allow update: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+    }
+
+    match /deposits/{id} {
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid && isStatusActive(request.auth.uid);
+      allow update: if isCipher();
+      allow delete: if isCipher();
+    }
+
+    match /withdrawals/{id} {
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
+      allow update, delete: if isCipher();
+    }
+
+    match /investments/{id} {
+      allow get: if isSignedIn() && (
+        resource.data.user_id == request.auth.uid || 
+        isCipher() || 
+        (exists(/databases/$(database)/documents/users/$(resource.data.user_id)) && 
+         get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.referred_by == request.auth.uid)
+      );
+      allow list: if isCipher() || (isSignedIn() && (
+        resource.data.user_id == request.auth.uid ||
+        (exists(/databases/$(database)/documents/users/$(resource.data.user_id)) && 
+         get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.referred_by == request.auth.uid)
+      ));
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid && isValidInvestment(incoming()) && isStatusActive(request.auth.uid);
+      allow update: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid && incoming().user_id == resource.data.user_id && isStatusActive(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'last_sync', 'total_earned', 'referral_bonus_processed', 'dailyRoi']) && isValidInvestment(incoming()));
+      allow delete: if isCipher();
+    }
+
+    match /support_tickets/{id} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update: if isCipher();
+      allow delete: if isCipher();
+    }
+
+    match /settings/{settingId} {
+      allow read: if settingId == 'ui_config' || isSignedIn();
+      allow write: if isCipher();
+    }
+
+    match /ui_versions/{id} {
+      allow read, write: if isCipher();
+    }
+
+    match /audit_logs/{id} {
+      allow get: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow list: if isCipher();
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid;
+    }
+
+    match /users/{userId}/devices/{deviceId} {
+      allow read: if isCipher() || isOwner(userId);
+      allow write: if isCipher() || isOwner(userId);
+    }
+
+    match /investment_plans/{id} {
+      allow read: if true;
+      allow write: if isCipher();
+    }
+
+    match /verification_codes/{id} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['used']);
+    }
+  }
+}

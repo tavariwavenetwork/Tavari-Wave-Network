@@ -1,0 +1,187 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User profile and balance information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "referral_code": { "type": "string" },
+        "referral_link": { "type": "string" },
+        "referred_by": { "type": "string" },
+        "public_id": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "cipher"] },
+        "funding_balance": { "type": "number" },
+        "available_balance": { "type": "number" },
+        "total_earnings": { "type": "number" },
+        "total_invested": { "type": "number" },
+        "referral_earnings": { "type": "number" },
+        "suspended": { "type": "boolean" },
+        "banned": { "type": "boolean" },
+        "roi_disabled": { "type": "boolean" },
+        "withdrawals_frozen": { "type": "boolean" },
+        "transfers_frozen": { "type": "boolean" },
+        "last_rebook": { "type": "string", "format": "date-time" },
+        "roi_cycle_start": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "name", "username", "email", "funding_balance", "available_balance", "total_earnings", "total_invested"]
+    },
+    "Deposit": {
+      "title": "Deposit Request",
+      "description": "A deposit entry into the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "reference": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "declined"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "amount", "status", "created_at"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal Request",
+      "description": "A withdrawal entry from the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string" },
+        "details": { "type": "object" },
+        "status": { "type": "string", "enum": ["pending", "approved", "declined"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "amount", "status", "created_at"]
+    },
+    "Investment": {
+      "title": "Investment Record",
+      "description": "An investment plan entry.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "plan_name": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["active", "completed", "declined"] },
+        "dailyRoi": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "amount", "status", "created_at"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "User notification entries.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "error"] },
+        "read": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "user_id", "title", "message", "read", "created_at"]
+    },
+    "SupportTicket": {
+      "title": "Support Ticket",
+      "description": "User support query ticket.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "userId": { "type": "string" },
+        "publicId": { "type": "string" },
+        "email": { "type": "string" },
+        "message": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "message", "status", "created_at"]
+    },
+    "InvestmentPlan": {
+      "title": "Investment Plan",
+      "description": "Dynamic ROI investment plan cards and settings managed by Cipher.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "roi": { "type": "number" },
+        "minWithdrawal": { "type": "number" },
+        "description": { "type": "string" },
+        "color": { "type": "string" },
+        "accentColor": { "type": "string" },
+        "borderColor": { "type": "string" },
+        "bgColor": { "type": "string" },
+        "buttonColor": { "type": "string" },
+        "gradient": { "type": "string" },
+        "duration": { "type": "number" },
+        "active_status": { "type": "boolean" },
+        "card_background": { "type": "string" },
+        "card_border": { "type": "string" },
+        "accent_color": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "min", "max", "roi", "active_status"]
+    },
+    "SystemSettings": {
+      "title": "System Settings",
+      "description": "Global system configuration.",
+      "type": "object",
+      "properties": {
+        "usd_to_ngn_rate": { "type": "number" },
+        "last_updated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["usd_to_ngn_rate"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profile records."
+    },
+    "/deposits/{id}": {
+      "schema": "Deposit",
+      "description": "System deposit records."
+    },
+    "/withdrawals/{id}": {
+      "schema": "Withdrawal",
+      "description": "System withdrawal records."
+    },
+    "/investments/{id}": {
+      "schema": "Investment",
+      "description": "User investment records."
+    },
+    "/notifications/{id}": {
+      "schema": "Notification",
+      "description": "User notifications."
+    },
+    "/support_tickets/{id}": {
+      "schema": "SupportTicket",
+      "description": "User support queries."
+    },
+    "/settings/system": {
+      "schema": "SystemSettings",
+      "description": "Global system settings."
+    },
+    "/investment_plans/{id}": {
+      "schema": "InvestmentPlan",
+      "description": "Dynamic ROI investment plan configurations."
+    }
+  }
+}
