@@ -20,6 +20,7 @@ import LandingPage from './components/LandingPage';
 import Blog from './components/Blog';
 import TermsOfService from './components/TermsOfService';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import InvestmentTerms from './components/InvestmentTerms';
 import TopInvestorsPage from './components/TopInvestorsPage';
 import ReviewsPage from './components/ReviewsPage';
 import NotificationsPage from './components/NotificationsPage';
@@ -181,6 +182,7 @@ export default function App() {
               <Route path="/token" element={<TWNTokenPortal />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
+              <Route path="/investment-terms" element={<InvestmentTerms />} />
               <Route path="/cipher" element={
                 <CipherProtectedRoute>
                   <CipherAdmin />

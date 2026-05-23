@@ -27,7 +27,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import investmentHeaderImage from '../assets/images/investment_header_1779476124204.png';
 import { DynamicBalance } from './DynamicBalance';
 import SuccessModal from './SuccessModal';
@@ -668,8 +668,16 @@ export default function Invest() {
                       onChange={(e) => setAgreedToTerms(e.target.checked)}
                       className="mt-1 accent-primary h-4 w-4 rounded border-white/10 bg-white/5"
                     />
-                    <label htmlFor="terms" className="text-[10px] font-bold text-aura-muted leading-relaxed uppercase tracking-[0.1em]">
-                      I accept the investment terms and acknowledge that past performance does not guarantee future results.
+                    <label htmlFor="terms" className="text-[10px] font-bold text-aura-muted leading-relaxed tracking-[0.1em] normal-case">
+                      I Understand And Agree To The{' '}
+                      <Link 
+                        to="/investment-terms" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-primary hover:text-aura-lime underline transition-colors"
+                      >
+                        Investment Terms
+                      </Link>
                     </label>
                   </div>
                 </div>

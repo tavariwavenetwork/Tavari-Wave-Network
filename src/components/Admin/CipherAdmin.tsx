@@ -533,9 +533,45 @@ export default function CipherAdmin() {
       }
     };
 
+    let unsubscribeNewsletterSubscribers: (() => void) | undefined;
+
     if (isCipher) {
       fetchSubscribers();
       intervalId = setInterval(fetchSubscribers, 10000);
+
+      try {
+        unsubscribeNewsletterSubscribers = onSnapshot(collection(db, 'newsletter_subscribers'),
+          (snap) => {
+            const list = snap.docs.map(doc => {
+              const data = doc.data();
+              let created_at: any = null;
+              if (data.created_at) {
+                if (typeof data.created_at.toDate === 'function') {
+                  created_at = data.created_at.toDate().toISOString();
+                } else if (data.created_at.seconds) {
+                  created_at = new Date(data.created_at.seconds * 1000).toISOString();
+                } else {
+                  created_at = data.created_at;
+                }
+              }
+              return {
+                id: doc.id,
+                email: data.email,
+                created_at
+              };
+            });
+            list.sort((a, b) => {
+              const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+              const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+              return timeB - timeA;
+            });
+            setSubscribers(list);
+          },
+          (err) => console.error("Newsletter subscribers sync failed:", err.message)
+        );
+      } catch (e) {
+        console.error("Failed to setup real-time newsletter snapshot:", e);
+      }
     }
 
     return () => {
@@ -548,6 +584,7 @@ export default function CipherAdmin() {
       unsubscribeUI();
       unsubscribeUIVersions();
       unsubscribeTransactions();
+      if (unsubscribeNewsletterSubscribers) unsubscribeNewsletterSubscribers();
       if (intervalId) clearInterval(intervalId);
     };
   }, [user, profile]);

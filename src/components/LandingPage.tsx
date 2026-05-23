@@ -242,6 +242,7 @@ export default function LandingPage() {
   // Newsletter subscription states & handlers
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [showNewsletterSuccessModal, setShowNewsletterSuccessModal] = useState(false);
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,62 +259,37 @@ export default function LandingPage() {
     }
 
     setNewsletterLoading(true);
+    const cleanEmail = emailStr.toLowerCase().trim();
     try {
-      const response = await fetch('/api/newsletter/subscribe', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: emailStr })
-      });
-
-      const data = await response.json();
-      if (response.ok && data.success) {
-        toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
-        setNewsletterEmail('');
-      } else {
-        // Fallback to client-side direct write if permission or backend error
-        console.warn("Backend subscribe failed, trying client-side fallback...");
-        const cleanEmail = emailStr.toLowerCase().trim();
-        const existsQuery = query(collection(db, 'newsletter_subscribers'), where('email', '==', cleanEmail));
-        const querySnap = await getDocs(existsQuery);
-        
-        if (!querySnap.empty) {
-          toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
-          setNewsletterEmail('');
-          return;
-        }
-
+      // 1. Instantly write/verify client-side Firestore to guarantee immediate Admin synchronization
+      const existsQuery = query(collection(db, 'newsletter_subscribers'), where('email', '==', cleanEmail));
+      const querySnap = await getDocs(existsQuery);
+      
+      if (querySnap.empty) {
         await addDoc(collection(db, 'newsletter_subscribers'), {
           email: cleanEmail,
           created_at: serverTimestamp()
         });
-        toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
-        setNewsletterEmail('');
       }
-    } catch (err: any) {
-      console.error("Newsletter submission error, trying fallback:", err);
+
+      // 2. Fire backend subscription notifier as background process
       try {
-        const cleanEmail = emailStr.toLowerCase().trim();
-        const existsQuery = query(collection(db, 'newsletter_subscribers'), where('email', '==', cleanEmail));
-        const querySnap = await getDocs(existsQuery);
-        
-        if (!querySnap.empty) {
-          toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
-          setNewsletterEmail('');
-          return;
-        }
-
-        await addDoc(collection(db, 'newsletter_subscribers'), {
-          email: cleanEmail,
-          created_at: serverTimestamp()
+        await fetch('/api/newsletter/subscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: cleanEmail })
         });
-        toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
-        setNewsletterEmail('');
-      } catch (fallbackErr) {
-        console.error("Fallback failed as well:", fallbackErr);
-        toast.error("Subscription could not be processed at this time.");
+      } catch (backendErr) {
+        console.warn("Backend logging skipped, client sync completed:", backendErr);
       }
+
+      setNewsletterEmail('');
+      setShowNewsletterSuccessModal(true);
+    } catch (err: any) {
+      console.error("Newsletter subscription error:", err);
+      toast.error("Subscription could not be processed at this time.");
     } finally {
       setNewsletterLoading(false);
     }
@@ -804,7 +780,7 @@ export default function LandingPage() {
 
       {/* Welcome Landing Full Width Header Photo */}
       <div 
-        className="w-full relative z-[101] overflow-hidden border-b border-white/10 bg-[#050608] mt-20 lg:mt-24"
+        className="w-full relative z-[101] overflow-hidden bg-[#050608] mt-20 lg:mt-24"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -839,15 +815,15 @@ export default function LandingPage() {
 
        {/* Nav */}
       <nav className={cn(
-        "fixed top-0 inset-x-0 z-[120] transition-all duration-500 flex items-center justify-between px-6 lg:px-20 backdrop-blur-md border-b",
+        "fixed top-0 inset-x-0 z-[120] transition-all duration-500 flex items-center justify-between px-4 lg:px-20 backdrop-blur-md border-b",
         isScrolled 
           ? "h-14 bg-[#050608]/85 border-primary/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)]" 
-          : "h-20 lg:h-24 bg-[#050608]/35 border-white/5 shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
+          : "h-14 lg:h-24 bg-[#050608]/35 border-transparent shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
       )}>
-        <div className={cn("flex items-center gap-4 transition-all duration-500", isScrolled ? "scale-90" : "scale-100")}>
-          <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-11 w-auto lg:h-14 object-contain" />
+        <div className={cn("flex items-center gap-1.5 transition-all duration-500", isScrolled ? "scale-90" : "scale-100")}>
+          <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-10 w-auto lg:h-14 object-contain" />
           {!isScrolled && (
-            <span className="text-2xl lg:text-3xl font-black uppercase tracking-tighter leading-none">Wave</span>
+            <span className="text-xl lg:text-3xl font-black uppercase tracking-tighter leading-none">Wave</span>
           )}
         </div>
 
@@ -870,29 +846,50 @@ export default function LandingPage() {
            ))}
         </div>
 
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
-            className="text-[10px] font-bold uppercase tracking-widest hover:text-primary transition-colors"
-          >
-            Sign In
-          </button>
-          {!isScrolled && (
+        <div className="flex items-center gap-2">
+          {/* Mobile Buttons Layout - Compact & Premium */}
+          <div className="flex lg:hidden items-center gap-1.5">
+            {/* 1. Dropdown/Hamburger menu */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1 px-1.5 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors shrink-0"
+              aria-label="Toggle menu"
+            >
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+
+            {/* 2. Get Started */}
+            <button 
+              onClick={() => { setIsModalOpen(true); setAuthMode('signup'); }}
+              className="px-2.5 py-1.5 bg-primary hover:bg-primary/95 text-white text-[9px] font-black uppercase tracking-widest rounded-md shadow-md active:scale-95 transition-all whitespace-nowrap"
+            >
+              Get Started
+            </button>
+
+            {/* 3. Sign In */}
+            <button 
+              onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
+              className="px-2.5 py-1.5 border border-white/10 hover:border-primary/50 text-white text-[9px] font-bold uppercase tracking-widest rounded-md hover:bg-white/5 transition-all whitespace-nowrap"
+            >
+              Sign In
+            </button>
+          </div>
+
+          {/* Desktop Only Buttons */}
+          <div className="hidden lg:flex items-center gap-4">
+            <button 
+              onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
+              className="text-[10px] font-bold uppercase tracking-widest hover:text-primary transition-colors"
+            >
+              Sign In
+            </button>
             <button 
               onClick={() => { setIsModalOpen(true); setAuthMode('signup'); }}
               className="px-6 py-2.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg hover:scale-105 transition-all text-xs"
             >
               Get Started
             </button>
-          )}
-          {/* Mobile navigation toggle */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          </div>
         </div>
       </nav>
 
@@ -924,29 +921,6 @@ export default function LandingPage() {
                   <ArrowRight size={12} className="text-primary" />
                 </button>
               ))}
-              <div className="h-[1px] bg-white/5 my-2" />
-              <div className="flex gap-4">
-                <button
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    setIsModalOpen(true);
-                    setAuthMode('signin');
-                  }}
-                  className="flex-1 h-12 rounded-xl border border-white/10 hover:border-primary/50 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-white/5"
-                >
-                  Sign In
-                </button>
-                <button
-                  onClick={() => {
-                    setIsMobileMenuOpen(false);
-                    setIsModalOpen(true);
-                    setAuthMode('signup');
-                  }}
-                  className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/95 text-[10px] font-black uppercase tracking-widest text-white transition-all shadow-md"
-                >
-                  Get Started
-                </button>
-              </div>
             </div>
           </motion.div>
         )}
@@ -1113,6 +1087,64 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Newsletter Success Modal */}
+      <AnimatePresence>
+        {showNewsletterSuccessModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowNewsletterSuccessModal(false)}
+              className="fixed inset-0 bg-black/85 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-sm bg-[#0c0f14] border border-white/5 rounded-[32px] overflow-hidden shadow-2xl z-10"
+            >
+              <div className="p-8 text-center space-y-6">
+                <button 
+                  onClick={() => setShowNewsletterSuccessModal(false)}
+                  className="absolute top-6 right-6 p-2 bg-white/5 hover:bg-white/10 rounded-full text-aura-muted hover:text-white transition-colors"
+                  aria-label="Close dialog"
+                >
+                  <X size={14} />
+                </button>
+
+                <div className="pt-4">
+                  <motion.div
+                    initial={{ scale: 0, rotate: -45 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: "spring", stiffness: 200, delay: 0.1 }}
+                    className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto"
+                  >
+                    <CheckCircle2 size={32} className="text-primary" />
+                  </motion.div>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black uppercase tracking-tight text-white italic font-serif">
+                    Welcome to Wave Press
+                  </h3>
+                  <p className="text-xs text-aura-muted leading-relaxed font-sans px-2">
+                    Thank you for subscribing to our newsletter. Stay updated with Wave via email.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => setShowNewsletterSuccessModal(false)}
+                  className="w-full h-12 bg-gradient-to-r from-primary to-secondary text-white font-black uppercase tracking-widest text-[10px] rounded-xl shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-98 transition-all flex items-center justify-center gap-2 mt-2"
+                >
+                  Continue Reading
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Auth Modal */}
       <AnimatePresence>
