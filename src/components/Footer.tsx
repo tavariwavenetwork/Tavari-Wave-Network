@@ -1,8 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Shield, Mail, Globe, Twitter, Github, MessageSquare, ChevronRight } from 'lucide-react';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Footer = () => {
+  const { t } = useLanguage();
+
   return (
     <footer className="relative mt-20 border-t border-white/5 bg-[#050608] overflow-hidden">
       {/* Decorative Background Elements */}
@@ -18,7 +21,7 @@ const Footer = () => {
               <span className="text-2xl lg:text-3xl font-black uppercase tracking-tighter text-white italic leading-none">Wave</span>
             </div>
             <p className="text-aura-muted text-xs leading-relaxed max-w-xs font-medium">
-              Institutional-grade digital asset management platform powered by high-frequency algorithmic neural networks. Redefining the future of automated equity growth.
+              {t("Institutional-grade digital asset management platform powered by high-frequency algorithmic neural networks. Redefining the future of automated equity growth.")}
             </p>
             <div className="flex items-center gap-4">
               {[Twitter, Github, MessageSquare].map((Icon, i) => (
@@ -31,7 +34,7 @@ const Footer = () => {
 
           {/* Quick Links */}
           <div className="space-y-6">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Ecosystem</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">{t("Ecosystem")}</h4>
             <ul className="space-y-3">
               {[
                 { name: 'Market Tickers', path: '/markets' },
@@ -48,7 +51,7 @@ const Footer = () => {
                 <li key={link.name}>
                   <Link to={link.path} className="text-aura-muted hover:text-primary text-xs transition-colors flex items-center gap-2 group">
                     <ChevronRight size={12} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
-                    {link.name}
+                    {t(link.name)}
                   </Link>
                 </li>
               ))}
@@ -57,65 +60,67 @@ const Footer = () => {
 
           {/* Legal */}
           <div className="space-y-6">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Legal & Compliance</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">{t("Legal & Compliance")}</h4>
             <ul className="space-y-3">
               <li>
                 <Link to="/terms" className="text-aura-muted hover:text-primary text-xs transition-colors flex items-center gap-2 group">
                   <ChevronRight size={12} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
-                  Terms of Service
+                  {t("Terms of Service")}
                 </Link>
               </li>
               <li>
                 <Link to="/privacy" className="text-aura-muted hover:text-primary text-xs transition-colors flex items-center gap-2 group">
                   <ChevronRight size={12} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
-                  Privacy & Security
+                  {t("Privacy & Security")}
                 </Link>
               </li>
               <li>
                 <Link to="/cookies" className="text-aura-muted hover:text-primary text-xs transition-colors flex items-center gap-2 group">
                   <ChevronRight size={12} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
-                  Cookie Policy
+                  {t("Cookie Policy")}
                 </Link>
               </li>
               <li>
                 <Link to="/aml" className="text-aura-muted hover:text-primary text-xs transition-colors flex items-center gap-2 group">
                   <ChevronRight size={12} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
-                  AML Policy
+                  {t("AML Policy")}
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Contact */}
-          <div className="space-y-6">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">Support Terminal</h4>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
-                <Mail size={16} className="text-primary" />
-                <div className="space-y-1">
-                  <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Global Inquiries</p>
-                  <p className="text-xs text-white font-mono lowercase">tavariwavenetwork@support.com</p>
-                  <p className="text-[10px] text-white/40 font-mono lowercase">tavariwavenetwork@gmail.com</p>
+          {[Twitter, Github, MessageSquare].length > 0 && (
+            /* Contact */
+            <div className="space-y-6">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-white">{t("Support Terminal")}</h4>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <Mail size={16} className="text-primary" />
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">{t("Global Inquiries")}</p>
+                    <p className="text-xs text-white font-mono lowercase">tavariwavenetwork@support.com</p>
+                    <p className="text-[10px] text-white/40 font-mono lowercase">tavariwavenetwork@gmail.com</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
-                <Globe size={16} className="text-primary" />
-                <div className="space-y-1">
-                  <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Network Status</p>
-                  <p className="text-xs text-emerald-500 font-mono uppercase tracking-tighter">Systems Operational</p>
+                <div className="flex items-center gap-3 p-4 bg-white/5 border border-white/10 rounded-xl">
+                  <Globe size={16} className="text-primary" />
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">{t("Network Status")}</p>
+                    <p className="text-xs text-emerald-500 font-mono uppercase tracking-tighter">{t("Systems Operational")}</p>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Bottom Bar */}
         <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-[10px] font-medium text-white/20 tracking-wide">
-            © 2026 TAVARI WAVE NETWORK. LICENSED SECURE ARCHITECTURE.
+            {t("© 2026 TAVARI WAVE NETWORK. LICENSED SECURE ARCHITECTURE.")}
           </p>
           <div className="flex items-center gap-6">
-            <p className="text-[10px] font-black text-primary italic uppercase tracking-[0.3em]">Quantum-Ready Security</p>
+            <p className="text-[10px] font-black text-primary italic uppercase tracking-[0.3em]">{t("Quantum-Ready Security")}</p>
           </div>
         </div>
       </div>

@@ -490,7 +490,7 @@ export default function Invest() {
             className="space-y-10 w-full"
           >
             {/* Edge-to-Edge Premium Header Banner with Image Background */}
-            <div className="-mx-6 -mt-8 mb-8 relative h-[200px] sm:h-[220px] md:h-[250px] overflow-hidden">
+            <div className="-mx-6 -mt-8 mb-4 relative h-[180px] sm:h-[200px] md:h-[220px] overflow-hidden">
               <img 
                 src="https://i.imgur.com/CfAErfD.png" 
                 alt="Investment Header" 
@@ -502,11 +502,15 @@ export default function Invest() {
               <div className="absolute bottom-6 left-6 right-6 z-10 flex flex-col md:flex-row md:items-end justify-between gap-4 max-w-5xl mx-auto w-full">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold font-serif italic text-white tracking-tight drop-shadow-md">Investment Plans</h1>
-                  <p className="text-white/80 text-[10px] md:text-[11px] font-semibold tracking-tight drop-shadow-sm leading-snug mt-1.5">
-                    choose the best plan that suits your goals and start earning daily rewards.
-                  </p>
                 </div>
               </div>
+            </div>
+
+            {/* Subtitle positioned beautifully between header and cards */}
+            <div className="max-w-5xl mx-auto px-4 lg:px-0 text-left -mt-4 mb-2">
+              <p className="text-gray-400 text-xs md:text-sm font-medium tracking-wide leading-relaxed max-w-2xl bg-white/[0.02] border border-white/5 rounded-2xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
+                Choose the best plan that suits your goals and start earning daily rewards.
+              </p>
             </div>
 
             <div className="flex overflow-x-auto lg:grid lg:grid-cols-3 gap-5 lg:gap-8 max-w-5xl mx-auto py-2 md:py-4 px-4 lg:px-0 scrollbar-hide snap-x snap-mandatory">

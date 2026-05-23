@@ -37,7 +37,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useLocation, useNavigate, Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useLanguage } from '../contexts/LanguageContext';
+import { useLanguage, LANGUAGES } from '../contexts/LanguageContext';
 import { useUI } from '../contexts/UIContext';
 import TransferModal from './TransferModal';
 import { db } from '../lib/firebase';
@@ -396,7 +396,7 @@ export default function Layout() {
           {[
             { label: 'Home', path: '/home' },
             { label: 'Invest', path: '/invest' },
-            { label: 'Fund', path: '/fund' },
+            { label: 'Deposit', path: '/fund' },
             { label: 'TWN Token', path: '/token' },
             { label: 'How It Works', path: '/how-it-works' },
             { label: 'About', path: '/about' },
@@ -415,7 +415,7 @@ export default function Layout() {
                     : "text-aura-muted hover:text-white"
                 )}
               >
-                <span className="relative z-10 transition-all group-hover:tracking-[0.3em]">{item.label}</span>
+                <span className="relative z-10 transition-all group-hover:tracking-[0.3em]">{t(item.label)}</span>
                 {isActive && (
                   <motion.div 
                     layoutId="top-nav-active"
@@ -492,9 +492,10 @@ export default function Layout() {
           <div className="relative" ref={languageRef}>
             <button 
               onClick={() => setIsLanguageOpen(!isLanguageOpen)}
-              className="p-2 text-aura-muted hover:text-aura-lime transition-colors"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/[0.04] border border-white/5 text-lg hover:bg-white/[0.08] hover:border-white/10 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:scale-95 text-xl"
+              title="Select Language"
             >
-              <Globe size={20} />
+              {LANGUAGES.find(l => l.code === language)?.flag || '🇺🇸'}
             </button>
 
             <AnimatePresence>
@@ -505,19 +506,12 @@ export default function Layout() {
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   style={{ willChange: 'transform, opacity' }}
                   className={cn(
-                    "absolute top-full right-0 mt-2 w-48 rounded-2xl border shadow-2xl z-[110] overflow-hidden backdrop-blur-xl",
+                    "absolute top-full right-0 mt-2 w-56 rounded-2xl border shadow-2xl z-[110] overflow-hidden backdrop-blur-xl",
                     isDark ? "bg-[#11141b]/95 border-white/10" : "bg-white/95 border-aura-line"
                   )}
                 >
-                  <div className="p-2">
-                    {[
-                      { code: 'EN', name: 'English' },
-                      { code: 'ES', name: 'Español' },
-                      { code: 'FR', name: 'Français' },
-                      { code: 'DE', name: 'Deutsch' },
-                      { code: 'ZH', name: '中文' },
-                      { code: 'HI', name: 'हिन्दी' }
-                    ].map((lang) => (
+                  <div className="p-2 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar space-y-0.5">
+                    {LANGUAGES.map((lang) => (
                       <button 
                         key={lang.code}
                         onClick={() => {
@@ -525,13 +519,16 @@ export default function Layout() {
                           setIsLanguageOpen(false);
                         }}
                         className={cn(
-                          "flex items-center justify-between w-full p-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                          "flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all",
                           language === lang.code 
-                            ? "bg-aura-lime text-aura-black" 
-                            : "text-aura-muted hover:text-white hover:bg-white/5"
+                            ? "bg-aura-lime text-aura-black shadow-lg shadow-aura-lime/20" 
+                            : isDark ? "text-aura-muted hover:text-white hover:bg-white/5" : "text-gray-600 hover:text-black hover:bg-black/5"
                         )}
                       >
-                        {lang.name}
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-base select-none">{lang.flag}</span>
+                          <span className="text-[10px] font-black uppercase tracking-wider">{lang.name}</span>
+                        </div>
                         {language === lang.code && <CheckCircle2 size={12} />}
                       </button>
                     ))}
@@ -692,19 +689,6 @@ export default function Layout() {
         <MarketTicker isDark={isDark} />
       )}
 
-      {/* Sleek Standardized Floating Back Button */}
-      {showBackButton && (
-        <div className="fixed top-24 left-6 lg:left-12 z-[110]">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="flex items-center gap-2 px-4 py-2 bg-black/60 hover:bg-black/85 border border-white/10 hover:border-primary/40 rounded-full text-[10px] font-black uppercase tracking-widest text-white/90 hover:text-white transition-all active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.5)] backdrop-blur-md cursor-pointer"
-          >
-            <ArrowLeft size={12} className="text-primary" />
-            <span>Back</span>
-          </button>
-        </div>
-      )}
-
       {/* --- MAIN CONTENT AREA --- */}
       <main className={cn(
         "flex-1 w-full transition-all duration-500",
@@ -845,7 +829,7 @@ export default function Layout() {
                 />
                 <SidebarItem 
                   icon={<Gift size={20} />} 
-                  label="Rewards" 
+                  label={t('reviews')} 
                   active={activeTab === 'rewards'}
                   onClick={() => handleNavigation('/rewards')}
                 />
@@ -859,19 +843,19 @@ export default function Layout() {
                   />
                   <SidebarItem 
                     icon={<MessageSquarePlus size={20} />} 
-                    label="Reviews" 
+                    label={t('reviews')} 
                     active={activeTab === 'reviews'}
                     onClick={() => handleNavigation('/reviews')}
                   />
                   <SidebarItem 
                     icon={<Trophy size={20} />} 
-                    label="Top Investors" 
+                    label={t('recent_investments')} 
                     active={activeTab === 'top-investors'}
                     onClick={() => handleNavigation('/top-investors')}
                   />
                   <SidebarItem 
                     icon={<Users size={20} />} 
-                    label="Partners" 
+                    label={t('about_us')} 
                     active={activeTab === 'partners'}
                     onClick={() => handleNavigation('/partners')}
                   />

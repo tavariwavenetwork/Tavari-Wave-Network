@@ -58,6 +58,7 @@ import 'react-phone-input-2/lib/style.css';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
+import { useLanguage, LANGUAGES } from '../contexts/LanguageContext';
 
 // --- HELPERS ---
 const generateReferralCode = () => {
@@ -206,6 +207,68 @@ const Realistic3DIcon = ({ type }: { type: 'user' | 'plan' | 'fund' | 'node' }) 
 };
 
 export default function LandingPage() {
+  const { language, setLanguage, t } = useLanguage();
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const languageRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (languageRef.current && !languageRef.current.contains(e.target as Node)) {
+        setIsLanguageOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const renderLanguageSelector = () => (
+    <div className="relative" ref={languageRef}>
+      <button 
+        onClick={() => setIsLanguageOpen(!isLanguageOpen)}
+        className="w-9 h-9 flex items-center justify-center rounded-xl bg-white/[0.04] border border-white/5 text-lg hover:bg-white/[0.08] hover:border-white/10 transition-all shadow-[0_4px_12px_rgba(0,0,0,0.15)] active:scale-95 text-xl"
+        title="Select Language"
+      >
+        {LANGUAGES.find(l => l.code === language)?.flag || '🇺🇸'}
+      </button>
+
+      <AnimatePresence>
+        {isLanguageOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+            style={{ willChange: 'transform, opacity' }}
+            className="absolute top-full right-0 mt-2 w-56 rounded-2xl border border-white/10 bg-[#11141b]/95 shadow-2xl z-[150] overflow-hidden backdrop-blur-xl"
+          >
+            <div className="p-2 max-h-80 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent custom-scrollbar space-y-0.5">
+              {LANGUAGES.map((lang) => (
+                <button 
+                  key={lang.code}
+                  onClick={() => {
+                    setLanguage(lang.code as any);
+                    setIsLanguageOpen(false);
+                  }}
+                  className={cn(
+                    "flex items-center justify-between w-full px-3 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all",
+                    language === lang.code 
+                      ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  )}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base select-none">{lang.flag}</span>
+                    <span className="text-[10px] font-black uppercase tracking-wider">{lang.name}</span>
+                  </div>
+                  {language === lang.code && <CheckCircle2 size={12} />}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
   const [loading, setLoading] = useState(false);
@@ -261,35 +324,24 @@ export default function LandingPage() {
     setNewsletterLoading(true);
     const cleanEmail = emailStr.toLowerCase().trim();
     try {
-      // 1. Instantly write/verify client-side Firestore to guarantee immediate Admin synchronization
-      const existsQuery = query(collection(db, 'newsletter_subscribers'), where('email', '==', cleanEmail));
-      const querySnap = await getDocs(existsQuery);
-      
-      if (querySnap.empty) {
-        await addDoc(collection(db, 'newsletter_subscribers'), {
-          email: cleanEmail,
-          created_at: serverTimestamp()
-        });
-      }
+      const response = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: cleanEmail })
+      });
 
-      // 2. Fire backend subscription notifier as background process
-      try {
-        await fetch('/api/newsletter/subscribe', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ email: cleanEmail })
-        });
-      } catch (backendErr) {
-        console.warn("Backend logging skipped, client sync completed:", backendErr);
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Subscription could not be processed at this time.");
       }
 
       setNewsletterEmail('');
       setShowNewsletterSuccessModal(true);
     } catch (err: any) {
       console.error("Newsletter subscription error:", err);
-      toast.error("Subscription could not be processed at this time.");
+      toast.error(err.message || "Subscription could not be processed at this time.");
     } finally {
       setNewsletterLoading(false);
     }
@@ -815,16 +867,18 @@ export default function LandingPage() {
 
        {/* Nav */}
       <nav className={cn(
-        "fixed top-0 inset-x-0 z-[120] transition-all duration-500 flex items-center justify-between px-4 lg:px-20 backdrop-blur-md border-b",
+        "fixed z-[120] transition-all duration-500 flex items-center justify-between",
+        // Mobile style: floating glassmorphic pill
+        "top-3.5 inset-x-3.5 h-12 rounded-2xl bg-[#050608]/70 border border-white/10 shadow-[0_8px_32px_rgba(124,58,237,0.12),0_1px_2px_rgba(255,255,255,0.05)] px-3 text-white backdrop-blur-xl lg:hidden",
+        // Desktop style: traditional header matching the scrolling theme
+        "lg:top-0 lg:inset-x-0 lg:fixed lg:rounded-none lg:px-20 lg:text-white lg:border-b lg:backdrop-blur-md",
         isScrolled 
-          ? "h-14 bg-[#050608]/85 border-primary/20 shadow-[0_4px_30px_rgba(0,0,0,0.5)]" 
-          : "h-14 lg:h-24 bg-[#050608]/35 border-transparent shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
+          ? "lg:h-14 lg:bg-[#050608]/85 lg:border-primary/20 lg:shadow-[0_4px_30px_rgba(0,0,0,0.5)]" 
+          : "lg:h-24 lg:bg-[#050608]/35 lg:border-transparent lg:shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
       )}>
         <div className={cn("flex items-center gap-1.5 transition-all duration-500", isScrolled ? "scale-90" : "scale-100")}>
-          <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-10 w-auto lg:h-14 object-contain" />
-          {!isScrolled && (
-            <span className="text-xl lg:text-3xl font-black uppercase tracking-tighter leading-none">Wave</span>
-          )}
+          <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-7 w-auto lg:h-14 object-contain" />
+          <span className="text-sm lg:text-3xl font-black uppercase tracking-tighter leading-none">Wave</span>
         </div>
 
         {/* Center Nav Items */}
@@ -841,7 +895,7 @@ export default function LandingPage() {
                }}
                className="text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
              >
-               {item}
+               {t(item)}
              </button>
            ))}
         </div>
@@ -849,45 +903,47 @@ export default function LandingPage() {
         <div className="flex items-center gap-2">
           {/* Mobile Buttons Layout - Compact & Premium */}
           <div className="flex lg:hidden items-center gap-1.5">
-            {/* 1. Dropdown/Hamburger menu */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="p-1 px-1.5 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors shrink-0"
-              aria-label="Toggle menu"
+            {renderLanguageSelector()}
+            {/* 1. Sign In */}
+            <button 
+              onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
+              className="px-2 py-1.5 border border-white/10 hover:border-primary/50 text-white text-[9px] font-bold uppercase tracking-widest rounded-lg hover:bg-white/5 transition-all whitespace-nowrap"
             >
-              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+              {t('Sign In')}
             </button>
 
             {/* 2. Get Started */}
             <button 
               onClick={() => { setIsModalOpen(true); setAuthMode('signup'); }}
-              className="px-2.5 py-1.5 bg-primary hover:bg-primary/95 text-white text-[9px] font-black uppercase tracking-widest rounded-md shadow-md active:scale-95 transition-all whitespace-nowrap"
+              className="px-2.5 py-1.5 bg-primary hover:bg-primary/95 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-md active:scale-95 transition-all whitespace-nowrap"
             >
-              Get Started
+              {t('Get Started')}
             </button>
 
-            {/* 3. Sign In */}
-            <button 
-              onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
-              className="px-2.5 py-1.5 border border-white/10 hover:border-primary/50 text-white text-[9px] font-bold uppercase tracking-widest rounded-md hover:bg-white/5 transition-all whitespace-nowrap"
+            {/* 3. Dropdown/Hamburger menu (extreme right) */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="p-1 px-1.5 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors shrink-0"
+              aria-label="Toggle menu"
             >
-              Sign In
+              {isMobileMenuOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
           </div>
 
           {/* Desktop Only Buttons */}
           <div className="hidden lg:flex items-center gap-4">
+            {renderLanguageSelector()}
             <button 
               onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
               className="text-[10px] font-bold uppercase tracking-widest hover:text-primary transition-colors"
             >
-              Sign In
+              {t('Sign In')}
             </button>
             <button 
               onClick={() => { setIsModalOpen(true); setAuthMode('signup'); }}
               className="px-6 py-2.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg hover:scale-105 transition-all text-xs"
             >
-              Get Started
+              {t('Get Started')}
             </button>
           </div>
         </div>
@@ -897,13 +953,13 @@ export default function LandingPage() {
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="fixed top-14 lg:hidden inset-x-0 z-[110] bg-[#050608]/95 backdrop-blur-xl border-b border-white/5 shadow-2xl overflow-hidden"
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="fixed top-[66px] lg:hidden inset-x-3.5 z-[110] bg-[#050608]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-xl overflow-hidden"
           >
-            <div className="flex flex-col p-6 gap-4">
+            <div className="flex flex-col p-4 gap-2">
               {['About Us', 'How It Works', 'Reviews', 'Blog', 'Help'].map((item) => (
                 <button
                   key={item}
@@ -915,10 +971,10 @@ export default function LandingPage() {
                     if (item === 'Blog') navigate('/blog');
                     if (item === 'Help') navigate('/help');
                   }}
-                  className="w-full text-left py-3 px-4 rounded-xl hover:bg-white/5 text-[11px] font-bold uppercase tracking-widest text-white/75 hover:text-primary transition-all flex items-center justify-between"
+                  className="w-full text-left py-2.5 px-3.5 rounded-xl hover:bg-white/5 text-[10px] font-bold uppercase tracking-widest text-white/75 hover:text-primary transition-all flex items-center justify-between"
                 >
-                  <span>{item}</span>
-                  <ArrowRight size={12} className="text-primary" />
+                  <span>{t(item)}</span>
+                  <ArrowRight size={10} className="text-primary" />
                 </button>
               ))}
             </div>
@@ -966,7 +1022,7 @@ export default function LandingPage() {
               <span className="h-[1px] w-8 bg-gradient-to-l from-transparent to-primary/50" />
             </div>
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-sans font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-100 uppercase select-none leading-snug">
-              Simple Steps to Start Your Journey to Financial Freedom
+              {t("Simple Steps to Start Your Journey to Financial Freedom")}
             </h2>
             <div className="h-[2px] w-20 bg-gradient-to-r from-transparent via-primary/50 to-transparent mt-1.5" />
           </div>
@@ -984,10 +1040,10 @@ export default function LandingPage() {
               <Realistic3DIcon type="user" />
             </div>
             <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
-              Create Account
+              {t("Create Account")}
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
-              Simple onboarding to get started
+              {t("Simple onboarding to get started")}
             </p>
           </div>
 
@@ -1002,10 +1058,10 @@ export default function LandingPage() {
               <Realistic3DIcon type="plan" />
             </div>
             <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
-              Choose a Plan
+              {t("Choose a Plan")}
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
-              Select a suitable growth path
+              {t("Select a suitable growth path")}
             </p>
           </div>
 
@@ -1020,10 +1076,10 @@ export default function LandingPage() {
               <Realistic3DIcon type="fund" />
             </div>
             <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
-              Fund & Start
+              {t("Fund & Start")}
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
-              Add funds and activate your journey
+              {t("Add funds and activate your journey")}
             </p>
           </div>
 
@@ -1038,10 +1094,10 @@ export default function LandingPage() {
               <Realistic3DIcon type="node" />
             </div>
             <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
-              Activate Your Nodes
+              {t("Activate Your Nodes")}
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
-              Enable your earning system
+              {t("Enable your earning system")}
             </p>
           </div>
         </div>

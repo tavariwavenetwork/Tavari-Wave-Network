@@ -1,5 +1,6 @@
 import React from 'react';
 import { useUIConfig } from '../contexts/UIConfigContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface EditableTextProps {
   configKey: string;
@@ -15,11 +16,12 @@ export const EditableText: React.FC<EditableTextProps> = ({
   as: Component = 'span' 
 }) => {
   const { config } = useUIConfig();
+  const { t } = useLanguage();
   const text = config[configKey] || defaultText;
 
   return (
     <Component className={className}>
-      {text}
+      {t(text)}
     </Component>
   );
 };

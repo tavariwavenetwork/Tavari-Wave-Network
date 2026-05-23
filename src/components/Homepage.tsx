@@ -14,6 +14,7 @@ import { cn, formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { DynamicBalance } from './DynamicBalance';
 import { RotatingButtonText } from './RotatingButtonText';
 import { collection, query, where, onSnapshot, doc, updateDoc, runTransaction } from 'firebase/firestore';

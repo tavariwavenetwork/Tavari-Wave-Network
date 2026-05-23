@@ -230,6 +230,16 @@ export default function Rewards() {
   const [selectedGuide, setSelectedGuide] = useState<any | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [countdownStr, setCountdownStr] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   
   // Points Conversion State
   const [pointsInput, setPointsInput] = useState('');
@@ -388,6 +398,17 @@ export default function Rewards() {
     return list;
   }, [profile?.created_at, profile?.createdAt, claimed_dates, todayStr]);
 
+  // Compute the exact subset of days to display based on mobile/desktop rolling rules
+  const visibleDays = useMemo(() => {
+    const K = isMobile ? 3 : 5;
+    // Find index of the first date that is NOT checked-in
+    const firstUnclaimedIdx = daysList.findIndex(d => !d.isClaimed);
+    const startIdx = firstUnclaimedIdx === -1 
+      ? Math.max(0, daysList.length - K - 1) 
+      : (firstUnclaimedIdx >= K ? firstUnclaimedIdx - K : 0);
+    return daysList.slice(startIdx, startIdx + K + 1);
+  }, [daysList, isMobile]);
+
   // Calculate dynamic missed days starting ONLY from registration date up to yesterday
   const missedDaysCount = useMemo(() => {
     let count = 0;
@@ -431,7 +452,7 @@ export default function Rewards() {
       }
     }, 450); // slight buffer to let layout stabilize
     return () => clearTimeout(timer);
-  }, [daysList, hasClaimedToday, todayStr]);
+  }, [visibleDays, hasClaimedToday, todayStr]);
 
   // Daily Check-In function
   const handleDailyCheckIn = async () => {
@@ -1176,7 +1197,7 @@ export default function Rewards() {
                 ref={calendarContainerRef}
                 className="flex overflow-x-auto gap-3.5 pb-4 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
               >
-                {daysList.map((item) => {
+                {visibleDays.map((item) => {
                   if (item.isClaimed) {
                     return (
                       <div 
