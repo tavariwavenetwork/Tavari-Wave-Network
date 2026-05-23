@@ -38,7 +38,9 @@ import {
   UserCircle,
   ArrowLeft,
   Copy,
-  X
+  X,
+  Menu,
+  Bell
 } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
@@ -64,6 +66,35 @@ import { useNavigate } from 'react-router-dom';
 import { logAudit } from '../../lib/auth_security';
 
 // --- COMPONENTS ---
+
+const AdminNotificationItem = ({ email, username, date, type }: { email: string, username?: string, date: string, type: 'user' | 'newsletter', key?: any }) => {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border border-white/5 bg-white/[0.02] hover:bg-white/[0.04] rounded-2xl transition-all">
+      <div className="flex items-start sm:items-center gap-3">
+        <div className={`p-2.5 rounded-xl ${type === 'user' ? 'bg-[#9333ea]/20 text-[#a855f7]' : 'bg-[#10b981]/20 text-[#34d399]'} shrink-0`}>
+          {type === 'user' ? <Users size={16} /> : <Mail size={16} />}
+        </div>
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-black uppercase tracking-widest text-[#ffffff60]">
+              {type === 'user' ? 'New User Registered' : 'New Newsletter Subscription'}
+            </span>
+            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${type === 'user' ? 'bg-[#9333ea]/20 text-[#a855f7]' : 'bg-[#10b981]/20 text-[#34d399]'}`}>
+              Alert
+            </span>
+          </div>
+          <p className="text-sm font-bold text-white tracking-tight mt-1">
+            {email} {username ? <span className="text-[#ffffff40] text-xs font-normal">(@{username})</span> : ''}
+          </p>
+        </div>
+      </div>
+      <div className="text-left sm:text-right">
+        <p className="text-[9px] font-black text-aura-muted uppercase tracking-widest">Received</p>
+        <p className="text-xs text-[#ffffff70] font-mono mt-0.5">{date}</p>
+      </div>
+    </div>
+  );
+};
 
 function SidebarItem({ icon, label, active, onClick, badge }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, badge?: number }) {
   return (
@@ -118,7 +149,10 @@ function StatCard({ label, value, icon: Icon, color, onClick }: { label: string,
 export default function CipherAdmin() {
   const { user, profile, logout, plans } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'csettings' | 'csecurity' | 'cplans' | 'ckycs' | 'cnotifications' | 'cui_editor' | 'cnewsletter'>('canalytics');
+  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings'>('canalytics');
+  const [isMobileAdminMenuOpen, setIsMobileAdminMenuOpen] = useState(false);
+  const [initialUsersCount, setInitialUsersCount] = useState<number | null>(null);
+  const [initialSubscribersCount, setInitialSubscribersCount] = useState<number | null>(null);
   const [investFilter, setInvestFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [depositFilter, setDepositFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -208,6 +242,80 @@ export default function CipherAdmin() {
   const [notifSearchTerm, setNotifSearchTerm] = useState('');
   const [notifUserFilter, setNotifUserFilter] = useState<'all' | 'inactive' | 'inactive_investors'>('all');
   const [isSendingNotif, setIsSendingNotif] = useState(false);
+
+  const recentUserNotifications = useMemo(() => {
+    return [...users]
+      .filter(u => u.created_at || u.joined_at)
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at || a.joined_at || 0).getTime();
+        const dateB = new Date(b.created_at || b.joined_at || 0).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 5)
+      .map(u => ({
+        id: u.id || u.uid,
+        email: u.email || 'no-email@tavari.network',
+        username: u.username || u.name?.toLowerCase().replace(/\s+/g, '_') || 'user',
+        date: u.created_at ? new Date(u.created_at).toLocaleString() : 'Recent',
+        type: 'user' as const
+      }));
+  }, [users]);
+
+  const recentNewsletterNotifications = useMemo(() => {
+    return [...subscribers]
+      .filter(s => s.created_at)
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at.seconds ? a.created_at.seconds * 1000 : a.created_at).getTime();
+        const dateB = new Date(b.created_at.seconds ? b.created_at.seconds * 1000 : b.created_at).getTime();
+        return dateB - dateA;
+      })
+      .slice(0, 5)
+      .map(s => {
+        const dateObj = s.created_at ? new Date(s.created_at.seconds ? s.created_at.seconds * 1000 : s.created_at) : new Date();
+        return {
+          id: s.id,
+          email: s.email,
+          date: dateObj.toLocaleString(),
+          type: 'newsletter' as const
+        };
+      });
+  }, [subscribers]);
+
+  useEffect(() => {
+    if (users.length > 0) {
+      if (initialUsersCount === null) {
+        setInitialUsersCount(users.length);
+      } else if (users.length > initialUsersCount) {
+        const sorted = [...users].sort((a, b) => {
+          const dateA = new Date(a.created_at || a.joined_at || 0).getTime();
+          const dateB = new Date(b.created_at || b.joined_at || 0).getTime();
+          return dateB - dateA;
+        });
+        const newest = sorted[0];
+        if (newest) {
+          toast.success(`System Alert: New User Registered - ${newest.email || newest.name}`, { duration: 8000 });
+        }
+        setInitialUsersCount(users.length);
+      }
+    }
+  }, [users, initialUsersCount]);
+
+  useEffect(() => {
+    if (subscribers.length > 0) {
+      if (initialSubscribersCount === null) {
+        setInitialSubscribersCount(subscribers.length);
+      } else if (subscribers.length > initialSubscribersCount) {
+        const newest = subscribers[0];
+        if (newest) {
+          toast.message(`Marketing Alert: New Newsletter Subscription`, {
+            description: newest.email,
+            duration: 8000
+          });
+        }
+        setInitialSubscribersCount(subscribers.length);
+      }
+    }
+  }, [subscribers, initialSubscribersCount]);
 
   const pendingDepositsUnseenCount = useMemo(() => {
     return deposits.filter((dep: any) => dep.status === 'pending' && !seenDepositIds.includes(dep.id)).length;
@@ -741,7 +849,251 @@ export default function CipherAdmin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050608] text-white flex">
+    <div className="min-h-screen bg-[#050608] text-white flex flex-col lg:flex-row relative">
+      {/* Mobile Top Header */}
+      <header className="fixed top-0 inset-x-0 h-16 bg-[#050608]/90 backdrop-blur-md border-b border-white/5 z-[100] flex items-center justify-between px-6 lg:hidden">
+        <div className="flex items-center gap-3">
+          <img src="https://i.imgur.com/wU33xy3.png" alt="Cipher Terminal Logo" className="w-8 h-8 object-contain" />
+          <span className="text-[10px] font-black uppercase tracking-widest text-[#ffffff80]">CIPHER MOBILE</span>
+        </div>
+        <button
+          onClick={() => setIsMobileAdminMenuOpen(!isMobileAdminMenuOpen)}
+          className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-colors"
+        >
+          {isMobileAdminMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+      </header>
+
+      {/* Mobile Menu Dropdown Overlay */}
+      <AnimatePresence>
+        {isMobileAdminMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-x-0 top-16 bottom-0 bg-[#050608]/95 backdrop-blur-xl z-[90] lg:hidden overflow-y-auto border-t border-white/5"
+          >
+            <div className="p-6 space-y-3 pb-24">
+              <p className="text-[8px] font-black uppercase tracking-[0.3em] text-aura-muted mb-4 pl-2">CIPHER SECTION MAPPING</p>
+              
+              <div className="space-y-1">
+                <button
+                  onClick={() => { handleTabChange('canalytics'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'canalytics' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <BarChart3 size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Analytics</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cdeposits'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cdeposits' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <CreditCard size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Deposits</span>
+                  </div>
+                  {pendingDepositsUnseenCount > 0 && (
+                    <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black">
+                      {pendingDepositsUnseenCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cwithdrawals'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cwithdrawals' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <ArrowDownLeft size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Withdrawals</span>
+                  </div>
+                  {pendingWithdrawalsUnseenCount > 0 && (
+                    <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black">
+                      {pendingWithdrawalsUnseenCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cinvestments'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cinvestments' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Zap size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Investments</span>
+                  </div>
+                  {pendingInvestmentsUnseenCount > 0 && (
+                    <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black">
+                      {pendingInvestmentsUnseenCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cuser'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cuser' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Users size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Users</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cinactiveusers'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cinactiveusers' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <UserMinus size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Inactive</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('ckycs'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'ckycs' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <IdCard size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">KYC Control</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('csecurity'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'csecurity' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <ShieldCheck size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Security</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cplans'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cplans' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <TrendingUp size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">ROI Plans</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cui_editor'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cui_editor' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Play size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">UI Studio</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cnewsletter'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cnewsletter' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Newsletter</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('cnotifications'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cnotifications' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Notifications</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('ctransactions'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'ctransactions' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <History size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Transactions</span>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => { handleTabChange('csettings'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'csettings' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Settings size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Settings</span>
+                  </div>
+                </button>
+              </div>
+
+              <div className="pt-6 border-t border-white/5">
+                <button
+                  onClick={async () => {
+                    setIsMobileAdminMenuOpen(false);
+                    await logout();
+                    navigate('/welcome');
+                  }}
+                  className="flex items-center gap-3 w-full p-4 rounded-xl text-red-400 hover:bg-red-400/10 transition-all font-bold"
+                >
+                  <LogOut size={18} />
+                  <span className="text-[10px] uppercase tracking-widest">Logout</span>
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <aside className="w-64 border-r border-white/5 flex flex-col p-6 hidden lg:flex">
         <div className="flex items-center gap-3 mb-12">
@@ -778,7 +1130,7 @@ export default function CipherAdmin() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 lg:p-12 overflow-y-auto max-h-screen">
+      <main className="flex-1 p-6 lg:p-12 pt-24 lg:pt-12 overflow-y-auto max-h-screen">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <h1 className="text-4xl lg:text-6xl font-black tracking-[-0.05em] leading-[0.85] text-white font-serif italic mb-2 capitalize">
@@ -1284,6 +1636,26 @@ export default function CipherAdmin() {
 
         {(activeTab === 'cuser' || activeTab === 'cinactiveusers') && (
           <div className="space-y-8">
+            {activeTab === 'cuser' && !isDetailView && recentUserNotifications.length > 0 && (
+              <div className="p-6 bg-white/[0.01] border border-[#9333ea]/20 rounded-[32px] space-y-4">
+                <div className="flex items-center gap-2">
+                  <Bell size={16} className="text-[#a855f7]" />
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-white">System Alerts: New Registrations</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {recentUserNotifications.map(notif => (
+                    <AdminNotificationItem
+                      key={notif.id}
+                      email={notif.email}
+                      username={notif.username}
+                      date={notif.date}
+                      type="user"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             {!isDetailView ? (
               <div className="space-y-6">
                 <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -2216,6 +2588,25 @@ export default function CipherAdmin() {
 
         {activeTab === 'cnewsletter' && (
           <div className="space-y-12">
+            {recentNewsletterNotifications.length > 0 && (
+              <div className="p-6 bg-white/[0.01] border border-[#10b981]/20 rounded-[32px] space-y-4 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  <Bell size={16} className="text-[#34d399]" />
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-white">System Alerts: New Newsletter Subscriptions</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-3">
+                  {recentNewsletterNotifications.map(notif => (
+                    <AdminNotificationItem
+                      key={notif.id}
+                      email={notif.email}
+                      date={notif.date}
+                      type="newsletter"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

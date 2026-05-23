@@ -16,7 +16,8 @@ import {
   getDocs,
   updateDoc,
   increment,
-  serverTimestamp 
+  serverTimestamp,
+  addDoc 
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
 import { 
@@ -33,6 +34,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { 
   X, 
+  Menu,
   Mail, 
   Lock, 
   User, 
@@ -71,11 +73,144 @@ const generatePublicId = () => {
   return Math.floor(10000000 + Math.random() * 90000000).toString();
 };
 
+const Realistic3DIcon = ({ type }: { type: 'user' | 'plan' | 'fund' | 'node' }) => {
+  if (type === 'user') {
+    return (
+      <div className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_10px_20px_rgba(124,58,237,0.35)] hover:rotate-6 transition-all duration-500">
+        {/* 3D Gold & Glass Shield */}
+        <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="gold3d-grad1" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#F59E0B" />
+              <stop offset="30%" stopColor="#FBBF24" />
+              <stop offset="70%" stopColor="#D97706" />
+              <stop offset="100%" stopColor="#78350F" />
+            </linearGradient>
+            <linearGradient id="purple3d-grad2" x1="10" y1="90" x2="90" y2="10" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#6D28D9" />
+              <stop offset="50%" stopColor="#8B5CF6" />
+              <stop offset="100%" stopColor="#DDD6FE" />
+            </linearGradient>
+            <radialGradient id="specular-light" cx="30" cy="30" r="30" fx="30" fy="30" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <ellipse cx="50" cy="88" rx="35" ry="8" fill="#000000" fillOpacity="0.4" />
+          <circle cx="50" cy="46" r="34" stroke="url(#purple3d-grad2)" strokeWidth="6" strokeLinecap="round" opacity="0.8" />
+          <circle cx="50" cy="32" r="16" fill="url(#gold3d-grad1)" />
+          <circle cx="45" cy="27" r="16" fill="url(#specular-light)" />
+          <path d="M22 68 C22 56, 32 48, 50 48 C68 48, 78 56, 78 68 L74 74 L26 74 Z" fill="url(#gold3d-grad1)" />
+          <path d="M22 68 C22 56, 32 48, 50 48 C68 48, 78 56, 78 68 L74 74 L26 74 Z" fill="url(#specular-light)" opacity="0.4" />
+          <path d="M15 46 L50 15 L85 46 L50 82 Z" fill="#FFFFFF" fillOpacity="0.1" stroke="#FFFFFF" strokeWidth="1.5" strokeOpacity="0.25" style={{ backdropFilter: 'blur(4px)' }} />
+          <path d="M15 46 L50 15 L50 82 Z" fill="#FFFFFF" fillOpacity="0.08" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (type === 'plan') {
+    return (
+      <div className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_10px_20px_rgba(14,165,233,0.35)] hover:-rotate-6 transition-all duration-500">
+        {/* 3D Cyan & Emerald Glass Ledger Stack */}
+        <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="cyan3d-grad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#0EA5E9" />
+              <stop offset="50%" stopColor="#0284C7" />
+              <stop offset="100%" stopColor="#0369A1" />
+            </linearGradient>
+            <linearGradient id="emerald3d-grad" x1="100" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#10B981" />
+              <stop offset="100%" stopColor="#047857" />
+            </linearGradient>
+            <linearGradient id="glass-reflection" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.6" />
+              <stop offset="40%" stopColor="#FFFFFF" stopOpacity="0.1" />
+              <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          <ellipse cx="50" cy="88" rx="38" ry="7" fill="#000000" fillOpacity="0.5" />
+          <path d="M20 62 L50 74 L80 62 L50 50 Z" fill="url(#emerald3d-grad)" />
+          <path d="M20 62 L50 74 L50 80 L20 68 Z" fill="#047857" />
+          <path d="M50 74 L80 62 L80 68 L50 80 Z" fill="#065F46" />
+          <line x1="50" y1="36" x2="50" y2="60" stroke="#0E1E2F" strokeWidth="5" />
+          <line x1="50" y1="36" x2="50" y2="60" stroke="#0EA5E9" strokeWidth="2" strokeDasharray="2 2" className="animate-pulse" />
+          <path d="M22 34 L50 16 L78 34 L50 52 Z" fill="url(#cyan3d-grad)" fillOpacity="0.85" />
+          <path d="M22 34 L50 16 L50 52 Z" fill="url(#glass-reflection)" fillOpacity="0.4" />
+          <ellipse cx="50" cy="34" rx="42" ry="12" stroke="#10B981" strokeWidth="2" strokeDasharray="6 12" />
+        </svg>
+      </div>
+    );
+  }
+
+  if (type === 'fund') {
+    return (
+      <div className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_10px_20px_rgba(245,158,11,0.35)] hover:scale-110 transition-all duration-500">
+        {/* 3D Glossy Gold Coin Chest / Vault Node */}
+        <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="gold-bright" x1="0" y1="0" x2="80" y2="80" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#FBBF24" />
+              <stop offset="50%" stopColor="#F59E0B" />
+              <stop offset="100%" stopColor="#B45309" />
+            </linearGradient>
+            <linearGradient id="gold-dark" x1="0" y1="100" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#78350F" />
+              <stop offset="100%" stopColor="#D97706" />
+            </linearGradient>
+          </defs>
+          <ellipse cx="50" cy="88" rx="36" ry="8" fill="#000000" fillOpacity="0.5" />
+          <path d="M22 64 C22 58, 42 58, 42 64 L42 76 C42 82, 22 82, 22 76 Z" fill="url(#gold-dark)" />
+          <ellipse cx="32" cy="64" rx="10" ry="4" fill="url(#gold-bright)" />
+          <path d="M58 58 C58 52, 78 52, 78 58 L78 70 C78 76, 58 76, 58 70 Z" fill="url(#gold-dark)" />
+          <ellipse cx="68" cy="58" rx="10" ry="4" fill="url(#gold-bright)" />
+          <circle cx="50" cy="46" r="22" fill="url(#gold-bright)" />
+          <circle cx="50" cy="46" r="14" fill="#111827" stroke="#F59E0B" strokeWidth="2" />
+          <circle cx="50" cy="46" r="6" fill="url(#gold-dark)" />
+          <path d="M50 36 L50 56 M40 46 L60 46" stroke="url(#gold-bright)" strokeWidth="2.5" strokeLinecap="round" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_10px_20px_rgba(168,85,247,0.35)] hover:rotate-12 transition-all duration-500">
+      {/* 3D Core Fusion Node */}
+      <svg className="w-16 h-16" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="purple-core" x1="10" y1="10" x2="90" y2="90" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#C084FC" />
+            <stop offset="50%" stopColor="#A855F7" />
+            <stop offset="100%" stopColor="#6B21A8" />
+          </linearGradient>
+          <linearGradient id="neon-glow" x1="0" y1="90" x2="100" y2="10" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#EC4899" />
+            <stop offset="100%" stopColor="#3B82F6" />
+          </linearGradient>
+        </defs>
+        <ellipse cx="50" cy="88" rx="40" ry="8" fill="#000000" fillOpacity="0.5" />
+        <ellipse cx="50" cy="46" rx="42" ry="18" stroke="url(#neon-glow)" strokeWidth="3" opacity="0.6" strokeDasharray="30 15" transform="rotate(-15 50 46)" />
+        <ellipse cx="50" cy="46" rx="42" ry="18" stroke="url(#neon-glow)" strokeWidth="2" opacity="0.4" strokeDasharray="30 15" transform="rotate(35 50 46)" />
+        <circle cx="50" cy="46" r="20" fill="url(#purple-core)" />
+        <circle cx="43" cy="39" r="6" fill="#FFFFFF" fillOpacity="0.6" filter="blur(1px)" />
+        <circle cx="16" cy="24" r="5" fill="#A855F7" />
+        <line x1="50" y1="46" x2="16" y2="24" stroke="#A855F7" strokeWidth="2.5" opacity="0.7" />
+        <circle cx="84" cy="24" r="5" fill="#EC4899" />
+        <line x1="50" y1="46" x2="84" y2="24" stroke="#EC4899" strokeWidth="2.5" opacity="0.7" />
+        <circle cx="50" cy="80" r="5" fill="#3B82F6" />
+        <line x1="50" y1="46" x2="50" y2="80" stroke="#3B82F6" strokeWidth="2.5" opacity="0.7" />
+      </svg>
+    </div>
+  );
+};
+
 export default function LandingPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signup');
   const [loading, setLoading] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   // Hero carousel slider state
@@ -137,11 +272,48 @@ export default function LandingPage() {
         toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
         setNewsletterEmail('');
       } else {
-        toast.error(data.error || "Subscription could not be processed at this time.");
+        // Fallback to client-side direct write if permission or backend error
+        console.warn("Backend subscribe failed, trying client-side fallback...");
+        const cleanEmail = emailStr.toLowerCase().trim();
+        const existsQuery = query(collection(db, 'newsletter_subscribers'), where('email', '==', cleanEmail));
+        const querySnap = await getDocs(existsQuery);
+        
+        if (!querySnap.empty) {
+          toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
+          setNewsletterEmail('');
+          return;
+        }
+
+        await addDoc(collection(db, 'newsletter_subscribers'), {
+          email: cleanEmail,
+          created_at: serverTimestamp()
+        });
+        toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
+        setNewsletterEmail('');
       }
     } catch (err: any) {
-      console.error("Newsletter submission error:", err);
-      toast.error("Subscription could not be processed at this time.");
+      console.error("Newsletter submission error, trying fallback:", err);
+      try {
+        const cleanEmail = emailStr.toLowerCase().trim();
+        const existsQuery = query(collection(db, 'newsletter_subscribers'), where('email', '==', cleanEmail));
+        const querySnap = await getDocs(existsQuery);
+        
+        if (!querySnap.empty) {
+          toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
+          setNewsletterEmail('');
+          return;
+        }
+
+        await addDoc(collection(db, 'newsletter_subscribers'), {
+          email: cleanEmail,
+          created_at: serverTimestamp()
+        });
+        toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
+        setNewsletterEmail('');
+      } catch (fallbackErr) {
+        console.error("Fallback failed as well:", fallbackErr);
+        toast.error("Subscription could not be processed at this time.");
+      }
     } finally {
       setNewsletterLoading(false);
     }
@@ -632,7 +804,7 @@ export default function LandingPage() {
 
       {/* Welcome Landing Full Width Header Photo */}
       <div 
-        className="w-full relative z-[101] overflow-hidden border-b border-white/10 bg-[#050608]"
+        className="w-full relative z-[101] overflow-hidden border-b border-white/10 bg-[#050608] mt-20 lg:mt-24"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -665,7 +837,7 @@ export default function LandingPage() {
         <div className="absolute bottom-[-5%] right-[-5%] w-[50%] h-[50%] bg-secondary/10 blur-[100px] rounded-full" />
       </div>
 
-      {/* Nav */}
+       {/* Nav */}
       <nav className={cn(
         "fixed top-0 inset-x-0 z-[120] transition-all duration-500 flex items-center justify-between px-6 lg:px-20 backdrop-blur-md border-b",
         isScrolled 
@@ -681,13 +853,15 @@ export default function LandingPage() {
 
         {/* Center Nav Items */}
         <div className="hidden lg:flex items-center gap-8">
-           {['About Us', 'How It Works', 'Reviews', 'Blog', 'Contact'].map(item => (
+           {['About Us', 'How It Works', 'Reviews', 'Blog', 'Help'].map(item => (
              <button 
                key={item} 
                onClick={() => {
                  if (item === 'Reviews') navigate('/reviews');
                  if (item === 'About Us') navigate('/about');
                  if (item === 'How It Works') navigate('/how-it-works');
+                 if (item === 'Blog') navigate('/blog');
+                 if (item === 'Help') navigate('/help');
                }}
                className="text-[10px] font-bold uppercase tracking-widest text-white/60 hover:text-primary transition-colors"
              >
@@ -711,8 +885,72 @@ export default function LandingPage() {
               Get Started
             </button>
           )}
+          {/* Mobile navigation toggle */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="lg:hidden p-2 text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+            aria-label="Toggle menu"
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
         </div>
       </nav>
+
+      {/* Mobile Menu Dropdown */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            className="fixed top-14 lg:hidden inset-x-0 z-[110] bg-[#050608]/95 backdrop-blur-xl border-b border-white/5 shadow-2xl overflow-hidden"
+          >
+            <div className="flex flex-col p-6 gap-4">
+              {['About Us', 'How It Works', 'Reviews', 'Blog', 'Help'].map((item) => (
+                <button
+                  key={item}
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    if (item === 'About Us') navigate('/about');
+                    if (item === 'How It Works') navigate('/how-it-works');
+                    if (item === 'Reviews') navigate('/reviews');
+                    if (item === 'Blog') navigate('/blog');
+                    if (item === 'Help') navigate('/help');
+                  }}
+                  className="w-full text-left py-3 px-4 rounded-xl hover:bg-white/5 text-[11px] font-bold uppercase tracking-widest text-white/75 hover:text-primary transition-all flex items-center justify-between"
+                >
+                  <span>{item}</span>
+                  <ArrowRight size={12} className="text-primary" />
+                </button>
+              ))}
+              <div className="h-[1px] bg-white/5 my-2" />
+              <div className="flex gap-4">
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setIsModalOpen(true);
+                    setAuthMode('signin');
+                  }}
+                  className="flex-1 h-12 rounded-xl border border-white/10 hover:border-primary/50 text-[10px] font-bold uppercase tracking-widest text-white transition-all hover:bg-white/5"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    setIsModalOpen(true);
+                    setAuthMode('signup');
+                  }}
+                  className="flex-1 h-12 rounded-xl bg-primary hover:bg-primary/95 text-[10px] font-black uppercase tracking-widest text-white transition-all shadow-md"
+                >
+                  Get Started
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hero */}
       <main className="relative z-10 flex flex-col items-center justify-center text-center px-6 pt-20 lg:pt-32 pb-40">
@@ -768,10 +1006,10 @@ export default function LandingPage() {
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
             
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(124,58,237,0.25)] transition-all duration-500">
-              <User size={28} />
+            <div className="relative z-10 p-2 rounded-2xl bg-transparent text-primary group-hover:scale-110 group-hover:shadow-[0_0_25px_rgba(124,58,237,0.3)] transition-all duration-500">
+              <Realistic3DIcon type="user" />
             </div>
-            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
               Create Account
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
@@ -786,10 +1024,10 @@ export default function LandingPage() {
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-secondary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
             <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
 
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-secondary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(14,165,233,0.25)] transition-all duration-500">
-              <Compass size={28} />
+            <div className="relative z-10 p-2 rounded-2xl bg-transparent text-secondary group-hover:scale-110 group-hover:shadow-[0_0_25px_rgba(14,165,233,0.3)] transition-all duration-500">
+              <Realistic3DIcon type="plan" />
             </div>
-            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
               Choose a Plan
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
@@ -804,10 +1042,10 @@ export default function LandingPage() {
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
 
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(124,58,237,0.25)] transition-all duration-500">
-              <Shield size={28} />
+            <div className="relative z-10 p-2 rounded-2xl bg-transparent text-primary group-hover:scale-110 group-hover:shadow-[0_0_25px_rgba(124,58,237,0.3)] transition-all duration-500">
+              <Realistic3DIcon type="fund" />
             </div>
-            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
               Fund & Start
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
@@ -822,10 +1060,10 @@ export default function LandingPage() {
             <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-secondary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
             <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
 
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-secondary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(14,165,233,0.25)] transition-all duration-500">
-              <Zap size={28} />
+            <div className="relative z-10 p-2 rounded-2xl bg-transparent text-secondary group-hover:scale-110 group-hover:shadow-[0_0_25px_rgba(14,165,233,0.3)] transition-all duration-500">
+              <Realistic3DIcon type="node" />
             </div>
-            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans mt-2">
               Activate Your Nodes
             </h4>
             <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">

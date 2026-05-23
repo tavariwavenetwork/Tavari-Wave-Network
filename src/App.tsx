@@ -17,6 +17,7 @@ import Referrals from './components/Referrals';
 import Rewards from './components/Rewards';
 import CipherAdmin from './components/Admin/CipherAdmin';
 import LandingPage from './components/LandingPage';
+import Blog from './components/Blog';
 import TermsOfService from './components/TermsOfService';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import TopInvestorsPage from './components/TopInvestorsPage';
@@ -171,6 +172,10 @@ export default function App() {
               <Toaster position="top-right" theme="dark" closeButton richColors />
               <Routes>
               <Route path="/welcome" element={<LandingPage />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/how-it-works" element={<HowItWorks />} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/help" element={<Support />} />
               <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/top-investors" element={<TopInvestorsPage />} />
               <Route path="/token" element={<TWNTokenPortal />} />
