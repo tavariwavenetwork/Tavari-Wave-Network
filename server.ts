@@ -9,6 +9,9 @@ import { query } from "./src/lib/db.js";
 import { hashPassword, comparePassword, generateToken, verifyToken, AuthUser } from "./src/lib/auth_utils.js";
 import { ROIEngine } from "./src/services/roiService.js";
 import { GoogleGenAI } from "@google/genai";
+import admin from "firebase-admin";
+import { getFirestore as getAdminFirestore } from "firebase-admin/firestore";
+import fs from "fs";
 
 // --- VALIDATION SCHEMAS ---
 const SignupSchema = z.object({
@@ -280,6 +283,143 @@ async function startServer() {
   setInterval(() => {
     ROIEngine.processDailyDistributions().catch(err => console.error("Auto ROI Error:", err));
   }, 24 * 60 * 60 * 1000); 
+
+  // --- FIREBASE ADMIN INITIALIZATION ---
+  const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
+  let adminApp: admin.app.App;
+  let adminDb: admin.firestore.Firestore;
+
+  try {
+    let projectId = "gen-lang-client-0341439865";
+    let databaseId = "ai-studio-339400f0-0e07-40fa-bc4e-9fd3d4481de3";
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      if (config.projectId) projectId = config.projectId;
+      if (config.firestoreDatabaseId) databaseId = config.firestoreDatabaseId;
+    }
+    
+    if (admin.apps.length === 0) {
+      adminApp = admin.initializeApp({
+        projectId: projectId
+      });
+    } else {
+      adminApp = admin.apps[0]!;
+    }
+    adminDb = getAdminFirestore(adminApp, databaseId);
+  } catch (err: any) {
+    console.error("Firebase admin init error:", err.message);
+  }
+
+  // Firebase Admin Authentication Middleware
+  const verifyFirebaseAdmin = async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      const isCipherEmail = [
+        'support@tavariwave.network',
+        'contact.cga.usa@gmail.com',
+        'tavariwavenetwork@gmail.com'
+      ].includes(decodedToken.email || '');
+
+      let isCipherRole = false;
+      if (adminDb) {
+        const userSnap = await adminDb.collection('users').doc(decodedToken.uid).get();
+        if (userSnap.exists) {
+          const userData = userSnap.data();
+          if (userData && (userData.role === 'cipher' || userData.role === 'admin' || userData.role === 'user')) {
+            if (userData.role === 'cipher' || userData.role === 'admin') {
+              isCipherRole = true;
+            }
+          }
+        }
+      }
+
+      if (decodedToken.uid === '3yV3rfcUzob5v9ltfVcMw0PL6tQ2' || isCipherEmail || isCipherRole) {
+        (req as any).firebaseUser = decodedToken;
+        next();
+      } else {
+        res.status(403).json({ error: "Forbidden: Not a Cipher admin" });
+      }
+    } catch (err) {
+      console.error("Firebase admin auth failed:", err);
+      res.status(401).json({ error: "Unauthorized / Invalid Admin token" });
+    }
+  };
+
+  // --- NEWSLETTER API ENDPOINTS ---
+  app.post("/api/newsletter/subscribe", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email || !email.trim()) {
+        return res.status(400).json({ error: "Please enter your email address." });
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Please enter a valid email address." });
+      }
+
+      if (!adminDb) {
+        throw new Error("Firestore Admin SDK is not initialized.");
+      }
+
+      const cleanEmail = email.trim().toLowerCase();
+      // Check if already exists
+      const existSnap = await adminDb.collection('newsletter_subscribers')
+        .where('email', '==', cleanEmail)
+        .limit(1)
+        .get();
+
+      if (!existSnap.empty) {
+        return res.json({ success: true, message: "Thank you! You are already subscribed to platform insights." });
+      }
+
+      await adminDb.collection('newsletter_subscribers').add({
+        email: cleanEmail,
+        created_at: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      res.json({ success: true, message: "Thank you! You are now subscribed to platform insights." });
+    } catch (err: any) {
+      console.error("Newsletter subscription error in backend:", err);
+      res.status(500).json({ error: "Subscription could not be processed at this time." });
+    }
+  });
+
+  app.get("/api/admin/newsletter-subscribers", verifyFirebaseAdmin, async (req, res) => {
+    try {
+      if (!adminDb) {
+        return res.status(500).json({ error: "Firestore Admin SDK is not initialized." });
+      }
+      const snap = await adminDb.collection('newsletter_subscribers')
+        .orderBy('created_at', 'desc')
+        .get();
+
+      const list = snap.docs.map(doc => {
+        const data = doc.data();
+        let created_at: any = null;
+        if (data.created_at) {
+          if (typeof data.created_at.toDate === 'function') {
+            created_at = data.created_at.toDate().toISOString();
+          } else if (data.created_at._seconds) {
+            created_at = new Date(data.created_at._seconds * 1000).toISOString();
+          } else {
+            created_at = data.created_at;
+          }
+        }
+        return {
+          id: doc.id,
+          email: data.email,
+          created_at
+        };
+      });
+
+      res.json(list);
+    } catch (err: any) {
+      console.error("Fetch subscribers error:", err);
+      res.status(500).json({ error: "Failed to load newsletter subscribers." });
+    }
+  });
 
   // --- GLOBAL ERROR HANDLER ---
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {

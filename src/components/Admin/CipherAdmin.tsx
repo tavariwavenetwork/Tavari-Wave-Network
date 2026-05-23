@@ -760,7 +760,7 @@ export default function CipherAdmin() {
           <SidebarItem icon={<ShieldCheck size={18} />} label="Security" active={activeTab === 'csecurity'} onClick={() => handleTabChange('csecurity')} />
           <SidebarItem icon={<TrendingUp size={18} />} label="ROI Plans" active={activeTab === 'cplans'} onClick={() => handleTabChange('cplans')} />
           <SidebarItem icon={<Play size={18} />} label="UI Studio" active={activeTab === 'cui_editor'} onClick={() => handleTabChange('cui_editor')} />
-          <SidebarItem icon={<Mail size={18} />} label="Newsletter Subscribers" active={activeTab === 'cnewsletter'} onClick={() => handleTabChange('cnewsletter')} />
+          <SidebarItem icon={<Mail size={18} />} label="Newsletter" active={activeTab === 'cnewsletter'} onClick={() => handleTabChange('cnewsletter')} />
           <SidebarItem icon={<Mail size={18} />} label="Notifications" active={activeTab === 'cnotifications'} onClick={() => handleTabChange('cnotifications')} />
           <SidebarItem icon={<History size={18} />} label="Transactions" active={activeTab === 'ctransactions'} onClick={() => handleTabChange('ctransactions')} />
           <SidebarItem icon={<Settings size={18} />} label="Settings" active={activeTab === 'csettings'} onClick={() => handleTabChange('csettings')} />
@@ -2219,7 +2219,7 @@ export default function CipherAdmin() {
             <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-xl font-bold uppercase tracking-tight italic font-serif">Newsletter Subscribers</h3>
+                  <h3 className="text-xl font-bold uppercase tracking-tight italic font-serif">Newsletter Dashboard</h3>
                   <p className="text-[10px] font-black text-aura-muted uppercase tracking-[0.3em] mt-1">
                     Showing {subscribers.length} total subscribers registered to the network
                   </p>
@@ -2231,29 +2231,56 @@ export default function CipherAdmin() {
                   <thead>
                     <tr className="border-b border-white/5">
                       <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Email Address</th>
-                      <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Subscription Z-Time</th>
+                      <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Subscription Date</th>
+                      <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Subscription Time</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.02]">
                     {subscribers.length === 0 ? (
                       <tr>
-                        <td colSpan={2} className="px-6 py-12 text-center text-aura-muted text-[10px] font-bold uppercase tracking-widest">
+                        <td colSpan={3} className="px-6 py-12 text-center text-aura-muted text-[10px] font-bold uppercase tracking-widest">
                           No newsletter subscribers loaded on this node
                         </td>
                       </tr>
                     ) : (
-                      subscribers.map((sub, index) => (
-                        <tr key={sub.id || index} className="group hover:bg-white/[0.01]">
-                          <td className="px-6 py-4">
-                            <p className="text-sm font-bold text-white font-sans">{sub.email}</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <p className="text-[10px] text-aura-muted font-bold font-mono uppercase italic">
-                              {sub.created_at ? new Date(sub.created_at.seconds ? sub.created_at.seconds * 1000 : sub.created_at).toLocaleString() : 'just now'}
-                            </p>
-                          </td>
-                        </tr>
-                      ))
+                      subscribers.map((sub, index) => {
+                        const dateObj = sub.created_at ? new Date(sub.created_at.seconds ? sub.created_at.seconds * 1000 : sub.created_at) : new Date();
+                        const subDate = dateObj.toLocaleDateString([], { year: 'numeric', month: 'short', day: 'numeric' });
+                        const subTime = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+                        return (
+                          <tr key={sub.id || index} className="group hover:bg-white/[0.01]">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm font-bold text-white font-sans">{sub.email}</span>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await navigator.clipboard.writeText(sub.email);
+                                      toast.success(`Copied: ${sub.email}`);
+                                    } catch (err) {
+                                      toast.error("Failed to copy email.");
+                                    }
+                                  }}
+                                  className="p-1.5 px-3 rounded-lg bg-white/[0.05] border border-white/10 text-[10px] text-aura-muted hover:text-white hover:bg-primary/20 hover:border-primary/40 flex items-center gap-1.5 transition-all shadow-sm"
+                                  title="Copy subscriber email"
+                                >
+                                  <Copy size={11} />
+                                  <span>Copy</span>
+                                </button>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm text-white/95 font-sans">{subDate}</p>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <p className="text-[10px] text-aura-muted font-bold font-mono uppercase italic">
+                                {subTime}
+                              </p>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

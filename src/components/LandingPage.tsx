@@ -110,25 +110,35 @@ export default function LandingPage() {
 
   const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newsletterEmail.trim()) {
+    const emailStr = newsletterEmail.trim();
+    if (!emailStr) {
       toast.error("Please enter your email address.");
       return;
     }
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newsletterEmail)) {
+    if (!emailRegex.test(emailStr)) {
       toast.error("Please enter a valid email address.");
       return;
     }
 
     setNewsletterLoading(true);
     try {
-      await setDoc(doc(collection(db, 'newsletter_subscribers')), {
-        email: newsletterEmail.trim().toLowerCase(),
-        created_at: new Date()
+      const response = await fetch('/api/newsletter/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: emailStr })
       });
-      toast.success("Thank you! You are now subscribed to platform insights.");
-      setNewsletterEmail('');
+
+      const data = await response.json();
+      if (response.ok && data.success) {
+        toast.success("Thank you for subscribing to our newsletter. Stay tuned for more updates in your email.");
+        setNewsletterEmail('');
+      } else {
+        toast.error(data.error || "Subscription could not be processed at this time.");
+      }
     } catch (err: any) {
       console.error("Newsletter submission error:", err);
       toast.error("Subscription could not be processed at this time.");
@@ -615,36 +625,38 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-[#050608] text-white selection:bg-primary selection:text-white overflow-hidden relative">
+      {/* Premium Visual Enhancements: Ambient Glow Blobs */}
+      <div className="absolute top-[20%] left-[-15%] w-[450px] h-[450px] rounded-full bg-primary/10 blur-[130px] pointer-events-none z-0" />
+      <div className="absolute top-[55%] right-[-15%] w-[500px] h-[500px] rounded-full bg-secondary/8 blur-[150px] pointer-events-none z-0" />
+      <div className="absolute bottom-[5%] left-[15%] w-[400px] h-[400px] rounded-full bg-accent/5 blur-[120px] pointer-events-none z-0" />
+
       {/* Welcome Landing Full Width Header Photo */}
       <div 
-        className="w-full relative z-[101] overflow-hidden border-b border-white/5"
+        className="w-full relative z-[101] overflow-hidden border-b border-white/10 bg-[#050608]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
-        {/* Invisible spacer matching the aspect ratio of the first slide to dynamically reserve height */}
-        <img 
-          src={carouselImages[0]} 
-          alt="Spacer" 
-          className="w-full h-auto block select-none pointer-events-none opacity-0"
-          referrerPolicy="no-referrer"
-        />
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#050608]/70 via-[#050608]/20 to-transparent z-25 pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#050608] to-transparent z-25 pointer-events-none" />
         
-        {carouselImages.map((src, index) => (
-          <div
-            key={src}
-            className={cn(
-              "absolute inset-0 transition-opacity duration-1000 ease-in-out",
-              currentSlide === index ? "opacity-100 z-10" : "opacity-0 z-0"
-            )}
-          >
-            <img 
-              src={src} 
-              alt={`Welcome Header Slide ${index + 1}`} 
-              className="w-full h-full object-cover block select-none"
-              referrerPolicy="no-referrer"
-            />
-          </div>
-        ))}
+        <div className="relative w-full aspect-[21/9] sm:aspect-[2.39/1] min-h-[160px] sm:min-h-[280px] lg:min-h-[380px] overflow-hidden">
+          {carouselImages.map((src, index) => (
+            <div
+              key={src}
+              className={cn(
+                "absolute inset-0 transition-all duration-1000 ease-in-out",
+                currentSlide === index ? "opacity-100 scale-100 z-10" : "opacity-0 scale-105 z-0"
+              )}
+            >
+              <img 
+                src={src} 
+                alt={`Welcome Header Slide ${index + 1}`} 
+                className="w-full h-full object-cover object-top block select-none"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Background Decor */}
@@ -713,18 +725,18 @@ export default function LandingPage() {
           <p className="max-w-xl mx-auto text-aura-muted text-sm lg:text-lg leading-relaxed font-medium uppercase tracking-[0.05em]">
             <EditableText configKey="heroSubtitle" defaultText="Precision trading and high-yield asset orchestration for the modern institutional grade investor." />
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
+          <div className="flex flex-row items-center justify-center gap-4 pt-8 w-full max-w-md mx-auto">
             <button 
               onClick={() => { setIsModalOpen(true); setAuthMode('signup'); }}
-              className="px-10 py-5 bg-gradient-to-r from-primary to-secondary text-white font-black uppercase tracking-widest text-xs rounded-xl shadow-[0_0_25px_rgba(124,58,237,0.3)] hover:shadow-[0_0_35px_rgba(124,58,237,0.5)] hover:scale-[1.02] transition-all flex items-center gap-2"
+              className="flex-1 h-14 bg-gradient-to-r from-primary to-secondary text-white font-black uppercase tracking-widest text-[10px] sm:text-xs rounded-2xl shadow-[0_4px_25px_rgba(124,58,237,0.35)] hover:shadow-[0_4px_35px_rgba(124,58,237,0.5)] hover:-translate-y-0.5 active:translate-y-0 active:scale-95 transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              Get Started <ArrowRight size={16} />
+              Get Started <ArrowRight size={14} className="shrink-0" />
             </button>
             <button 
-              onClick={() => { setIsModalOpen(true); setAuthMode('signup'); }}
-              className="px-10 py-5 bg-white/5 border border-white/10 text-white font-bold uppercase tracking-widest text-xs rounded-xl hover:bg-white/10 hover:border-white/20 transition-all hover:scale-[1.02]"
+              onClick={() => { setIsModalOpen(true); setAuthMode('signin'); }}
+              className="flex-1 h-14 bg-[#050608]/50 hover:bg-[#050608]/80 border border-[#ffffff15] hover:border-secondary/40 text-white font-black uppercase tracking-widest text-[10px] sm:text-xs rounded-2xl shadow-lg hover:-translate-y-0.5 hover:shadow-[0_4px_20px_rgba(14,165,233,0.15)] active:translate-y-0 active:scale-95 transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              Sign Up
+              Sign In
             </button>
           </div>
         </motion.div>
@@ -732,63 +744,91 @@ export default function LandingPage() {
 
       {/* Start Guide Section */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24 text-center">
-        <h2 className="text-3xl lg:text-5xl font-black uppercase italic tracking-tight font-serif mb-12 max-w-4xl mx-auto leading-tight">
-          Simple Steps to Start Your Journey to Financial Freedom
-        </h2>
+        {/* Premium Header Typography Redesign */}
+        <div className="relative inline-block mb-12 max-w-3xl mx-auto text-center">
+          <div className="absolute -inset-4 blur-xl bg-gradient-to-r from-primary/15 to-secondary/15 opacity-70 pointer-events-none rounded-full" />
+          <div className="relative flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <span className="h-[1px] w-8 bg-gradient-to-r from-transparent to-primary/50" />
+              <span className="h-1.5 w-1.5 rounded-full bg-primary/70 animate-pulse" />
+              <span className="h-[1px] w-8 bg-gradient-to-l from-transparent to-primary/50" />
+            </div>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-sans font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-100 uppercase select-none leading-snug">
+              Simple Steps to Start Your Journey to Financial Freedom
+            </h2>
+            <div className="h-[2px] w-20 bg-gradient-to-r from-transparent via-primary/50 to-transparent mt-1.5" />
+          </div>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Card 1 */}
-          <div className="group relative p-8 rounded-3xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-primary/30 transition-all duration-500 flex flex-col items-center justify-center text-center space-y-4 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.02] border border-white/5 text-primary group-hover:scale-110 transition-transform duration-500">
+          <div className="group relative p-8 rounded-3xl bg-white/[0.02] backdrop-blur-xl border border-white/10 hover:border-primary/30 shadow-[0_8px_32px_rgba(0,0,0,0.37)] hover:-translate-y-2 lg:hover:-translate-y-2 duration-500 transition-all flex flex-col items-center justify-center text-center space-y-4 overflow-hidden">
+            {/* Elegant corner gradient accents */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-bl-3xl" />
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
+            
+            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(124,58,237,0.25)] transition-all duration-500">
               <User size={28} />
             </div>
-            <h4 className="relative z-10 text-xl font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
               Create Account
             </h4>
-            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[11px]">
+            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
               Simple onboarding to get started
             </p>
           </div>
 
           {/* Card 2 */}
-          <div className="group relative p-8 rounded-3xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-secondary/30 transition-all duration-500 flex flex-col items-center justify-center text-center space-y-4 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.02] border border-white/5 text-secondary group-hover:scale-110 transition-transform duration-500">
+          <div className="group relative p-8 rounded-3xl bg-white/[0.02] backdrop-blur-xl border border-white/10 hover:border-secondary/30 shadow-[0_8px_32px_rgba(0,0,0,0.37)] hover:-translate-y-2 lg:hover:-translate-y-2 duration-500 transition-all flex flex-col items-center justify-center text-center space-y-4 overflow-hidden">
+            {/* Elegant corner gradient accents */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-secondary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-bl-3xl" />
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-secondary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
+
+            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-secondary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(14,165,233,0.25)] transition-all duration-500">
               <Compass size={28} />
             </div>
-            <h4 className="relative z-10 text-xl font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
               Choose a Plan
             </h4>
-            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[11px]">
+            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
               Select a suitable growth path
             </p>
           </div>
 
           {/* Card 3 */}
-          <div className="group relative p-8 rounded-3xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-primary/30 transition-all duration-500 flex flex-col items-center justify-center text-center space-y-4 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.02] border border-white/5 text-primary group-hover:scale-110 transition-transform duration-500">
+          <div className="group relative p-8 rounded-3xl bg-white/[0.02] backdrop-blur-xl border border-white/10 hover:border-primary/30 shadow-[0_8px_32px_rgba(0,0,0,0.37)] hover:-translate-y-2 lg:hover:-translate-y-2 duration-500 transition-all flex flex-col items-center justify-center text-center space-y-4 overflow-hidden">
+            {/* Elegant corner gradient accents */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-bl-3xl" />
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
+
+            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-primary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(124,58,237,0.25)] transition-all duration-500">
               <Shield size={28} />
             </div>
-            <h4 className="relative z-10 text-xl font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
               Fund & Start
             </h4>
-            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[11px]">
+            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
               Add funds and activate your journey
             </p>
           </div>
 
           {/* Card 4 */}
-          <div className="group relative p-8 rounded-3xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-secondary/30 transition-all duration-500 flex flex-col items-center justify-center text-center space-y-4 shadow-xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl" />
-            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.02] border border-white/5 text-secondary group-hover:scale-110 transition-transform duration-500">
+          <div className="group relative p-8 rounded-3xl bg-white/[0.02] backdrop-blur-xl border border-white/10 hover:border-secondary/30 shadow-[0_8px_32px_rgba(0,0,0,0.37)] hover:-translate-y-2 lg:hover:-translate-y-2 duration-500 transition-all flex flex-col items-center justify-center text-center space-y-4 overflow-hidden">
+            {/* Elegant corner gradient accents */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-secondary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-bl-3xl" />
+            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-secondary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none rounded-tr-3xl" />
+            <div className="absolute inset-0 bg-gradient-to-br from-secondary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl pointer-events-none" />
+
+            <div className="relative z-10 p-5 rounded-2xl bg-white/[0.03] backdrop-blur-md border border-white/10 text-secondary group-hover:scale-110 group-hover:shadow-[0_0_20px_rgba(14,165,233,0.25)] transition-all duration-500">
               <Zap size={28} />
             </div>
-            <h4 className="relative z-10 text-xl font-bold tracking-tight text-white uppercase font-sans">
+            <h4 className="relative z-10 text-lg font-bold tracking-tight text-white uppercase font-sans">
               Activate Your Nodes
             </h4>
-            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[11px]">
+            <p className="relative z-10 text-aura-muted leading-relaxed uppercase tracking-wider text-[10px] font-medium">
               Enable your earning system
             </p>
           </div>
@@ -797,38 +837,38 @@ export default function LandingPage() {
 
       {/* Trust & Statistics Highlight Card */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-32">
-        <div className="relative overflow-hidden rounded-[40px] border border-white/10 bg-gradient-to-br from-white/[0.02] to-white/[0.01] backdrop-blur-xl p-8 lg:p-16 shadow-2xl">
+        <div className="relative overflow-hidden rounded-[40px] border border-white/10 bg-gradient-to-br from-white/[0.04] via-white/[0.01] to-transparent backdrop-blur-2xl p-8 lg:p-16 shadow-[0_24px_64px_rgba(0,0,0,0.55)]">
           {/* Subtle brand glow effects */}
-          <div className="absolute -top-12 -left-12 w-64 h-64 bg-primary/10 blur-[80px] rounded-full pointer-events-none" />
-          <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-secondary/5 blur-[80px] rounded-full pointer-events-none" />
+          <div className="absolute -top-12 -left-12 w-64 h-64 bg-primary/10 blur-[90px] rounded-full pointer-events-none" />
+          <div className="absolute -bottom-12 -right-12 w-64 h-64 bg-secondary/8 blur-[100px] rounded-full pointer-events-none" />
           
-          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-8 divide-y md:divide-y-0 md:divide-x divide-white/5 text-center">
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-12 lg:gap-8 divide-y md:divide-y-0 md:divide-x divide-white/10 text-center">
             {/* Stat 1 */}
             <div className="space-y-3 flex flex-col justify-center items-center">
-              <span className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary italic font-serif leading-none">
+              <span className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-400 to-secondary italic font-serif leading-none filter drop-shadow-[0_4px_16px_rgba(124,58,237,0.2)]">
                 $26M+
               </span>
-              <p className="text-sm lg:text-base font-bold text-white uppercase tracking-wider text-[10px] px-4">
+              <p className="text-xs font-bold text-white uppercase tracking-wider px-4">
                 Proven payouts delivered globally
               </p>
             </div>
 
             {/* Stat 2 */}
             <div className="space-y-3 flex flex-col justify-center items-center pt-8 md:pt-0">
-              <span className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-secondary to-accent italic font-serif leading-none">
+              <span className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-secondary via-teal-400 to-accent italic font-serif leading-none filter drop-shadow-[0_4px_16px_rgba(14,165,233,0.2)]">
                 90%
               </span>
-              <p className="text-sm lg:text-base font-bold text-white uppercase tracking-wider text-[10px] px-4">
+              <p className="text-xs font-bold text-white uppercase tracking-wider px-4">
                 Users achieve up to $955K+ returns
               </p>
             </div>
 
             {/* Stat 3 */}
             <div className="space-y-3 flex flex-col justify-center items-center pt-8 md:pt-0">
-              <span className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent italic font-serif leading-none">
+              <span className="text-4xl lg:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary via-pink-400 to-accent italic font-serif leading-none filter drop-shadow-[0_4px_16px_rgba(124,58,237,0.2)]">
                 155,000+
               </span>
-              <p className="text-sm lg:text-base font-bold text-white uppercase tracking-wider text-[10px] px-4">
+              <p className="text-xs font-bold text-white uppercase tracking-wider px-4">
                 Trusted by users worldwide
               </p>
             </div>
@@ -965,12 +1005,6 @@ export default function LandingPage() {
                          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google logo" />
                          {authMode === 'signup' ? 'Sign up with Google' : 'Sign in with Google'}
                        </button>
-                       <button 
-                         className="w-full py-3.5 bg-[#1877F2] text-white rounded-xl flex items-center justify-center gap-3 font-semibold text-sm hover:bg-[#1877F2]/90 transition-all shadow-sm"
-                       >
-                         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                         {authMode === 'signup' ? 'Sign up with Facebook' : 'Sign in with Facebook'}
-                       </button>
                     </div>
 
                     <div className="relative flex items-center gap-4">
@@ -1081,9 +1115,22 @@ export default function LandingPage() {
 
       {/* Testimonials Ticker Section */}
       <section className="relative z-10 py-16 text-center overflow-hidden">
-        <h2 className="text-3xl lg:text-5xl font-black uppercase italic tracking-tight font-serif mb-4">
-          What Our Users Are Saying
-        </h2>
+        {/* Premium Header Typography Redesign */}
+        <div className="relative inline-block mb-10 max-w-3xl mx-auto text-center">
+          <div className="absolute -inset-4 blur-xl bg-gradient-to-r from-secondary/15 to-accent/15 opacity-70 pointer-events-none rounded-full" />
+          <div className="relative flex flex-col items-center gap-2">
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <span className="h-[1px] w-8 bg-gradient-to-r from-transparent to-secondary/50" />
+              <span className="h-1.5 w-1.5 rounded-full bg-secondary/70 animate-pulse" />
+              <span className="h-[1px] w-8 bg-gradient-to-l from-transparent to-secondary/50" />
+            </div>
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-sans font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-indigo-100 uppercase select-none leading-snug">
+              What Our Users Are Saying
+            </h2>
+            <div className="h-[2px] w-20 bg-gradient-to-r from-transparent via-secondary/50 to-transparent mt-1.5" />
+          </div>
+        </div>
+
         <p className="text-[10px] font-black text-aura-muted uppercase tracking-[0.3em] mb-12">
           Global consensus from verified nodes & traders worldwide.
         </p>
@@ -1106,28 +1153,34 @@ export default function LandingPage() {
             {[...REVIEWS.slice(0, 10), ...REVIEWS.slice(0, 10)].map((rev, index) => (
               <div 
                 key={`${rev.id}-${index}`} 
-                className="w-80 flex-shrink-0 p-8 rounded-3xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-primary/20 transition-all duration-300 flex flex-col justify-between text-left h-48 space-y-4"
+                className="w-80 flex-shrink-0 p-8 rounded-3xl bg-white/[0.02]/70 backdrop-blur-xl border border-white/10 hover:border-primary/30 hover:-translate-y-1.5 shadow-[0_8px_32px_rgba(0,0,0,0.3)] duration-300 transition-all flex flex-col justify-between text-left h-48 space-y-4 relative overflow-hidden group"
               >
+                {/* Subtle visual accent in card background */}
+                <div className="absolute top-0 right-0 w-12 h-12 bg-gradient-to-bl from-primary/5 to-transparent pointer-events-none rounded-bl-2xl" />
+                
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-black text-primary text-sm shadow-inner">
+                  <div className="w-10 h-10 rounded-full bg-primary/15 border border-primary/25 flex items-center justify-center font-black text-primary text-sm shadow-inner shrink-0 group-hover:scale-105 transition-transform duration-300">
                     {rev.name.charAt(0)}
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white tracking-tight">{rev.name}</h4>
-                    <span className="text-[9px] text-aura-muted font-bold tracking-widest uppercase mt-0.5 block">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-white tracking-tight truncate">{rev.name}</h4>
+                    <span className="text-[8px] text-aura-muted font-bold tracking-widest uppercase mt-0.5 block truncate">
                       {rev.countryName}
                     </span>
                   </div>
                 </div>
                 
-                <p className="text-xs text-white/70 leading-relaxed italic line-clamp-3">
-                  {rev.text}
+                <p className="text-xs text-white/85 leading-relaxed italic line-clamp-3">
+                  "{rev.text}"
                 </p>
 
-                <div className="flex gap-1 text-yellow-500">
-                  {Array.from({ length: rev.rating }).map((_, i) => (
-                    <Star key={i} size={11} fill="currentColor" />
-                  ))}
+                <div className="flex justify-between items-center">
+                  <div className="flex gap-1 text-yellow-500">
+                    {Array.from({ length: rev.rating }).map((_, i) => (
+                      <Star key={i} size={11} fill="currentColor" />
+                    ))}
+                  </div>
+                  <span className="text-[7px] text-white/20 font-mono tracking-widest uppercase">Verified Node</span>
                 </div>
               </div>
             ))}
@@ -1137,15 +1190,27 @@ export default function LandingPage() {
 
       {/* Newsletter Subscription Banner */}
       <section className="relative z-10 max-w-7xl mx-auto px-6 pb-24">
-        <div className="p-8 lg:p-16 rounded-[40px] bg-gradient-to-br from-white/[0.02] via-white/[0.01] to-transparent border border-white/10 flex flex-col lg:flex-row items-center justify-between gap-8 overflow-hidden shadow-2xl relative">
+        <div className="p-8 lg:p-16 rounded-[40px] bg-gradient-to-br from-white/[0.03] via-white/[0.01] to-transparent border border-white/10 flex flex-col lg:flex-row items-center justify-between gap-8 overflow-hidden shadow-[0_24px_64px_rgba(0,0,0,0.55)] relative backdrop-blur-xl">
           {/* Neon background blur */}
           <div className="absolute -top-12 -right-12 w-64 h-64 bg-secondary/10 blur-[90px] rounded-full pointer-events-none" />
           
           <div className="space-y-4 max-w-xl text-center lg:text-left relative z-10">
-            <h2 className="text-2xl lg:text-4xl font-black uppercase tracking-tight italic font-serif text-white">
-              Stay updated with Tavaaril Waves Network
-            </h2>
-            <p className="text-[10px] font-black text-aura-muted uppercase tracking-[0.25em] leading-relaxed">
+            {/* Premium Header Typography Redesign */}
+            <div className="relative inline-block text-center lg:text-left">
+              <div className="absolute -inset-4 blur-xl bg-gradient-to-r from-primary/10 to-secondary/10 opacity-70 pointer-events-none rounded-full" />
+              <div className="relative flex flex-col items-center lg:items-start gap-2">
+                <div className="flex items-center gap-2 justify-center lg:justify-start">
+                  <span className="h-1 w-1 rounded-full bg-secondary/80 animate-ping" />
+                  <span className="text-[10px] uppercase tracking-[0.3em] text-secondary font-black">Platform Broadcast</span>
+                </div>
+                <h2 className="text-xl lg:text-3xl font-sans font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300 uppercase select-none leading-snug">
+                  Stay updated with Tavari Wave Network
+                </h2>
+                <div className="h-[1px] w-20 bg-gradient-to-r from-secondary/40 to-transparent mt-0.5" />
+              </div>
+            </div>
+
+            <p className="text-[10px] font-black text-aura-muted uppercase tracking-[0.25em] leading-relaxed block pl-0.5 pt-1">
               Subscribe to get latest updates and platform insights
             </p>
           </div>
@@ -1158,14 +1223,14 @@ export default function LandingPage() {
                 placeholder="Enter email address"
                 value={newsletterEmail}
                 onChange={(e) => setNewsletterEmail(e.target.value)}
-                className="w-full bg-white/[0.02] border border-white/5 rounded-2xl py-4.5 pl-12 pr-4 text-sm font-medium transition-all outline-none focus:border-secondary/30 focus:bg-white/[0.04] text-white placeholder:text-white/20"
+                className="w-full bg-white/[0.02]/30 border border-white/10 rounded-2xl py-4.5 pl-12 pr-4 text-sm font-medium transition-all outline-none focus:border-secondary/40 focus:bg-white/[0.04] text-white placeholder:text-white/25 shadow-inner"
                 required
               />
             </div>
             <button 
               type="submit"
               disabled={newsletterLoading}
-              className="px-8 py-4.5 bg-gradient-to-r from-primary to-secondary text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-lg hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
+              className="px-8 py-4.5 bg-gradient-to-r from-primary via-indigo-600 to-secondary text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-lg hover:shadow-[0_0_20px_rgba(124,58,237,0.4)] hover:scale-[1.02] active:-scale-95 transition-all duration-300 disabled:opacity-50 flex items-center justify-center gap-2 whitespace-nowrap"
             >
               {newsletterLoading ? 'Subscribing...' : 'Subscribe Now'}
             </button>
