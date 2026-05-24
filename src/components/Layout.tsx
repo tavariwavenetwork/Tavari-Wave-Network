@@ -120,31 +120,79 @@ interface NavItemProps {
   label: string;
   active?: boolean;
   onClick?: () => void;
+  gradientId?: string;
+  glowColor?: string;
 }
 
-function BottomNavItem({ icon, label, active, onClick }: NavItemProps) {
+function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor }: NavItemProps) {
   return (
     <motion.button 
       onClick={onClick}
-      whileTap={{ scale: 0.9 }}
-      className={cn(
-        "relative flex flex-col items-center justify-center gap-1 flex-1 py-2 z-10 transition-colors duration-300",
-        active ? "text-aura-lime" : "text-aura-muted hover:text-white"
-      )}
+      whileTap={{ scale: 0.95 }}
+      className="relative flex flex-col items-center justify-center flex-1 h-full py-1.5 z-10 transition-all duration-300 cursor-pointer"
     >
-      <div className={cn("transition-all duration-300", active ? "scale-110 drop-shadow-[0_0_8px_rgba(204,255,0,0.5)]" : "scale-100")}>
-        {React.cloneElement(icon as React.ReactElement, { size: 22 })}
-      </div>
-      <span className={cn("text-[8px] font-black uppercase tracking-[0.2em] transition-all", active ? "opacity-100" : "opacity-60")}>
+      {/* Light background glow when active */}
+      <AnimatePresence>
+        {active && (
+          <motion.div
+            layoutId={`glow-${gradientId}`}
+            className="absolute inset-[15%] rounded-2xl opacity-10 blur-md -z-10 pointer-events-none"
+            style={{ backgroundColor: glowColor }}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 0.12, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Floating Icon Wrapper */}
+      <motion.div 
+        animate={{ 
+          y: active ? -4 : 0,
+          scale: active ? 1.08 : 1
+        }}
+        transition={{ type: "spring", stiffness: 350, damping: 25 }}
+        className={cn(
+          "relative p-2 rounded-xl flex items-center justify-center transition-all duration-300",
+          active 
+            ? "bg-white/[0.04] border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.35)]" 
+            : "bg-transparent border border-transparent"
+        )}
+        style={{
+          boxShadow: active ? `0 4px 15px -3px ${glowColor}30, 0 0 10px -1px ${glowColor}20` : 'none'
+        }}
+      >
+        {React.isValidElement(icon)
+          ? React.cloneElement(icon as React.ReactElement, { 
+              size: 20,
+              stroke: active && gradientId ? `url(#${gradientId})` : "currentColor",
+              className: cn(
+                "transition-all duration-300", 
+                active ? "text-white animate-pulse" : "text-white/40"
+              )
+            })
+          : icon}
+        
+        {/* Subtle dot beneath active icon */}
+        {active && (
+          <motion.div
+            layoutId={`dot-${gradientId}`}
+            className="absolute -bottom-1 w-1 h-1 rounded-full pointer-events-none"
+            style={{ backgroundColor: glowColor }}
+          />
+        )}
+      </motion.div>
+
+      {/* Label */}
+      <span className={cn(
+        "text-[9px] font-semibold transition-all duration-300 tracking-wide mt-1 select-none", 
+        active 
+          ? "text-white opacity-100 font-extrabold" 
+          : "text-white/45 opacity-100 hover:text-white"
+      )}>
         {label}
       </span>
-      
-      {active && (
-        <motion.div 
-          layoutId="bottom-nav-glow"
-          className="absolute inset-0 bg-aura-lime/5 blur-xl rounded-full -z-10"
-        />
-      )}
     </motion.button>
   );
 }
@@ -222,14 +270,24 @@ export default function Layout() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const activeTab = location.pathname.substring(1) || 'dashboard';
   const showFooterPaths = ['/home', '/', '/markets', '/nodes', '/pools', '/neural-analytics', '/terms', '/privacy', '/cookies', '/aml'];
   const showFooter = showFooterPaths.includes(location.pathname);
   const isInternalApp = ['/dashboard', '/invest', '/fund', '/settings', '/profile', '/help', '/notifications'].some(path => location.pathname.startsWith(path));
 
   // Determine if we should show a back button
-  const showBackButton = !['/home', '/dashboard'].includes(location.pathname);
-  const isFullBleedPage = ['/about', '/how-it-works', '/faq', '/rewards'].includes(location.pathname);
+  const showBackButton = !['/home', '/dashboard'].includes(location.pathname) && !(isMobile && location.pathname === '/token');
+  const isFullBleedPage = ['/about', '/how-it-works', '/faq', '/rewards', '/token'].includes(location.pathname);
 
   // Real-time notifications
   useEffect(() => {
@@ -351,12 +409,23 @@ export default function Layout() {
           ? "bg-white/[0.03] border-primary/20 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]" 
           : "bg-white/70 border-primary/20",
         // Mobile visibility logic
-        (location.pathname === '/home' || location.pathname === '/' || isInternalApp) && !isDistractionFree ? "flex" : "hidden lg:flex",
+        ((location.pathname === '/home' || location.pathname === '/token') && !isDistractionFree) ? "flex" : "hidden lg:flex",
         isDistractionFree && "hidden lg:hidden"
       )}>
         {/* Left: Back Button or Menu */}
         <div className="flex items-center gap-4 lg:gap-6 flex-1 lg:flex-none">
-          {showBackButton ? (
+          {isMobile && location.pathname === '/token' ? (
+            <motion.button 
+              whileHover={{ x: -2 }}
+              onClick={() => navigate('/home')}
+              className={cn(
+                "p-2 rounded-xl transition-all flex items-center gap-2 group",
+                isDark ? "hover:bg-white/5 text-aura-muted hover:text-white" : "hover:bg-aura-black/5 text-aura-muted hover:text-aura-black"
+              )}
+            >
+              <ArrowLeft size={20} />
+            </motion.button>
+          ) : showBackButton ? (
             <motion.button 
               whileHover={{ x: -2 }}
               onClick={() => navigate(-1)}
@@ -703,51 +772,124 @@ export default function Layout() {
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav className={cn(
-        "lg:hidden fixed bottom-0 left-0 right-0 h-16 z-[100] flex items-center px-4 backdrop-blur-3xl border-t shadow-[0_-10px_30px_rgba(0,0,0,0.5)]",
+        "lg:hidden fixed bottom-4 left-4 right-4 h-20 z-[100] flex items-center px-2 backdrop-blur-2xl border rounded-[24px] shadow-[0_15px_35px_rgba(0,0,0,0.85),0_0_15px_rgba(168,85,247,0.04),0_0_20px_rgba(204,255,0,0.03)]",
         isDark 
-          ? "bg-white/[0.03] border-primary/20 shadow-[inset_0_0_20px_rgba(255,255,255,0.01)]" 
-          : "bg-white/90 border-primary/20",
+          ? "bg-[#0b0d14]/75 border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
+          : "bg-white/85 border-[#a855f7]/15",
         isDistractionFree && "hidden"
       )}>
-        <div className="relative flex w-full items-center justify-between">
-          <BottomNavItem icon={<Home />} label={t('home')} active={activeTab === 'home'} onClick={() => handleNavigation('/home')} />
-          <BottomNavItem icon={<PlusCircle />} label={t('fund')} active={activeTab === 'fund'} onClick={() => handleNavigation('/fund')} />
-          <BottomNavItem icon={<TrendingUp />} label={t('invest')} active={activeTab === 'invest'} onClick={() => handleNavigation('/invest')} />
+        {/* SVG definitions for realistic icon linear gradients */}
+        <svg className="absolute w-0 h-0" width="0" height="0">
+          <defs>
+            <linearGradient id="homeIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffb03a" />
+              <stop offset="100%" stopColor="#ff7a00" />
+            </linearGradient>
+            <linearGradient id="fundIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#10b981" />
+              <stop offset="100%" stopColor="#059669" />
+            </linearGradient>
+            <linearGradient id="investIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#06b6d4" />
+              <stop offset="100%" stopColor="#3b82f6" />
+            </linearGradient>
+            <linearGradient id="tokenIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#f59e0b" />
+              <stop offset="100%" stopColor="#ea580c" />
+            </linearGradient>
+            <linearGradient id="rewardIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ec4899" />
+              <stop offset="100%" stopColor="#9333ea" />
+            </linearGradient>
+            <linearGradient id="meIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#CCFF00" />
+              <stop offset="100%" stopColor="#10b981" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        <div className="relative flex w-full h-full items-center justify-between">
           <BottomNavItem 
-            icon={
-              <div className="relative flex items-center justify-center">
-                <Coins className={cn("text-yellow-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]", activeTab === 'token' ? "animate-pulse" : "")} />
-                <div className="absolute -inset-1 bg-gradient-to-r from-purple-500/30 to-yellow-500/30 rounded-full blur-xs opacity-50" />
-              </div>
-            } 
+            icon={<Home />} 
+            label={t('home')} 
+            active={activeTab === 'home'} 
+            onClick={() => handleNavigation('/home')} 
+            gradientId="homeIconGrad"
+            glowColor="#ff9f0a"
+          />
+          <BottomNavItem 
+            icon={<PlusCircle />} 
+            label={t('fund')} 
+            active={activeTab === 'fund'} 
+            onClick={() => handleNavigation('/fund')} 
+            gradientId="fundIconGrad"
+            glowColor="#10b981"
+          />
+          <BottomNavItem 
+            icon={<TrendingUp />} 
+            label={t('invest')} 
+            active={activeTab === 'invest'} 
+            onClick={() => handleNavigation('/invest')} 
+            gradientId="investIconGrad"
+            glowColor="#06b6d4"
+          />
+          <BottomNavItem 
+            icon={<Coins />} 
             label="Token" 
             active={activeTab === 'token'} 
             onClick={() => handleNavigation('/token')} 
+            gradientId="tokenIconGrad"
+            glowColor="#f59e0b"
           />
-          <BottomNavItem icon={<Gift />} label="Rewards" active={activeTab === 'rewards'} onClick={() => handleNavigation('/rewards')} />
+          <BottomNavItem 
+            icon={<Gift />} 
+            label="Reward" 
+            active={activeTab === 'rewards'} 
+            onClick={() => handleNavigation('/rewards')} 
+            gradientId="rewardIconGrad"
+            glowColor="#a855f7"
+          />
           <BottomNavItem 
             icon={
               <div className={cn(
-                "w-7 h-7 rounded-full overflow-hidden border-2 transition-all duration-300",
-                activeTab === 'profile' ? "border-aura-lime scale-110 shadow-[0_0_15px_rgba(204,255,0,0.4)]" : "border-white/20"
+                "w-6 h-6 rounded-full overflow-hidden border-2 transition-all duration-300 relative",
+                activeTab === 'profile' ? "border-[#CCFF00] scale-105 shadow-[0_0_12px_rgba(204,255,0,0.5)]" : "border-white/10"
               )}>
-                <img src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} alt="Me" className="w-full h-full object-cover" />
+                <img 
+                  src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} 
+                  alt="Me" 
+                  className="w-full h-full object-cover" 
+                />
               </div>
             } 
             label={t('me')} 
             active={activeTab === 'profile'} 
             onClick={() => handleNavigation('/profile')} 
+            gradientId="meIconGrad"
+            glowColor="#CCFF00"
           />
           
           {/* Animated Indicator Trail */}
           <motion.div 
             layoutId="mobile-nav-indicator"
-            className="absolute bottom-[-8px] h-1 bg-aura-lime rounded-full blur-[1px] shadow-[0_0_10px_rgba(204,255,0,0.8)]"
+            className="absolute bottom-1 h-0.5 rounded-full blur-[0.5px] pointer-events-none"
             initial={false}
-            transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+            transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
             style={{ 
-              width: `${100 / 6}%`,
-              left: `${((['home', 'fund', 'invest', 'token', 'rewards', 'profile'].indexOf(activeTab === 'dashboard' ? 'home' : activeTab) >= 0 ? ['home', 'fund', 'invest', 'token', 'rewards', 'profile'].indexOf(activeTab === 'dashboard' ? 'home' : activeTab) : 0) * (100 / 6))}%`
+              width: `calc(${100 / 6}% - 12px)`,
+              left: `calc(${((['home', 'fund', 'invest', 'token', 'rewards', 'profile'].indexOf(activeTab === 'dashboard' ? 'home' : activeTab) >= 0 ? ['home', 'fund', 'invest', 'token', 'rewards', 'profile'].indexOf(activeTab === 'dashboard' ? 'home' : activeTab) : 0) * (100 / 6))}% + 6px)`,
+              backgroundColor: 
+                activeTab === 'home' ? '#ff9f0a' :
+                activeTab === 'fund' ? '#10b981' :
+                activeTab === 'invest' ? '#06b6d4' :
+                activeTab === 'token' ? '#f59e0b' :
+                activeTab === 'rewards' ? '#a855f7' : '#CCFF00',
+              boxShadow: 
+                activeTab === 'home' ? '0 0 10px #ff9f0a' :
+                activeTab === 'fund' ? '0 0 10px #10b981' :
+                activeTab === 'invest' ? '0 0 10px #06b6d4' :
+                activeTab === 'token' ? '0 0 10px #f59e0b' :
+                activeTab === 'rewards' ? '0 0 10px #a855f7' : '0 0 10px rgb(204,255,0)'
             }}
           />
         </div>

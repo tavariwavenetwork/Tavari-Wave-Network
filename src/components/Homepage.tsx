@@ -25,6 +25,7 @@ import TopInvestorsSection from './TopInvestorsSection';
 import WhyChooseSection from './WhyChooseSection';
 import { ROIEngineStats } from './ROIEngineDisplay';
 import LiveActivityNotification from './LiveActivityNotification';
+import { IconGlowWrapper, PremiumFundingIcon, PremiumWithdrawIcon, PremiumAssetsIcon } from './PremiumCardIcons';
 
 const MemoizedTopInvestorsSection = React.memo(TopInvestorsSection);
 const MemoizedWhyChooseSection = React.memo(WhyChooseSection);
@@ -204,19 +205,21 @@ export default function Homepage() {
         {/* CARD 1: FUNDING */}
         <div 
           style={{ willChange: 'transform' }}
-          className="bg-[#0b0e14] border-2 border-emerald-500/25 shadow-[0_0_30px_rgba(16,185,129,0.1)] rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-emerald-500 transition-all duration-500"
+          className="bg-gradient-to-b from-[#11141d]/85 to-[#0b0c10]/95 backdrop-blur-xl border border-white/[0.08] hover:border-emerald-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_20px_rgba(16,185,129,0.02)] hover:shadow-[0_25px_60px_rgba(16,185,129,0.18),inset_0_1px_2px_rgba(255,255,255,0.12),0_4px_25px_rgba(16,185,129,0.08)] transition-all duration-500 rounded-[28px] lg:rounded-[36px] p-4 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group relative overflow-hidden active:scale-[0.99]"
         >
-          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-[#11141b] rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-inner group-hover:scale-105 transition-transform">
-            <Building2 className="text-emerald-400 w-4 h-4 lg:w-7 lg:h-7 shadow-[0_0_20px_rgba(52,211,153,0.3)]" />
-          </div>
-          <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Funding</h3>
+          {/* Subtle luxurious background accent */}
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none transition-all duration-700 group-hover:bg-emerald-500/10 group-hover:scale-110" />
+          <IconGlowWrapper color="emerald">
+            <PremiumFundingIcon />
+          </IconGlowWrapper>
+          <h3 className="text-white text-[9px] lg:text-[11px] font-black uppercase tracking-[0.25em] mb-1.5 lg:mb-3 mt-1 lg:mt-0 font-sans">Funding</h3>
           <div className="hidden lg:block w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
           <div className="flex-1 flex items-center justify-center w-full min-h-[40px] lg:min-h-[80px]">
             <DynamicBalance value={formatCurrency(profile?.funding_balance || 0)} />
           </div>
           <button 
             onClick={() => navigate('/fund/deposit')}
-            className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-[0_5px_15px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="w-full py-2 lg:py-3.5 rounded-xl lg:rounded-2xl text-[9px] lg:text-[11px] font-black uppercase tracking-[0.2em] text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-[0_6px_20px_rgba(16,185,129,0.25)] hover:shadow-[0_8px_25px_rgba(16,185,129,0.4)] hover:brightness-110 active:scale-[0.97] transition-all cursor-pointer font-sans"
           >
             {t('Deposit')}
           </button>
@@ -225,19 +228,21 @@ export default function Homepage() {
         {/* CARD 2: AVAILABLE BALANCE */}
         <div 
           style={{ willChange: 'transform' }}
-          className="bg-[#0b0e14] border-2 border-red-500/25 shadow-[0_0_30px_rgba(239,68,68,0.1)] rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-red-500 transition-all duration-500"
+          className="bg-gradient-to-b from-[#11141d]/85 to-[#0b0c10]/95 backdrop-blur-xl border border-white/[0.08] hover:border-red-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_20px_rgba(239,68,68,0.02)] hover:shadow-[0_25px_60px_rgba(239,68,68,0.18),inset_0_1px_2px_rgba(255,255,255,0.12),0_4px_25px_rgba(239,68,68,0.08)] transition-all duration-500 rounded-[28px] lg:rounded-[36px] p-4 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group relative overflow-hidden active:scale-[0.99]"
         >
-          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-[#11141b] rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-inner group-hover:scale-105 transition-transform">
-            <Wallet className="text-red-400 w-4 h-4 lg:w-7 lg:h-7 shadow-[0_0_20px_rgba(239,68,68,0.3)]" />
-          </div>
-          <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Available</h3>
+          {/* Subtle luxurious background accent */}
+          <div className="absolute top-0 right-0 w-24 h-24 bg-red-400/5 rounded-full blur-2xl pointer-events-none transition-all duration-700 group-hover:bg-red-400/10 group-hover:scale-110" />
+          <IconGlowWrapper color="red">
+            <PremiumWithdrawIcon />
+          </IconGlowWrapper>
+          <h3 className="text-white text-[9px] lg:text-[11px] font-black uppercase tracking-[0.25em] mb-1.5 lg:mb-3 mt-1 lg:mt-0 font-sans">Available</h3>
           <div className="hidden lg:block w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
           <div className="flex-1 flex items-center justify-center w-full min-h-[40px] lg:min-h-[80px]">
             <DynamicBalance value={formatCurrency(profile?.available_balance || 0)} />
           </div>
           <button 
             onClick={() => navigate('/fund/withdraw')}
-            className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-red-500 to-red-600 shadow-[0_5px_15px_rgba(239,68,68,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
+            className="w-full py-2 lg:py-3.5 rounded-xl lg:rounded-2xl text-[9px] lg:text-[11px] font-black uppercase tracking-[0.2em] text-white bg-gradient-to-r from-red-500 to-red-600 shadow-[0_6px_20px_rgba(239,68,68,0.25)] hover:shadow-[0_8px_25px_rgba(239,68,68,0.4)] hover:brightness-110 active:scale-[0.97] transition-all cursor-pointer font-sans"
           >
             Withdraw
           </button>
@@ -246,19 +251,21 @@ export default function Homepage() {
         {/* CARD 3: TOTAL ASSETS */}
         <div 
           style={{ willChange: 'transform' }}
-          className="bg-[#0b0e14] border-2 border-blue-500/25 shadow-[0_0_30px_rgba(59,130,246,0.1)] rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-blue-500 transition-all duration-500"
+          className="bg-gradient-to-b from-[#11141d]/85 to-[#0b0c10]/95 backdrop-blur-xl border border-white/[0.08] hover:border-blue-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_20px_rgba(59,130,246,0.02)] hover:shadow-[0_25px_60px_rgba(59,130,246,0.18),inset_0_1px_2px_rgba(255,255,255,0.12),0_4px_25px_rgba(59,130,246,0.08)] transition-all duration-500 rounded-[28px] lg:rounded-[36px] p-4 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group relative overflow-hidden active:scale-[0.99]"
         >
-          <div className="w-8 h-8 lg:w-14 lg:h-14 bg-[#11141b] rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-inner group-hover:scale-105 transition-transform">
-            <Coins className="text-blue-400 w-4 h-4 lg:w-7 lg:h-7 shadow-[0_0_20px_rgba(59,130,246,0.3)]" />
-          </div>
-          <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Assets</h3>
+          {/* Subtle luxurious background accent */}
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none transition-all duration-700 group-hover:bg-blue-500/10 group-hover:scale-110" />
+          <IconGlowWrapper color="blue">
+            <PremiumAssetsIcon />
+          </IconGlowWrapper>
+          <h3 className="text-white text-[9px] lg:text-[11px] font-black uppercase tracking-[0.25em] mb-1.5 lg:mb-3 mt-1 lg:mt-0 font-sans">Assets</h3>
           <div className="hidden lg:block w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
           <div className="flex-1 flex items-center justify-center w-full min-h-[40px] lg:min-h-[80px]">
             <DynamicBalance value={formatCurrency(profile?.total_invested || 0)} />
           </div>
           <button 
             onClick={() => navigate('/invest')}
-            className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_5px_15px_rgba(59,130,246,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center min-h-[32px] lg:min-h-[56px]"
+            className="w-full py-2 lg:py-3.5 rounded-xl lg:rounded-2xl text-[9px] lg:text-[11px] font-black uppercase tracking-[0.2em] text-white bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_6px_20px_rgba(59,130,246,0.25)] hover:shadow-[0_8px_25px_rgba(59,130,246,0.4)] hover:brightness-110 active:scale-[0.97] transition-all flex items-center justify-center min-h-[32px] lg:min-h-[56px] cursor-pointer font-sans"
           >
             <RotatingButtonText texts={['You Invest', 'We Trade', 'You Earn']} />
           </button>

@@ -179,7 +179,6 @@ export default function App() {
               <Route path="/help" element={<Support />} />
               <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/top-investors" element={<TopInvestorsPage />} />
-              <Route path="/token" element={<TWNTokenPortal />} />
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/investment-terms" element={<InvestmentTerms />} />
@@ -197,6 +196,7 @@ export default function App() {
                 }
               >
                 <Route path="/home" element={<Homepage />} />
+                <Route path="/token" element={<TWNTokenPortal />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/invest" element={<Invest />} />
                 <Route path="/fund" element={<Fund />} />

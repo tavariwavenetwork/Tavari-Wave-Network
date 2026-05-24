@@ -64,6 +64,16 @@ const REFERENCE_PRICE = 0.00425;
 export default function TWNTokenPortal() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Price & Market Metrics Fluctuation States (Requirements 6 & 7)
   const [currentPrice, setCurrentPrice] = useState(0.00425);
@@ -614,15 +624,17 @@ export default function TWNTokenPortal() {
   return (
     <div className="min-h-screen bg-[#05060f] text-white selection:bg-purple-500/30 overflow-hidden relative pb-32">
       {/* Sleek Floating Back Button */}
-      <div className="absolute top-6 left-6 z-[60]">
-        <button 
-          onClick={() => navigate(-1)} 
-          className="flex items-center gap-2 px-4 py-2.5 bg-black/60 hover:bg-black/85 border border-white/10 hover:border-purple-500/40 rounded-full text-xs font-black uppercase tracking-widest text-white/90 hover:text-white transition-all active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.5)] backdrop-blur-md cursor-pointer"
-        >
-          <ArrowLeft size={14} className="text-purple-400" />
-          <span>Back</span>
-        </button>
-      </div>
+      {!isMobile && (
+        <div className="absolute top-6 left-6 z-[60]">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="flex items-center gap-2 px-4 py-2.5 bg-black/60 hover:bg-black/85 border border-white/10 hover:border-purple-500/40 rounded-full text-xs font-black uppercase tracking-widest text-white/90 hover:text-white transition-all active:scale-95 shadow-[0_4px_12px_rgba(0,0,0,0.5)] backdrop-blur-md cursor-pointer"
+          >
+            <ArrowLeft size={14} className="text-purple-400" />
+            <span>Back</span>
+          </button>
+        </div>
+      )}
 
       {/* Background radial overlays */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

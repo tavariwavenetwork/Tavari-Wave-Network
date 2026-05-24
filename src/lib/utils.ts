@@ -7,8 +7,43 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function isWeekendROI(): boolean {
-  const day = new Date().getDay();
-  return day === 5 || day === 6 || day === 0; // Friday, Saturday, Sunday
+  const now = new Date();
+  // GMT+1 is exactly UTC + 1 hour (3600000 ms)
+  const gmt1 = new Date(now.getTime() + 3600000);
+  const day = gmt1.getUTCDay(); // 0: Sunday, 1: Monday, ..., 5: Friday, 6: Saturday
+  const hour = gmt1.getUTCHours(); // 0-23
+  
+  // WEEKDAY ROI WINDOW: Monday 8:00 AM GMT+1 → Friday 10:59 PM GMT+1 (gmt1.getUTCHours() < 23)
+  // Weekend ROI Window: Friday 11:00 PM GMT+1 → Monday 7:59 AM GMT+1
+  if (day === 5) { // Friday
+    return hour >= 23;
+  }
+  if (day === 6 || day === 0) { // Saturday, Sunday
+    return true;
+  }
+  if (day === 1) { // Monday
+    return hour < 8;
+  }
+  return false; // Tuesday, Wednesday, Thursday
+}
+
+export function isWithdrawalAllowed(): boolean {
+  const now = new Date();
+  const gmt1 = new Date(now.getTime() + 3600000);
+  const day = gmt1.getUTCDay(); // 0-6
+  const hour = gmt1.getUTCHours(); // 0-23
+
+  // Monday 9:00 AM GMT+1 to Friday 4:00 PM GMT+1 (16:00)
+  if (day === 1) { // Monday
+    return hour >= 9;
+  }
+  if (day === 2 || day === 3 || day === 4) { // Tuesday, Wednesday, Thursday
+    return true;
+  }
+  if (day === 5) { // Friday
+    return hour < 16;
+  }
+  return false; // Saturday, Sunday
 }
 
 export function getRoiByAmount(amount: number): number {

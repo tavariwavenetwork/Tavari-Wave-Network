@@ -220,8 +220,55 @@ export default function Profile() {
 
   return (
     <div className="space-y-6 pb-24 max-w-7xl mx-auto">
-      {/* Profile Header Card - Fixed Gradient design as requested */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#051937] via-[#004d7a] to-[#008793] p-8 lg:p-12 text-white shadow-xl">
+      {/* Mobile Sticky/Floating Profile bar with Glassmorphism */}
+      <div className="lg:hidden sticky top-2 z-[40] mx-0 p-3.5 rounded-2xl bg-[#0b0d14]/75 border border-white/[0.08] backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05)] flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          {/* Profile picture at the extreme far left */}
+          <div className="relative group flex-shrink-0">
+            <div className="w-12 h-12 rounded-full border border-white/10 p-0.5 overflow-hidden bg-white/5 backdrop-blur-sm shadow-md">
+              <img 
+                src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} 
+                alt="Avatar" 
+                className="w-full h-full object-cover rounded-full" 
+              />
+            </div>
+            <button 
+              onClick={() => {
+                setPhotoMode('options');
+                setShowPhotoModal(true);
+              }}
+              className="absolute -bottom-1 -right-1 p-1 bg-white text-slate-900 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center cursor-pointer"
+            >
+              <Camera size={10} />
+            </button>
+          </div>
+
+          {/* Display name & Username (@handle) stacked tightly beside name */}
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-extrabold text-white tracking-tight truncate max-w-[150px] sm:max-w-[200px]">
+                {profile?.name}
+              </span>
+              {/* Green tick icon only for verified status */}
+              <div className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                <Check size={10} strokeWidth={3.5} className="text-emerald-400 animate-pulse" />
+              </div>
+            </div>
+            <span className="text-[10px] font-semibold text-white/50 tracking-wide mt-0.5">
+              @{profile?.username}
+            </span>
+          </div>
+        </div>
+
+        {/* Premium subtle fintech glow or a subtle label */}
+        <div className="flex items-center gap-1.5 px-2 py-1 bg-white/[0.03] border border-white/[0.06] rounded-xl text-[8px] font-black uppercase tracking-widest text-white/40">
+          <span className="w-1 h-1 rounded-full bg-[#CCFF00] animate-ping" />
+          <span>Active</span>
+        </div>
+      </div>
+
+      {/* Desktop Profile Header Card (Keep exact original layout on desktop) */}
+      <div className="hidden lg:block relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#051937] via-[#004d7a] to-[#008793] p-8 lg:p-12 text-white shadow-xl">
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="relative group">

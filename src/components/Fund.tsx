@@ -27,7 +27,7 @@ import {
   Send,
   LayoutDashboard
 } from 'lucide-react';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, isWithdrawalAllowed } from '../lib/utils';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../contexts/AuthContext';
 import { DynamicBalance } from './DynamicBalance';
@@ -334,46 +334,46 @@ export default function Fund() {
   const withdrawalFeePercent = 20;
 
   // Mobile Flow States
-  const [isDepositContinued, setIsDepositContinued] = useState(false);
-  const [isWithdrawContinued, setIsWithdrawContinued] = useState(false);
+  const [isDepositContinued, setIsDepositContinued] = useState(() => {
+    return sessionStorage.getItem('nexus_has_seen_deposit_popup') === 'true';
+  });
+  const [isWithdrawContinued, setIsWithdrawContinued] = useState(() => {
+    return sessionStorage.getItem('nexus_has_seen_withdraw_popup') === 'true';
+  });
   const [showContinueDepositPopup, setShowContinueDepositPopup] = useState(false);
   const [showContinueWithdrawPopup, setShowContinueWithdrawPopup] = useState(false);
-  const [hasDismissedDepositPopup, setHasDismissedDepositPopup] = useState(false);
-  const [hasDismissedWithdrawPopup, setHasDismissedWithdrawPopup] = useState(false);
+  const [hasDismissedDepositPopup, setHasDismissedDepositPopup] = useState(() => {
+    return sessionStorage.getItem('nexus_has_seen_deposit_popup') === 'true';
+  });
+  const [hasDismissedWithdrawPopup, setHasDismissedWithdrawPopup] = useState(() => {
+    return sessionStorage.getItem('nexus_has_seen_withdraw_popup') === 'true';
+  });
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-    
     if (tab === 'deposit') {
-      if (hasDismissedDepositPopup) {
+      const hasSeen = sessionStorage.getItem('nexus_has_seen_deposit_popup') === 'true';
+      if (hasSeen) {
         setIsDepositContinued(true);
         setShowContinueDepositPopup(false);
-      } else if (selectedCountry === 'Nigeria' && !isDepositContinued) {
-        timer = setTimeout(() => {
-          setShowContinueDepositPopup(true);
-        }, 2200);
+      } else if (selectedCountry === 'Nigeria') {
+        setShowContinueDepositPopup(true);
       }
     } else {
       setShowContinueDepositPopup(false);
     }
 
     if (tab === 'withdraw') {
-      if (hasDismissedWithdrawPopup) {
+      const hasSeen = sessionStorage.getItem('nexus_has_seen_withdraw_popup') === 'true';
+      if (hasSeen) {
         setIsWithdrawContinued(true);
         setShowContinueWithdrawPopup(false);
-      } else if (!isWithdrawContinued) {
-        timer = setTimeout(() => {
-          setShowContinueWithdrawPopup(true);
-        }, 2200);
+      } else {
+        setShowContinueWithdrawPopup(true);
       }
     } else {
       setShowContinueWithdrawPopup(false);
     }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [tab, selectedCountry, isDepositContinued, isWithdrawContinued, hasDismissedDepositPopup, hasDismissedWithdrawPopup]);
+  }, [tab, selectedCountry]);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -780,23 +780,32 @@ export default function Fund() {
 
                 <div className="space-y-6">
                   {depositMethod === 'bank' ? (
-                    <div className="p-5 bg-aura-black/60 border border-white/5 rounded-2xl space-y-4">
-                      <div className="flex justify-between items-center text-[9px] font-medium uppercase text-aura-muted tracking-widest">
-                        <span>Bank Name</span>
-                        <span className="text-white font-bold">OPay</span>
-                      </div>
-                      <div className="flex justify-between items-center">
+                    <div className="p-6 bg-gradient-to-b from-[#11241b]/35 to-[#0c0d12]/95 border border-emerald-500/20 rounded-3xl space-y-5 shadow-[0_15px_30px_rgba(0,0,0,0.5),0_0_25px_rgba(16,185,129,0.03)] relative overflow-hidden backdrop-blur-md">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -z-10" />
+                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
                         <div className="flex flex-col gap-0.5">
-                          <p className="text-[9px] text-aura-muted uppercase tracking-widest">Account Number</p>
-                          <code className="text-sm font-bold text-aura-lime">6550002094</code>
+                          <span className="text-[10px] font-black uppercase text-aura-muted tracking-widest leading-none">Institution</span>
+                          <span className="text-xs font-black text-white uppercase tracking-wider">OPay Bank</span>
                         </div>
-                        <button onClick={() => handleCopy('6550002094', 'accNum')} className="p-2 bg-white/5 rounded-lg hover:bg-aura-lime hover:text-aura-black transition-all">
-                          {copiedField === 'accNum' ? <Check size={14} /> : <Copy size={14} />}
+                        <span className="text-[8px] font-extrabold bg-emerald-400/10 text-emerald-400 border border-emerald-400/25 px-2 py-0.5 rounded-md uppercase tracking-wide">
+                          Active Bridge
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="flex flex-col gap-0.5">
+                          <p className="text-[10px] text-aura-muted uppercase tracking-widest font-bold">Account Number</p>
+                          <code className="text-base font-black text-emerald-400 tracking-wider">6550002094</code>
+                        </div>
+                        <button 
+                          onClick={() => handleCopy('6550002094', 'accNum')} 
+                          className="p-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-emerald-500/20 hover:text-emerald-400 transition-all active:scale-95 shadow-md flex-shrink-0"
+                        >
+                          {copiedField === 'accNum' ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                         </button>
                       </div>
                       <div className="pt-2 border-t border-white/5">
-                        <p className="text-[9px] text-aura-muted uppercase tracking-widest mb-1">Account Name</p>
-                        <p className="text-[11px] font-bold text-white uppercase tracking-tight">TAVARI WAVE NETWORK</p>
+                        <p className="text-[10px] text-aura-muted uppercase tracking-widest mb-1 font-bold">Account Name</p>
+                        <p className="text-xs font-black text-white uppercase tracking-wide">TAVARI WAVE NETWORK</p>
                       </div>
                     </div>
                   ) : (
@@ -815,13 +824,20 @@ export default function Fund() {
                           </button>
                         ))}
                       </div>
-                      <div className="p-4 bg-aura-black/60 border border-white/5 rounded-2xl flex flex-col items-center gap-4">
-                        <div className="p-2 bg-white rounded-lg"><QRCodeCanvas value={CRYPTO_ADDRESSES[depositCryptoType]} size={100} /></div>
-                        <div className="w-full space-y-1">
-                          <div className="bg-aura-black/60 border border-white/10 rounded-lg px-3 py-2 flex items-center justify-between gap-2 overflow-hidden">
-                            <code className="text-[9px] font-mono text-aura-lime truncate">{CRYPTO_ADDRESSES[depositCryptoType]}</code>
-                            <button onClick={() => handleCopy(CRYPTO_ADDRESSES[depositCryptoType], 'wallet')} className="flex-shrink-0 text-aura-muted">
-                              {copiedField === 'wallet' ? <Check size={12} /> : <Copy size={12} />}
+                      <div className="p-6 bg-gradient-to-b from-[#161124]/30 to-[#0c0d12]/95 border border-purple-500/20 rounded-3xl flex flex-col items-center gap-5 shadow-[0_15px_30px_rgba(0,0,0,0.5),0_0_25px_rgba(168,85,247,0.03)] relative overflow-hidden backdrop-blur-md">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl -z-10" />
+                        <div className="p-3 bg-white rounded-2xl shadow-[0_10px_25px_rgba(255,255,255,0.05)] border border-white/20">
+                          <QRCodeCanvas value={CRYPTO_ADDRESSES[depositCryptoType]} size={105} />
+                        </div>
+                        <div className="w-full space-y-1.5">
+                          <p className="text-[9px] text-center text-aura-muted uppercase tracking-widest font-bold">Scan QR or Copy Address</p>
+                          <div className="bg-aura-black/95 border border-white/10 rounded-2xl px-4 py-3 flex items-center justify-between gap-3 overflow-hidden shadow-inner">
+                            <code className="text-[9px] font-mono text-purple-400 truncate tracking-wide">{CRYPTO_ADDRESSES[depositCryptoType]}</code>
+                            <button 
+                              onClick={() => handleCopy(CRYPTO_ADDRESSES[depositCryptoType], 'wallet')} 
+                              className="flex-shrink-0 p-1.5 hover:bg-white/5 rounded-lg text-aura-muted hover:text-white transition-all active:scale-95"
+                            >
+                              {copiedField === 'wallet' ? <Check size={12} className="text-purple-400" /> : <Copy size={12} />}
                             </button>
                           </div>
                         </div>
@@ -846,6 +862,32 @@ export default function Fund() {
   };
 
   const renderWithdraw = () => {
+    if (!isWithdrawalAllowed()) {
+      return (
+        <div className="max-w-[360px] mx-auto p-6 rounded-2xl bg-[#0c0d12]/50 border border-rose-500/10 text-center space-y-4 shadow-[0_15px_30px_rgba(0,0,0,0.6)] backdrop-blur-md relative overflow-hidden transition-all duration-300">
+          <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-rose-500/15 to-transparent" />
+          <div className="w-12 h-12 mx-auto bg-rose-500/5 border border-rose-500/15 rounded-full flex items-center justify-center text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.08)] relative">
+            <Lock size={20} className="animate-pulse" />
+            <div className="absolute inset-0 rounded-full bg-rose-500/5 animate-ping opacity-10" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-base font-bold text-white tracking-wide font-sans">Portal Closed</h3>
+            <p className="text-[9px] font-black text-rose-400 py-0.5 px-2 bg-rose-500/5 rounded-full border border-rose-500/10 inline-block">
+              Service temporarily closed
+            </p>
+          </div>
+          <p className="text-[11px] text-white/50 leading-relaxed font-medium">
+            Withdrawals are currently unavailable. Withdrawal window reopens Monday 9:00 AM GMT+1.
+          </p>
+          <div className="pt-2 border-t border-white/[0.04]">
+            <div className="text-[9px] font-semibold text-white/30 tracking-wide">
+              Operational window: Mon 9:00 AM – Fri 4:00 PM (GMT+1)
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const amountNum = parseFloat(withdrawAmount);
     const isFrozen = profile?.withdrawals_frozen || profile?.suspended || profile?.banned;
     const isInsufficient = withdrawAmount && (amountNum > available_balance);
@@ -1103,7 +1145,7 @@ export default function Fund() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              className="absolute inset-0 bg-black/50 backdrop-blur-[3px]"
               onClick={() => {
                 if (selectedCountry) setShowCountryModal(false);
               }}
@@ -1113,8 +1155,9 @@ export default function Fund() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-[#0d1016] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+              className="relative w-full max-w-lg bg-[#0c0d12]/95 border border-white/10 rounded-[32px] overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_50px_rgba(255,255,255,0.01)] flex flex-col max-h-[80vh] backdrop-blur-xl z-10"
             >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-aura-lime/5 rounded-full blur-3xl -z-10 pointer-events-none" />
               {/* Header */}
               <div className="p-8 border-b border-white/5 space-y-6 flex-shrink-0">
                 <div className="flex items-center justify-between">
@@ -1335,6 +1378,7 @@ export default function Fund() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => {
+                    sessionStorage.setItem('nexus_has_seen_deposit_popup', 'true');
                     setHasDismissedDepositPopup(true);
                     setIsDepositContinued(true);
                     setShowContinueDepositPopup(false);
@@ -1350,6 +1394,7 @@ export default function Fund() {
                 >
                   <button 
                     onClick={() => {
+                      sessionStorage.setItem('nexus_has_seen_deposit_popup', 'true');
                       setHasDismissedDepositPopup(true);
                       setIsDepositContinued(true);
                       setShowContinueDepositPopup(false);
@@ -1373,6 +1418,7 @@ export default function Fund() {
 
                     <button
                       onClick={() => {
+                        sessionStorage.setItem('nexus_has_seen_deposit_popup', 'true');
                         setHasDismissedDepositPopup(true);
                         setIsDepositContinued(true);
                         setShowContinueDepositPopup(false);
@@ -1395,6 +1441,7 @@ export default function Fund() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => {
+                    sessionStorage.setItem('nexus_has_seen_withdraw_popup', 'true');
                     setHasDismissedWithdrawPopup(true);
                     setIsWithdrawContinued(true);
                     setShowContinueWithdrawPopup(false);
@@ -1410,6 +1457,7 @@ export default function Fund() {
                 >
                   <button 
                     onClick={() => {
+                      sessionStorage.setItem('nexus_has_seen_withdraw_popup', 'true');
                       setHasDismissedWithdrawPopup(true);
                       setIsWithdrawContinued(true);
                       setShowContinueWithdrawPopup(false);
@@ -1433,6 +1481,7 @@ export default function Fund() {
 
                     <button
                       onClick={() => {
+                        sessionStorage.setItem('nexus_has_seen_withdraw_popup', 'true');
                         setHasDismissedWithdrawPopup(true);
                         setIsWithdrawContinued(true);
                         setShowContinueWithdrawPopup(false);

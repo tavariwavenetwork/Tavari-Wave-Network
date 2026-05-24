@@ -25,7 +25,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../lib/utils';
+import { cn, isWithdrawalAllowed } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
 import { useNavigate } from 'react-router-dom';
@@ -1586,7 +1586,28 @@ export default function Rewards() {
                 </button>
               </div>
 
-              {!selectedMobileMethod ? (
+              {!isWithdrawalAllowed() ? (
+                <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-4">
+                  <div className="w-12 h-12 mx-auto bg-rose-500/5 border border-rose-500/15 rounded-full flex items-center justify-center text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.08)] relative">
+                    <Lock size={20} className="animate-pulse" />
+                    <div className="absolute inset-0 rounded-full bg-rose-500/5 animate-ping opacity-10" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-white tracking-wide font-sans">Portal Closed</h3>
+                    <p className="text-[9px] font-black text-rose-400 py-0.5 px-2 bg-rose-500/5 rounded-full border border-rose-500/10 inline-block font-mono">
+                      Service temporarily closed
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-white/50 leading-relaxed font-medium max-w-[280px]">
+                    Withdrawals are currently unavailable. Withdrawal window reopens Monday 9:00 AM GMT+1.
+                  </p>
+                  <div className="pt-4 border-t border-white/[0.04] w-full">
+                    <div className="text-[9px] font-semibold text-white/30 tracking-wide font-sans">
+                      Operational window: Mon 9:00 AM – Fri 4:00 PM (GMT+1)
+                    </div>
+                  </div>
+                </div>
+              ) : !selectedMobileMethod ? (
                 // Step 1: Payout Method Options
                 <div className="space-y-4">
                   <p className="text-xs text-[#9CA3AF] mb-4 text-left">Choose your preferred settlement option below to proceed.</p>
