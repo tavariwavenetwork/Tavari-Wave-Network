@@ -246,6 +246,52 @@ function TabButton({ label, active, onClick, icon: Icon }: { label: string, acti
   );
 }
 
+const RealisticDepositIcon = () => (
+  <div className="relative w-14 h-14 mx-auto mb-1 flex items-center justify-center">
+    {/* Outer halo / drop-shadow / radial-glow */}
+    <div className="absolute inset-0 bg-emerald-500/20 blur-lg rounded-full scale-110" />
+    
+    {/* Inner shadow/reflection ring */}
+    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent p-[1px] shadow-[inset_0_2px_4px_rgba(255,255,255,0.1)]">
+      {/* Curved glass body */}
+      <div className="w-full h-full rounded-2xl bg-gradient-to-b from-[#11241b] to-[#040806]/90 flex items-center justify-center border border-emerald-500/30 shadow-[0_8px_20px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.05)] relative overflow-hidden">
+        {/* Specular highlights / gloss diagonal */}
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-white/10 to-transparent rotate-45 transform pointer-events-none" />
+        
+        {/* Glowing 3D inner coin element */}
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 p-[1px] shadow-[0_4px_12px_rgba(16,185,129,0.4),inset_0_1px_rgba(255,255,255,0.2)] flex items-center justify-center">
+          <div className="w-full h-full rounded-full bg-gradient-to-b from-emerald-500 to-emerald-600 flex items-center justify-center text-white font-black text-md shadow-inner">
+            +
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const RealisticWithdrawIcon = () => (
+  <div className="relative w-14 h-14 mx-auto mb-1 flex items-center justify-center">
+    {/* Outer halo / drop-shadow / radial-glow */}
+    <div className="absolute inset-0 bg-rose-500/20 blur-lg rounded-full scale-110" />
+    
+    {/* Inner shadow/reflection ring */}
+    <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent p-[1px] shadow-[inset_0_2px_4px_rgba(255,255,255,0.1)]">
+      {/* Curved glass body */}
+      <div className="w-full h-full rounded-2xl bg-gradient-to-b from-[#241114] to-[#080405]/95 flex items-center justify-center border border-rose-500/30 shadow-[0_8px_20px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.05)] relative overflow-hidden">
+        {/* Specular highlights / gloss diagonal */}
+        <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-gradient-to-br from-white/10 to-transparent rotate-45 transform pointer-events-none" />
+        
+        {/* Glowing 3D inner coin element */}
+        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-rose-400 to-rose-600 p-[1px] shadow-[0_4px_12px_rgba(244,63,94,0.4),inset_0_1px_rgba(255,255,255,0.2)] flex items-center justify-center">
+          <div className="w-full h-full rounded-full bg-gradient-to-b from-rose-500 to-rose-600 flex items-center justify-center text-white font-black text-md shadow-inner">
+            −
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function Fund() {
   const { user, profile } = useAuth();
   const { tab } = useParams();
@@ -286,6 +332,48 @@ export default function Fund() {
 
   const withdrawalThreshold = 7;
   const withdrawalFeePercent = 20;
+
+  // Mobile Flow States
+  const [isDepositContinued, setIsDepositContinued] = useState(false);
+  const [isWithdrawContinued, setIsWithdrawContinued] = useState(false);
+  const [showContinueDepositPopup, setShowContinueDepositPopup] = useState(false);
+  const [showContinueWithdrawPopup, setShowContinueWithdrawPopup] = useState(false);
+  const [hasDismissedDepositPopup, setHasDismissedDepositPopup] = useState(false);
+  const [hasDismissedWithdrawPopup, setHasDismissedWithdrawPopup] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    
+    if (tab === 'deposit') {
+      if (hasDismissedDepositPopup) {
+        setIsDepositContinued(true);
+        setShowContinueDepositPopup(false);
+      } else if (selectedCountry === 'Nigeria' && !isDepositContinued) {
+        timer = setTimeout(() => {
+          setShowContinueDepositPopup(true);
+        }, 2200);
+      }
+    } else {
+      setShowContinueDepositPopup(false);
+    }
+
+    if (tab === 'withdraw') {
+      if (hasDismissedWithdrawPopup) {
+        setIsWithdrawContinued(true);
+        setShowContinueWithdrawPopup(false);
+      } else if (!isWithdrawContinued) {
+        timer = setTimeout(() => {
+          setShowContinueWithdrawPopup(true);
+        }, 2200);
+      }
+    } else {
+      setShowContinueWithdrawPopup(false);
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [tab, selectedCountry, isDepositContinued, isWithdrawContinued, hasDismissedDepositPopup, hasDismissedWithdrawPopup]);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -536,6 +624,19 @@ export default function Fund() {
     navigate('/dashboard#history');
   }
 
+  // Mobile Click Gateways
+  const handleMobileDepositClick = () => {
+    if (!selectedCountry) {
+      setShowCountryModal(true);
+    } else {
+      navigate('/fund/deposit');
+    }
+  };
+
+  const handleMobileWithdrawClick = () => {
+    navigate('/fund/withdraw');
+  };
+
   // --- RENDER LOGIC ---
 
   const renderDeposit = () => {
@@ -639,6 +740,11 @@ export default function Fund() {
                         className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-base md:text-xl font-bold outline-none focus:border-aura-lime/50 transition-all text-white"
                       />
                     </div>
+                    {depositAmount && parseFloat(depositAmount) < 10 && (
+                      <p className="text-red-500 text-[10px] font-black uppercase tracking-widest mt-2 text-center animate-pulse">
+                        Minimum deposit amount is $10.
+                      </p>
+                    )}
                   </div>
 
 
@@ -1052,6 +1158,7 @@ export default function Fund() {
                             setSelectedCountry('Nigeria');
                             setShowCountryModal(false);
                             toast.success('Assigned instant local institutional settlement route.');
+                            navigate('/fund/deposit');
                           } else {
                             setShowCountryModal(false);
                             setNotSupportedCountry(c.name);
@@ -1211,21 +1318,6 @@ export default function Fund() {
         {/* MAIN WALLET NODE / CONTENT AREA */}
         <div className="flex-1 w-full space-y-8">
           
-          {/* MOBILE NAVIGATION HUB BACK-BAR */}
-          {tab && (
-            <div className="lg:hidden flex items-center justify-between pb-2">
-              <button 
-                onClick={() => navigate('/fund')}
-                className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline px-4 py-3 bg-white/5 border border-white/5 rounded-2xl active:scale-95 transition-all"
-              >
-                <ArrowLeft size={14} /> Back to Wallet Hub
-              </button>
-              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-aura-muted bg-white/5 px-3 py-1.5 rounded-md border border-white/5">
-                {tab.toUpperCase()} NODE
-              </span>
-            </div>
-          )}
-
           {/* 1. Summary Stats */}
           <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
             <SummaryCard label="Funding Wallet" value={formatCurrency(profile?.funding_balance || 0)} color="text-blue-400" />
@@ -1234,78 +1326,292 @@ export default function Fund() {
             <SummaryCard label="Total Invested" value={formatCurrency(profile?.total_invested || 0)} color="text-orange-400" />
           </div>
 
-          {/* MOBILE WALLET HUB (MAIN VIEW WITH TOUCH CARD CHANNELS) */}
-          {!tab && (
-            <div className="lg:hidden space-y-8 py-2">
-              <div className="text-center space-y-2 py-4">
-                <p className="text-[9px] font-black text-aura-lime uppercase tracking-[0.2em]">Wave Transit Bridge</p>
-                <h2 className="text-3xl font-black text-white italic tracking-tight font-serif uppercase">Premium Hub</h2>
-                <p className="text-xs text-aura-muted uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
-                  Connect and process instant peer-to-peer settlement channels.
-                </p>
+          {/* PREMIUM FLOATING CONTINUATION POPUPS (MOBILE ONLY/POPUP BEHAVIOR) */}
+          <AnimatePresence>
+            {showContinueDepositPopup && !isDepositContinued && tab === 'deposit' && (
+              <div className="fixed inset-0 z-[1150] flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => {
+                    setHasDismissedDepositPopup(true);
+                    setIsDepositContinued(true);
+                    setShowContinueDepositPopup(false);
+                  }}
+                  className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                  className="relative w-full max-w-[280px] bg-[#0c0d12]/95 border border-emerald-500/20 rounded-[28px] overflow-hidden p-5 text-center shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(16,185,129,0.08)] z-10 backdrop-blur-xl"
+                >
+                  <button 
+                    onClick={() => {
+                      setHasDismissedDepositPopup(true);
+                      setIsDepositContinued(true);
+                      setShowContinueDepositPopup(false);
+                    }} 
+                    className="absolute top-3.5 right-3.5 p-1 hover:bg-white/5 rounded-full transition-colors text-white/30 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+
+                  <div className="space-y-4 pt-1">
+                    <RealisticDepositIcon />
+
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider font-serif">Deposit</h3>
+                      <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest">Swift/secure payment</p>
+                    </div>
+
+                    <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wide leading-relaxed px-1">
+                      Proceed to complete your deposit.
+                    </p>
+
+                    <button
+                      onClick={() => {
+                        setHasDismissedDepositPopup(true);
+                        setIsDepositContinued(true);
+                        setShowContinueDepositPopup(false);
+                      }}
+                      className="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black uppercase tracking-[0.15em] text-[9px] rounded-xl shadow-lg shadow-emerald-500/10 active:scale-95 transition-all text-center flex items-center justify-center gap-1.5"
+                    >
+                      Proceed <ArrowRight size={10} />
+                    </button>
+                  </div>
+                </motion.div>
               </div>
+            )}
+          </AnimatePresence>
 
-              {/* Large touch-friendly premium action buttons/cards */}
-              <div className="grid grid-cols-1 gap-4">
-                {/* DEPOSIT ACTION CARD */}
-                <button 
-                  onClick={() => navigate('/fund/deposit')}
-                  className="p-6 rounded-[32px] bg-gradient-to-br from-[#0c0f16]/95 via-[#0e171b]/80 to-[#10241b]/20 border border-emerald-500/20 group hover:border-emerald-500/40 relative overflow-hidden transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.5)] active:scale-[0.98] text-left animate-fade-in"
+          <AnimatePresence>
+            {showContinueWithdrawPopup && !isWithdrawContinued && tab === 'withdraw' && (
+              <div className="fixed inset-0 z-[1150] flex items-center justify-center p-4">
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => {
+                    setHasDismissedWithdrawPopup(true);
+                    setIsWithdrawContinued(true);
+                    setShowContinueWithdrawPopup(false);
+                  }}
+                  className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+                />
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                  className="relative w-full max-w-[280px] bg-[#0c0d12]/95 border border-rose-500/20 rounded-[28px] overflow-hidden p-5 text-center shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),0_0_40px_rgba(244,63,94,0.08)] z-10 backdrop-blur-xl"
                 >
-                  <div className="absolute top-0 right-0 p-4 bg-emerald-500/10 rounded-bl-3xl border-l border-b border-emerald-500/20">
-                    <PlusCircle size={20} className="text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  </div>
-                  <div className="space-y-1 relative z-10">
-                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Fund Wallet</p>
-                    <h3 className="text-lg font-black text-white uppercase italic tracking-wider font-serif">Deposit Node</h3>
-                    <p className="text-[9.5px] text-aura-muted uppercase tracking-widest leading-relaxed">
-                      Assign localized settlement bridge for instant dollar credits.
+                  <button 
+                    onClick={() => {
+                      setHasDismissedWithdrawPopup(true);
+                      setIsWithdrawContinued(true);
+                      setShowContinueWithdrawPopup(false);
+                    }} 
+                    className="absolute top-3.5 right-3.5 p-1 hover:bg-white/5 rounded-full transition-colors text-white/30 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+
+                  <div className="space-y-4 pt-1">
+                    <RealisticWithdrawIcon />
+
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-black text-white uppercase tracking-wider font-serif">Withdrawal</h3>
+                      <p className="text-[9px] font-bold text-rose-400 uppercase tracking-widest">Secure Payment gateway</p>
+                    </div>
+
+                    <p className="text-[10px] font-semibold text-white/50 uppercase tracking-wide leading-relaxed px-1">
+                      Continue to complete your withdrawal.
                     </p>
+
+                    <button
+                      onClick={() => {
+                        setHasDismissedWithdrawPopup(true);
+                        setIsWithdrawContinued(true);
+                        setShowContinueWithdrawPopup(false);
+                      }}
+                      className="w-full py-3 bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 text-white font-black uppercase tracking-[0.15em] text-[9px] rounded-xl shadow-lg shadow-rose-500/10 active:scale-95 transition-all text-center flex items-center justify-center gap-1.5"
+                    >
+                      Continue <ArrowRight size={10} />
+                    </button>
                   </div>
-                  <div className="absolute inset-0 bg-emerald-500/[0.02] pointer-events-none blur-xl rounded-full" />
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>
+
+          {/* MOBILE NEW PREMIUM ACTION HUB */}
+          <div className="lg:hidden space-y-6">
+            <div className="bg-gradient-to-b from-white/[0.03] to-white/[0.01] backdrop-blur-xl border border-white/10 rounded-[32px] p-4 py-5 shadow-[inner_0_1px_rgba(255,255,255,0.05),0_15px_35px_rgba(0,0,0,0.6)]">
+              <div className="grid grid-cols-3 gap-3">
+                {/* DEPOSIT ACTION BUTTON */}
+                <button 
+                  onClick={handleMobileDepositClick}
+                  className={cn(
+                    "relative py-5 px-2 rounded-[24px] bg-[#0d1016]/80 border transition-all duration-300 flex flex-col items-center justify-center gap-2 group overflow-hidden active:scale-95 shadow-md",
+                    tab === 'deposit' 
+                      ? "border-emerald-500/50 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]" 
+                      : "border-white/5 hover:border-emerald-500/20 text-white/80"
+                  )}
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center relative transition-all duration-300",
+                    tab === 'deposit' ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-white/5 text-emerald-400 group-hover:bg-emerald-500/10"
+                  )}>
+                    <PlusCircle size={18} className="drop-shadow-[0_0_4px_rgba(16,185,129,0.5)]" />
+                    {tab === 'deposit' && <span className="absolute inset-0 rounded-full bg-emerald-500/15 animate-ping opacity-30" />}
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-white">Deposit</span>
                 </button>
 
-                {/* WITHDRAW ACTION CARD */}
+                {/* WITHDRAW ACTION BUTTON */}
                 <button 
-                  onClick={() => navigate('/fund/withdraw')}
-                  className="p-6 rounded-[32px] bg-gradient-to-br from-[#0c0f16]/95 via-[#1d1214]/80 to-[#2e1014]/20 border border-rose-500/20 group hover:border-rose-500/40 relative overflow-hidden transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.5)] active:scale-[0.98] text-left animate-fade-in"
+                  onClick={handleMobileWithdrawClick}
+                  className={cn(
+                    "relative py-5 px-2 rounded-[24px] bg-[#0d1016]/80 border transition-all duration-300 flex flex-col items-center justify-center gap-2 group overflow-hidden active:scale-95 shadow-md",
+                    tab === 'withdraw' 
+                      ? "border-rose-500/50 bg-rose-950/20 shadow-[0_0_15px_rgba(244,63,94,0.2)]" 
+                      : "border-white/5 hover:border-rose-500/20 text-white/80"
+                  )}
                 >
-                  <div className="absolute top-0 right-0 p-4 bg-rose-500/10 rounded-bl-3xl border-l border-b border-rose-500/20">
-                    <MinusCircle size={20} className="text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center relative transition-all duration-300",
+                    tab === 'withdraw' ? "bg-rose-500/20 text-rose-400 border border-rose-500/30" : "bg-white/5 text-rose-400 group-hover:bg-rose-500/10"
+                  )}>
+                    <MinusCircle size={18} className="drop-shadow-[0_0_4px_rgba(244,63,94,0.5)]" />
+                    {tab === 'withdraw' && <span className="absolute inset-0 rounded-full bg-rose-500/15 animate-ping opacity-30" />}
                   </div>
-                  <div className="space-y-1 relative z-10">
-                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-1">Exchange Out</p>
-                    <h3 className="text-lg font-black text-white uppercase italic tracking-wider font-serif">Withdraw Node</h3>
-                    <p className="text-[9.5px] text-aura-muted uppercase tracking-widest leading-relaxed">
-                      Initiate smart-contracts or bank networks for settlements.
-                    </p>
-                  </div>
-                  <div className="absolute inset-0 bg-rose-400/[0.02] pointer-events-none blur-xl rounded-full" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-white">Withdraw</span>
                 </button>
 
-                {/* HISTORY ACTION CARD */}
+                {/* HISTORY ACTION BUTTON */}
                 <button 
                   onClick={() => navigate('/fund/transactions')}
-                  className="p-6 rounded-[32px] bg-gradient-to-br from-[#0c0f16]/95 via-[#1b121e]/80 to-[#20102e]/20 border border-purple-500/20 group hover:border-purple-500/40 relative overflow-hidden transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.5)] active:scale-[0.98] text-left animate-fade-in"
+                  className={cn(
+                    "relative py-5 px-2 rounded-[24px] bg-[#0d1016]/80 border transition-all duration-300 flex flex-col items-center justify-center gap-2 group overflow-hidden active:scale-95 shadow-md",
+                    (tab === 'transactions' || !tab) 
+                      ? "border-purple-500/50 bg-purple-950/20 shadow-[0_0_15px_rgba(168,85,247,0.2)]" 
+                      : "border-white/5 hover:border-purple-500/20 text-white/80"
+                  )}
                 >
-                  <div className="absolute top-0 right-0 p-4 bg-purple-500/10 rounded-bl-3xl border-l border-b border-purple-500/20">
-                    <History size={20} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                  <div className={cn(
+                    "w-10 h-10 rounded-full flex items-center justify-center relative transition-all duration-300",
+                    (tab === 'transactions' || !tab) ? "bg-purple-500/20 text-purple-400 border border-purple-500/30" : "bg-white/5 text-purple-400 group-hover:bg-purple-500/10"
+                  )}>
+                    <History size={18} className="drop-shadow-[0_0_4px_rgba(168,85,247,0.5)]" />
+                    {(tab === 'transactions' || !tab) && <span className="absolute inset-0 rounded-full bg-purple-500/15 animate-ping opacity-30" />}
                   </div>
-                  <div className="space-y-1 relative z-10">
-                    <p className="text-[10px] font-black text-purple-400 uppercase tracking-[0.2em] mb-1">Ledger Audits</p>
-                    <h3 className="text-lg font-black text-white uppercase italic tracking-wider font-serif">History Node</h3>
-                    <p className="text-[9.5px] text-aura-muted uppercase tracking-widest leading-relaxed">
-                      Verify complete cryptographically-signed records of operations.
-                    </p>
-                  </div>
-                  <div className="absolute inset-0 bg-purple-500/[0.02] pointer-events-none blur-xl rounded-full" />
+                  <span className="text-[10px] font-black uppercase tracking-wider text-white">History</span>
                 </button>
               </div>
             </div>
-          )}
 
-          {/* ACTIVE CONTENT BLOCK (DESKTOP OR EMBEDDED STAGES) */}
-          <div className={cn("min-h-[400px]", !tab && "hidden lg:block")}>
+            {/* EMBEDDED CONTENT BLOCK ON MOBILE */}
+            <div className="space-y-4">
+              {tab === 'deposit' && (
+                isDepositContinued ? (
+                  <div className="animate-fade-in">{renderDeposit()}</div>
+                ) : (
+                  <div className="py-12 text-center border border-white/5 bg-[#11141b]/40 rounded-[32px] shadow-inner relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/[0.01] to-transparent pointer-events-none" />
+                    <div className="relative z-10 space-y-3">
+                      <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto text-white/30 border border-white/5 shadow-inner">
+                        <PlusCircle size={22} className="animate-pulse" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase text-aura-lime tracking-widest">Aura Secure Bridge</p>
+                        <p className="text-[9px] font-bold text-white/40 uppercase tracking-wider">Awaiting Secure Gateway Authorization...</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {tab === 'withdraw' && (
+                isWithdrawContinued ? (
+                  <div className="animate-fade-in">{renderWithdraw()}</div>
+                ) : (
+                  <div className="py-12 text-center border border-white/5 bg-[#11141b]/40 rounded-[32px] shadow-inner relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-white/[0.01] to-transparent pointer-events-none" />
+                    <div className="relative z-10 space-y-3">
+                      <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto text-white/30 border border-white/5 shadow-inner">
+                        <MinusCircle size={22} className="animate-pulse" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase text-aura-lime tracking-widest">Aura Secure Bridge</p>
+                        <p className="text-[9px] font-bold text-white/40 uppercase tracking-wider">Awaiting Secure Gateway Authorization...</p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+
+              {(tab === 'transactions' || !tab) && (
+                <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+                    <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted flex items-center gap-2 font-mono">
+                      <History size={14} className="text-purple-400" /> Transaction History
+                    </h3>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      <div className="flex bg-[#11141b] p-1 rounded-lg border border-white/5">
+                        {['all', 'deposit', 'withdrawal', 'transfer', 'investment'].map((t) => (
+                          <button
+                            key={t}
+                            onClick={() => setFilterType(t)}
+                            className={cn(
+                              "px-3 py-1 rounded-md text-[7px] font-black uppercase tracking-widest transition-all font-mono",
+                              filterType === t ? "bg-aura-lime text-aura-black" : "text-aura-muted hover:text-white"
+                            )}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {filteredTransactions.length === 0 ? (
+                    <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-[40px] bg-[#11141b]/30">
+                      <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <History size={32} className="text-white/10" />
+                      </div>
+                      <p className="text-aura-muted text-[10px] font-black uppercase tracking-[0.2em]">No matching records found</p>
+                      {(filterType !== 'all' || filterStatus !== 'all') && (
+                        <button 
+                          onClick={() => { setFilterType('all'); setFilterStatus('all'); }}
+                          className="mt-4 text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline flex items-center gap-2 mx-auto"
+                        >
+                          <X size={12} /> Clear Filters
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid gap-3" id="fund-tx-grid">
+                      {filteredTransactions.map((tx, idx) => (
+                        <TransactionTicket 
+                          key={`${tx.type}-${tx.id}-${idx}`}
+                          tx={tx}
+                          currentUserId={user?.uid ?? undefined}
+                          variant="fund"
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ACTIVE CONTENT BLOCK (DESKTOP) */}
+          <div className={cn("min-h-[400px] hidden lg:block")}>
             <AnimatePresence mode="wait">
               <motion.div
                 key={tab || 'home'}
