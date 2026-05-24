@@ -122,9 +122,11 @@ interface NavItemProps {
   onClick?: () => void;
   gradientId?: string;
   glowColor?: string;
+  isProfile?: boolean;
+  profilePhoto?: string;
 }
 
-function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor }: NavItemProps) {
+function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, isProfile, profilePhoto }: NavItemProps) {
   return (
     <motion.button 
       onClick={onClick}
@@ -163,7 +165,18 @@ function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor }: 
           boxShadow: active ? `0 4px 15px -3px ${glowColor}30, 0 0 10px -1px ${glowColor}20` : 'none'
         }}
       >
-        {React.isValidElement(icon)
+        {isProfile ? (
+          <div className={cn(
+            "w-5 h-5 rounded-full overflow-hidden border transition-all duration-300 relative flex-shrink-0",
+            active ? "border-[#CCFF00]" : "border-white/20"
+          )}>
+            <img 
+              src={profilePhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=nexus`} 
+              alt={label} 
+              className="w-full h-full object-cover animate-none" 
+            />
+          </div>
+        ) : React.isValidElement(icon)
           ? React.cloneElement(icon as React.ReactElement, { 
               size: 20,
               stroke: active && gradientId ? `url(#${gradientId})` : "currentColor",
@@ -772,11 +785,11 @@ export default function Layout() {
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav className={cn(
-        "lg:hidden fixed bottom-4 left-4 right-4 h-20 z-[100] flex items-center px-2 backdrop-blur-2xl border rounded-[24px] shadow-[0_15px_35px_rgba(0,0,0,0.85),0_0_15px_rgba(168,85,247,0.04),0_0_20px_rgba(204,255,0,0.03)]",
+        "lg:hidden fixed bottom-0 left-0 right-0 h-20 w-full z-[100] flex items-center px-2 backdrop-blur-2xl border-t border-x-0 border-b-0 rounded-none shadow-[0_-8px_30px_rgba(0,0,0,0.65)]",
         isDark 
           ? "bg-[#0b0d14]/75 border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
           : "bg-white/85 border-[#a855f7]/15",
-        isDistractionFree && "hidden"
+        (isDistractionFree || location.pathname === '/token' || location.pathname.startsWith('/token/')) && "hidden"
       )}>
         {/* SVG definitions for realistic icon linear gradients */}
         <svg className="absolute w-0 h-0" width="0" height="0">
@@ -850,18 +863,9 @@ export default function Layout() {
             glowColor="#a855f7"
           />
           <BottomNavItem 
-            icon={
-              <div className={cn(
-                "w-6 h-6 rounded-full overflow-hidden border-2 transition-all duration-300 relative",
-                activeTab === 'profile' ? "border-[#CCFF00] scale-105 shadow-[0_0_12px_rgba(204,255,0,0.5)]" : "border-white/10"
-              )}>
-                <img 
-                  src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} 
-                  alt="Me" 
-                  className="w-full h-full object-cover" 
-                />
-              </div>
-            } 
+            icon={null} 
+            isProfile={true}
+            profilePhoto={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`}
             label={t('me')} 
             active={activeTab === 'profile'} 
             onClick={() => handleNavigation('/profile')} 

@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Zap, Clock } from 'lucide-react';
+import { Bot, Zap, Clock } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { useAuth, getRoiByAmountDynamic } from '../contexts/AuthContext';
 import { DynamicBalance } from './DynamicBalance';
 import { CandlestickChart, TradingActivity } from './ROIEngineVisuals';
-import { PremiumRobotIcon } from './PremiumCardIcons';
 
 interface ROIEngineStatsProps {
   investments: any[];
@@ -19,6 +18,23 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
   const [progress, setProgress] = useState(0);
   const [timeLeft, setTimeLeft] = useState("24:00:00");
   const [liveEarnings, setLiveEarnings] = useState(0);
+  const [isBlinking, setIsBlinking] = useState(false);
+
+  useEffect(() => {
+    let timeoutId: any;
+    const triggerBlink = () => {
+      setIsBlinking(true);
+      setTimeout(() => {
+        setIsBlinking(false);
+      }, 150);
+
+      const intervals = [1000, 2000, 3000, 5000];
+      const randomInterval = intervals[Math.floor(Math.random() * intervals.length)];
+      timeoutId = setTimeout(triggerBlink, randomInterval);
+    };
+    timeoutId = setTimeout(triggerBlink, 3000);
+    return () => clearTimeout(timeoutId);
+  }, []);
 
   const activeInvestments = useMemo(() => investments.filter(i => i.status === 'active'), [investments]);
   const activeCount = activeInvestments.length;
@@ -63,8 +79,8 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
               style={{ willChange: 'opacity' }}
               className="p-10 bg-[#11141b] border border-white/5 rounded-[40px] flex flex-col items-center justify-center text-center space-y-3 min-h-[300px]"
             >
-               <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-2">
-                 <PremiumRobotIcon isActive={false} className="w-11 h-11" />
+               <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-aura-muted/20 mb-2">
+                 <Bot size={32} />
                </div>
                <h3 className="text-xl font-black text-white uppercase tracking-widest">No active investment</h3>
                <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest max-w-[200px]">Pulse detected, but no core active. Activate one to start earning.</p>
@@ -74,16 +90,39 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
     return (
         <div 
         style={{ willChange: 'transform' }}
-        className="bg-gradient-to-b from-[#11141d]/85 to-[#0b0c10]/95 backdrop-blur-xl border border-white/[0.08] hover:border-emerald-500/30 shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05)] hover:shadow-[0_25px_60px_rgba(16,185,129,0.12),inset_0_1px_2px_rgba(255,255,255,0.1)] transition-all duration-500 rounded-[28px] lg:rounded-[36px] p-4 lg:p-8 flex flex-col items-center justify-center text-center aspect-square lg:aspect-auto lg:min-h-full relative overflow-hidden group active:scale-[0.99]"
+        className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-4 lg:p-8 flex flex-col items-center justify-center text-center aspect-square lg:aspect-auto lg:min-h-full relative overflow-visible group"
         >
-        {/* Subtle background glow */}
-        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none transition-all duration-700 group-hover:bg-amber-500/10 group-hover:scale-110" />
-        <div className="w-14 h-14 lg:w-24 lg:h-24 bg-[#11141b]/80 rounded-2xl lg:rounded-[32px] border border-white/10 flex items-center justify-center mb-4 lg:mb-8 relative z-10 shadow-inner group-hover:scale-105 transition-transform duration-500">
-            <PremiumRobotIcon isActive={false} className="w-8 h-8 lg:w-16 lg:h-16 opacity-50 group-hover:opacity-80 transition-opacity" />
+        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.01]" />
+        
+        {/* Increased robot size inside the exact same container frame */}
+        <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-white/10 flex items-center justify-center mb-4 lg:mb-8 relative z-10 overflow-hidden shadow-inner">
+          <div className="w-11 h-11 lg:w-18 lg:h-18 relative flex items-center justify-center group-hover:scale-110 transition-transform duration-700">
+            <img 
+              src="/src/assets/images/premium_robot_head_1779625130663.png" 
+              alt="Premium AI Bot Offline" 
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-60"
+            />
+            {/* Blinking eyes overlay in off-state */}
+            <div className="absolute top-[42%] left-[24%] right-[24%] flex justify-between pointer-events-none">
+              <motion.div 
+                animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                transition={{ duration: 0.08, ease: "easeInOut" }}
+                className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-emerald-500/50 rounded-full shadow-[0_0_4px_rgba(16,185,129,0.4)]"
+              />
+              <motion.div 
+                animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                transition={{ duration: 0.08, ease: "easeInOut" }}
+                className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-emerald-500/50 rounded-full shadow-[0_0_4px_rgba(16,185,129,0.4)]"
+              />
+            </div>
+          </div>
         </div>
+        
         <div className="relative z-10 space-y-2 lg:space-y-4 px-2">
-            <h3 className="text-[10px] lg:text-[15px] font-black text-white uppercase tracking-[0.25em] italic font-serif leading-tight">Engine Offline</h3>
-            <p className="text-[7px] lg:text-[10px] font-bold text-white/40 uppercase tracking-[0.15em] leading-relaxed max-w-[120px] lg:max-w-[200px] mx-auto">
+            <h3 className="text-[10px] lg:text-xl font-black text-white uppercase tracking-[0.2em] italic font-serif leading-tight">Engine Offline</h3>
+            <p className="text-[7px] lg:text-[10px] font-bold text-aura-muted uppercase tracking-[0.1em] leading-relaxed max-w-[120px] lg:max-w-[200px] mx-auto opacity-60">
             Activate pool to start earning
             </p>
         </div>
@@ -104,7 +143,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                 
                 <div className="absolute top-4 left-4 lg:top-4 lg:left-6 flex flex-col items-start translate-y-0">
                     <div className="w-10 h-10 lg:w-14 lg:h-14 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-primary shadow-xl">
-                    <PremiumRobotIcon isActive={true} className="w-6 h-6 lg:w-9 lg:h-9 animate-[bounce_3s_infinite]" />
+                    <Bot className="w-5 h-5 lg:w-7 lg:h-7 animate-bounce" />
                     <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full animate-ping" />
                     <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full" />
                     </div>
@@ -159,18 +198,41 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
   return (
     <div 
         style={{ willChange: 'transform' }}
-        className="bg-gradient-to-b from-[#11141d]/85 to-[#0b0c10]/95 backdrop-blur-xl border border-white/[0.08] hover:border-emerald-500/50 shadow-[0_20px_50px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_20px_rgba(16,185,129,0.02)] hover:shadow-[0_25px_60px_rgba(16,185,129,0.18),inset_0_1px_2px_rgba(255,255,255,0.12),0_4px_25px_rgba(16,185,129,0.08)] transition-all duration-500 rounded-[28px] lg:rounded-[36px] overflow-hidden flex flex-col relative group aspect-square lg:aspect-auto active:scale-[0.99]"
+        className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] overflow-visible flex flex-col relative group aspect-square lg:aspect-auto"
     >
+        {/* Subtle 3D glossy highlight line overlay */}
+        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none z-20" />
+        
         <div className="absolute inset-0 lg:relative lg:h-32 overflow-visible">
             <div className="absolute inset-0 flex items-center lg:items-end justify-between px-1 lg:px-2 gap-1 opacity-20 lg:opacity-30 translate-y-4 lg:translate-y-0">
                 <CandlestickChart count={25} />
             </div>
             
             <div className="absolute top-4 left-4 lg:top-6 lg:left-6 flex flex-col items-start lg:translate-y-0">
-                <div className="w-12 h-12 lg:w-18 lg:h-18 bg-[#11141b]/95 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-emerald-500 shadow-xl group-hover:scale-105 transition-transform duration-500">
-                <PremiumRobotIcon isActive={true} className="w-8 h-8 lg:w-11 lg:h-11 animate-[bounce_3s_infinite]" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full animate-ping" />
-                <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full" />
+                <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-emerald-500 shadow-xl overflow-hidden relative">
+                  <div className="w-9 h-9 lg:w-14 lg:h-14 relative flex items-center justify-center animate-bounce">
+                    <img 
+                      src="/src/assets/images/premium_robot_head_1779625130663.png" 
+                      alt="Premium AI Bot Active" 
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)]"
+                    />
+                    {/* Blinking eyes overlay */}
+                    <div className="absolute top-[42%] left-[24%] right-[24%] flex justify-between pointer-events-none">
+                      <motion.div 
+                        animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                        transition={{ duration: 0.08, ease: "easeInOut" }}
+                        className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.9),0_0_15px_rgba(52,211,153,0.6)]"
+                      />
+                      <motion.div 
+                        animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                        transition={{ duration: 0.08, ease: "easeInOut" }}
+                        className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-emerald-400 rounded-full shadow-[0_0_8px_rgba(52,211,153,0.9),0_0_15px_rgba(52,211,153,0.6)]"
+                      />
+                    </div>
+                  </div>
+                  <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full animate-ping z-30" />
+                  <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full z-30" />
                 </div>
             </div>
 

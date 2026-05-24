@@ -58,13 +58,37 @@ const BANK_DETAILS = {
   accountName: "TAVARI WAVE NETWORK"
 };
 
-const PLAN_ICONS: Record<string, React.ReactNode> = {
-  regular: <BarChart3 className="w-5 h-5 text-white" />,
-  premium: <Zap className="w-5 h-5 text-white" />,
-  elite: <Coins className="w-5 h-5 text-white" />,
+const PLAN_IMAGES: Record<string, string> = {
+  regular: "https://i.imgur.com/rXzjSWv.png",
+  premium: "https://i.imgur.com/BqbyCqy.png",
+  elite: "https://i.imgur.com/ik9pTGI.png",
 };
 
-const getPlanIcon = (id: string) => PLAN_ICONS[id] || <Coins className="w-5 h-5 text-white" />;
+const getPlanIcon = (id: string) => {
+  const imgSrc = PLAN_IMAGES[id];
+  if (!imgSrc) return <Coins className="w-5 h-5 text-white" />;
+  
+  const glowStyle = id === 'regular' 
+    ? 'shadow-[0_4px_20px_rgba(16,185,129,0.3)] shadow-[#10b981]'
+    : id === 'premium'
+    ? 'shadow-[0_4px_20px_rgba(139,92,246,0.35)] shadow-[#8b5cf6]'
+    : 'shadow-[0_4px_22px_rgba(245,158,11,0.4)] shadow-[#f59e0b]';
+
+  return (
+    <div className={`w-8 h-8 lg:w-11 lg:h-11 flex items-center justify-center relative overflow-visible ${glowStyle} select-none`}>
+      {/* Soft atmospheric gradient radial reflex glow */}
+      <div className={`absolute inset-0 rounded-full bg-gradient-to-tr opacity-20 blur-md pointer-events-none -z-10 ${
+        id === 'regular' ? 'from-emerald-500/30 to-transparent' : id === 'premium' ? 'from-purple-500/30 to-transparent' : 'from-amber-500/30 to-transparent'
+      }`} />
+      <img 
+        src={imgSrc} 
+        alt={`${id} tier`} 
+        className="w-full h-full object-contain filter brightness-[1.12] contrast-[1.08] drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)] transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500"
+        referrerPolicy="no-referrer"
+      />
+    </div>
+  );
+};
 
 // --- HIGH-QUALITY COUNTRY DATA ---
 const COUNTRIES = [

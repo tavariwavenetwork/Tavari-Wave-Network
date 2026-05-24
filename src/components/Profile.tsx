@@ -224,24 +224,24 @@ export default function Profile() {
       <div className="lg:hidden sticky top-2 z-[40] mx-0 p-3.5 rounded-2xl bg-[#0b0d14]/75 border border-white/[0.08] backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05)] flex items-center justify-between gap-4">
         <div className="flex items-center gap-3.5 min-w-0">
           {/* Profile picture at the extreme far left */}
-          <div className="relative group flex-shrink-0">
-            <div className="w-12 h-12 rounded-full border border-white/10 p-0.5 overflow-hidden bg-white/5 backdrop-blur-sm shadow-md">
+          <button 
+            onClick={() => {
+              setPhotoMode('options');
+              setShowPhotoModal(true);
+            }}
+            className="relative group flex-shrink-0 cursor-pointer focus:outline-none"
+          >
+            <div className="w-12 h-12 rounded-full border border-white/10 p-0.5 overflow-hidden bg-white/5 backdrop-blur-sm shadow-md hover:scale-105 transition-transform">
               <img 
                 src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} 
                 alt="Avatar" 
                 className="w-full h-full object-cover rounded-full" 
               />
             </div>
-            <button 
-              onClick={() => {
-                setPhotoMode('options');
-                setShowPhotoModal(true);
-              }}
-              className="absolute -bottom-1 -right-1 p-1 bg-white text-slate-900 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center cursor-pointer"
-            >
+            <div className="absolute -bottom-1 -right-1 p-1 bg-white text-slate-900 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center">
               <Camera size={10} />
-            </button>
-          </div>
+            </div>
+          </button>
 
           {/* Display name & Username (@handle) stacked tightly beside name */}
           <div className="flex flex-col min-w-0">
@@ -260,10 +260,41 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Premium subtle fintech glow or a subtle label */}
-        <div className="flex items-center gap-1.5 px-2 py-1 bg-white/[0.03] border border-white/[0.06] rounded-xl text-[8px] font-black uppercase tracking-widest text-white/40">
-          <span className="w-1 h-1 rounded-full bg-[#CCFF00] animate-ping" />
-          <span>Active</span>
+        {/* Edit Profile button neatly positioned on the right instead of Active status */}
+        <div className="flex items-center gap-2">
+          {!profile?.profile_edited ? (
+            !isEditing ? (
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold tracking-wider transition-all shadow-md cursor-pointer whitespace-nowrap"
+              >
+                Edit Profile
+              </button>
+            ) : (
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditName(profile?.name || '');
+                    setEditPhone(profile?.phone || '');
+                  }}
+                  className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white rounded-xl text-[10px] font-bold tracking-wider transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                   onClick={() => setShowWarningModal(true)}
+                  className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-bold tracking-wider transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            )
+          ) : (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 border border-white/10 rounded-xl text-[9px] font-bold text-slate-400 tracking-wider whitespace-nowrap">
+              <Lock size={10} /> Profile Locked
+            </div>
+          )}
         </div>
       </div>
 
@@ -272,19 +303,25 @@ export default function Profile() {
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex flex-col md:flex-row items-center gap-6">
             <div className="relative group">
-              <div className="w-28 h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white/20 p-1.5 overflow-hidden bg-white/10 backdrop-blur-sm shadow-2xl">
-                <img 
-                  src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} 
-                  alt="Avatar" 
-                  className="w-full h-full object-cover rounded-full" 
-                />
-              </div>
               <button 
                 onClick={() => {
                   setPhotoMode('options');
                   setShowPhotoModal(true);
                 }}
-                className="absolute bottom-1 right-1 p-2 bg-white text-slate-900 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center"
+                className="w-28 h-28 lg:w-32 lg:h-32 rounded-full border-4 border-white/20 p-1.5 overflow-hidden bg-white/10 hover:bg-white/20 backdrop-blur-sm shadow-2xl cursor-pointer hover:opacity-95 active:scale-95 transition-all focus:outline-none text-left"
+              >
+                <img 
+                  src={profile?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile?.username || 'nexus'}`} 
+                  alt="Avatar" 
+                  className="w-full h-full object-cover rounded-full" 
+                />
+              </button>
+              <button 
+                onClick={() => {
+                  setPhotoMode('options');
+                  setShowPhotoModal(true);
+                }}
+                className="absolute bottom-1 right-1 p-2 bg-white text-slate-900 rounded-full shadow-lg hover:scale-110 transition-transform flex items-center justify-center cursor-pointer"
               >
                 <Camera size={14} />
               </button>
@@ -311,13 +348,13 @@ export default function Profile() {
       <div className="grid grid-cols-2 gap-4 px-2">
         <button 
           onClick={() => navigate('/dashboard')}
-          className="flex items-center justify-center gap-2 px-4 py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-[10px] sm:text-xs tracking-widest uppercase transition-all shadow-xl hover:shadow-blue-500/20 active:scale-95"
+          className="flex items-center justify-center gap-2 px-4 py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-[10px] sm:text-xs tracking-widest transition-all shadow-xl hover:shadow-blue-500/20 active:scale-95 cursor-pointer"
         >
           <LayoutDashboard size={18} /> Dashboard
         </button>
         <button 
           onClick={openTransferModal}
-          className="flex items-center justify-center gap-2 px-4 py-5 bg-primary hover:bg-primary/90 text-white rounded-2xl font-bold text-[10px] sm:text-xs tracking-widest uppercase transition-all shadow-xl shadow-primary/20 active:scale-95"
+          className="flex items-center justify-center gap-2 px-4 py-5 bg-primary hover:bg-primary/90 text-white rounded-2xl font-bold text-[10px] sm:text-xs tracking-widest transition-all shadow-xl shadow-primary/20 active:scale-95 cursor-pointer"
         >
           <ArrowRightLeft size={18} /> Transfer
         </button>
@@ -341,32 +378,32 @@ export default function Profile() {
                 !isEditing ? (
                   <button 
                     onClick={() => setIsEditing(true)}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+                    className="hidden lg:block px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-bold tracking-wider transition-all shadow-md cursor-pointer"
                   >
                     Edit Profile
                   </button>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="hidden lg:flex gap-2">
                     <button 
                       onClick={() => {
                         setIsEditing(false);
                         setEditName(profile?.name || '');
                         setEditPhone(profile?.phone || '');
                       }}
-                      className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white rounded-xl text-[10px] font-bold tracking-wider transition-all cursor-pointer"
                     >
                       Cancel
                     </button>
                     <button 
                       onClick={() => setShowWarningModal(true)}
-                      className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-emerald-500/10"
+                      className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-bold tracking-wider transition-all shadow-md shadow-emerald-500/10 cursor-pointer"
                     >
                       Save
                     </button>
                   </div>
                 )
               ) : (
-                <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-xl text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-xl text-[9px] font-bold text-slate-400 tracking-wider">
                   <Lock size={10} /> Profile Locked
                 </div>
               )}
