@@ -22,7 +22,10 @@ import {
   Unlock,
   ChevronLeft,
   ChevronDown,
-  Search
+  Search,
+  Globe,
+  Send,
+  LayoutDashboard
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -44,6 +47,24 @@ import { toast } from 'sonner';
 import SuccessModal from './SuccessModal';
 import PinProtocolModal from './PinProtocolModal';
 import { TransactionTicket } from './TransactionTicket';
+
+const COUNTRIES = [
+  { name: 'United States', flag: '🇺🇸', code: 'US' },
+  { name: 'United Kingdom', flag: '🇬🇧', code: 'GB' },
+  { name: 'Canada', flag: '🇨🇦', code: 'CA' },
+  { name: 'Australia', flag: '🇦🇺', code: 'AU' },
+  { name: 'Germany', flag: '🇩🇪', code: 'DE' },
+  { name: 'France', flag: '🇫🇷', code: 'FR' },
+  { name: 'Singapore', flag: '🇸🇬', code: 'SG' },
+  { name: 'Tanzania', flag: '🇹🇿', code: 'TZ' },
+  { name: 'South Africa', flag: '🇿🇦', code: 'ZA' },
+  { name: 'Nigeria', flag: '🇳🇬', code: 'NG' },
+  { name: 'Cameroon', flag: '🇨🇲', code: 'CM' },
+  { name: 'Uganda', flag: '🇺🇬', code: 'UG' },
+  { name: 'Ghana', flag: '🇬🇭', code: 'GH' },
+  { name: 'Kenya', flag: '🇰🇪', code: 'KE' },
+  { name: 'Kuwait', flag: '🇰🇼', code: 'KW' }
+];
 
 // --- BANK SELECTOR MODAL ---
 const NIGERIAN_BANKS = [
@@ -237,6 +258,11 @@ export default function Fund() {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
+  const [showCountryModal, setShowCountryModal] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [notSupportedCountry, setNotSupportedCountry] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
   // --- DEPOSIT STATES ---
   const [depositAmount, setDepositAmount] = useState('');
   const [depositMethod, setDepositMethod] = useState<'bank' | 'crypto' | null>(null);
@@ -339,6 +365,12 @@ export default function Fund() {
       unsubscribeTx();
     };
   }, [user, profile]);
+
+  useEffect(() => {
+    if (tab === 'deposit' && !selectedCountry) {
+      setShowCountryModal(true);
+    }
+  }, [tab, selectedCountry]);
 
   const filteredTransactions = transactions.filter(tx => {
     const matchesType = filterType === 'all' || tx.type.toLowerCase() === filterType.toLowerCase();
@@ -507,11 +539,41 @@ export default function Fund() {
   // --- RENDER LOGIC ---
 
   const renderDeposit = () => {
+    if (selectedCountry !== 'Nigeria') {
+      return (
+        <div className="h-full min-h-[350px] flex flex-col items-center justify-center border border-white/5 bg-[#11141b] rounded-[32px] text-center p-10 space-y-6">
+          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center text-aura-muted border border-white/5">
+            <Globe size={28} className="animate-pulse" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg font-bold uppercase tracking-tight text-white mb-2">Region Assignment Required</h3>
+            <p className="text-xs text-aura-muted uppercase tracking-widest max-w-sm mx-auto leading-relaxed">
+              Please select your country or region to verify support and assign the correct settlement bridge.
+            </p>
+          </div>
+          <button 
+            onClick={() => setShowCountryModal(true)}
+            className="px-6 py-4 bg-aura-lime text-aura-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:scale-105 transition-all mt-4"
+          >
+            Select Region
+          </button>
+        </div>
+      );
+    }
+
     return (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Payment Methods */}
         <div className="lg:col-span-4 space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-[0.2em] text-aura-muted mb-4 px-2">Payment Channels</h3>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-aura-muted">Payment Channels</h3>
+            <button 
+              onClick={() => setShowCountryModal(true)}
+              className="text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline flex items-center gap-1 font-mono"
+            >
+              <Globe size={12} /> {selectedCountry}
+            </button>
+          </div>
           
           <button 
             onClick={() => setDepositMethod('bank')}
@@ -540,7 +602,7 @@ export default function Fund() {
             <div className="flex items-center gap-4">
               <Bitcoin size={24} className={cn(depositMethod === 'crypto' ? "text-aura-lime" : "text-aura-muted")} />
               <div className="text-left">
-                <p className="text-sm font-bold uppercase tracking-tight">Crypto Injection</p>
+                <p className="text-sm font-bold uppercase tracking-tight">Crypto Payment</p>
                 <p className="text-[10px] opacity-60 font-medium">USDT / BTC / ETH</p>
               </div>
             </div>
@@ -588,7 +650,7 @@ export default function Fund() {
                         type="text"
                         value={depositTxId}
                         onChange={(e) => setDepositTxId(e.target.value)}
-                        placeholder="Transaction ID"
+                        placeholder="Input your transaction ID or username"
                         className="w-full bg-aura-black border border-white/10 rounded-2xl px-6 py-4 text-base md:text-sm font-mono focus:border-aura-lime outline-none transition-all text-white"
                       />
                     </div>
@@ -926,101 +988,394 @@ export default function Fund() {
         }}
         isSubmitting={isSubmitting}
       />
-      {/* 1. Summary Stats (Always Visible) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 lg:gap-6">
-        <SummaryCard label="Funding Wallet" value={formatCurrency(profile?.funding_balance || 0)} color="text-blue-400" />
-        <SummaryCard label="Available" value={formatCurrency(profile?.available_balance || 0)} color="text-aura-lime" />
-        <SummaryCard label="Total Earnings" value={formatCurrency(profile?.total_earnings || 0)} color="text-purple-400" />
-        <SummaryCard label="Total Invested" value={formatCurrency(profile?.total_invested || 0)} color="text-orange-400" />
-      </div>
 
-      {/* 2. Tabs Navigation (Always Visible) */}
-      <div className="flex bg-[#11141b] rounded-xl overflow-hidden border border-white/5">
-        <TabButton 
-          label="Deposit" 
-          active={tab === 'deposit'} 
-          onClick={() => navigate('/fund/deposit')} 
-          icon={PlusCircle} 
-        />
-        <TabButton 
-          label="Withdraw" 
-          active={tab === 'withdraw'} 
-          onClick={() => navigate('/fund/withdraw')} 
-          icon={MinusCircle} 
-        />
-        <TabButton 
-          label="History" 
-          active={tab === 'transactions' || !tab} 
-          onClick={() => navigate('/fund/transactions')} 
-          icon={History} 
-        />
-      </div>
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={tab || 'home'}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-          className="min-h-[400px]"
-        >
-          {tab === 'deposit' && renderDeposit()}
-          {tab === 'withdraw' && renderWithdraw()}
-          {(tab === 'transactions' || !tab) && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted">Transaction History</h3>
-                
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex bg-[#11141b] p-1 rounded-lg border border-white/5">
-                    {['all', 'deposit', 'withdrawal', 'transfer', 'investment'].map((t) => (
-                      <button
-                        key={t}
-                        onClick={() => setFilterType(t)}
-                        className={cn(
-                          "px-3 py-1 rounded-md text-[7px] font-black uppercase tracking-widest transition-all",
-                          filterType === t ? "bg-aura-lime text-aura-black" : "text-aura-muted hover:text-white"
-                        )}
-                      >
-                        {t}
-                      </button>
-                    ))}
+      {/* COUNTRY SELECTOR MODAL */}
+      <AnimatePresence>
+        {showCountryModal && (
+          <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => {
+                if (selectedCountry) setShowCountryModal(false);
+              }}
+            />
+            
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-[#0d1016] border border-white/10 rounded-[40px] overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+            >
+              {/* Header */}
+              <div className="p-8 border-b border-white/5 space-y-6 flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <h3 className="text-2xl font-black text-white italic font-serif leading-none">Select Region</h3>
+                    <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Assign localized settlement node</p>
                   </div>
-                </div>
-              </div>
-
-              {filteredTransactions.length === 0 ? (
-                <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/5">
-                  <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <History size={32} className="text-white/10" />
-                  </div>
-                  <p className="text-aura-muted text-[10px] font-black uppercase tracking-[0.2em]">No matching records found</p>
-                  {(filterType !== 'all' || filterStatus !== 'all') && (
+                  {selectedCountry && (
                     <button 
-                      onClick={() => { setFilterType('all'); setFilterStatus('all'); }}
-                      className="mt-4 text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline flex items-center gap-2 mx-auto"
+                      onClick={() => setShowCountryModal(false)}
+                      className="p-2 text-aura-muted hover:text-white transition-colors"
                     >
-                      <X size={12} /> Clear Filters
+                      <X size={20} />
                     </button>
                   )}
                 </div>
-              ) : (
-                <div className="grid gap-3" id="fund-tx-grid">
-                  {filteredTransactions.map((tx, idx) => (
-                    <TransactionTicket 
-                      key={`${tx.type}-${tx.id}-${idx}`}
-                      tx={tx}
-                      currentUserId={user?.uid ?? undefined}
-                      variant="fund"
-                    />
-                  ))}
+
+                {/* Search */}
+                <div className="relative">
+                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-aura-muted" />
+                  <input 
+                    type="text" 
+                    placeholder="Search countries..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-5 text-sm font-bold text-white outline-none focus:border-aura-lime/50 transition-all font-mono"
+                  />
                 </div>
-              )}
+              </div>
+
+              {/* Countries Grid */}
+              <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
+                <div className="grid grid-cols-2 gap-3">
+                  {COUNTRIES.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).map((c) => {
+                    const isNigeria = c.name === 'Nigeria';
+                    return (
+                      <button 
+                        key={c.code}
+                        onClick={() => {
+                          if (isNigeria) {
+                            setSelectedCountry('Nigeria');
+                            setShowCountryModal(false);
+                            toast.success('Assigned instant local institutional settlement route.');
+                          } else {
+                            setShowCountryModal(false);
+                            setNotSupportedCountry(c.name);
+                          }
+                        }}
+                        className={cn(
+                          "p-4 flex items-center justify-between bg-white/5 border rounded-2xl transition-all hover:bg-white/10 group text-left",
+                          isNigeria ? "border-aura-lime/30 text-white" : "border-white/5 text-aura-muted"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl" role="img" aria-label={c.name}>{c.flag}</span>
+                          <div>
+                            <p className="text-xs font-bold leading-none">{c.name}</p>
+                            <p className="text-[8px] font-bold opacity-40 font-mono mt-0.5">{c.code}</p>
+                          </div>
+                        </div>
+                        {isNigeria && (
+                          <span className="text-[8px] font-black uppercase tracking-widest text-aura-lime px-2 py-0.5 bg-aura-lime/10 border border-aura-lime/20 rounded-md">
+                            Active
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* REGION NOT SUPPORTED MODAL */}
+        {notSupportedCountry && (
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+              onClick={() => setNotSupportedCountry(null)}
+            />
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-sm bg-[#0d1016] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl p-8 space-y-6 text-center"
+            >
+              <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-500">
+                <Globe size={28} className="animate-pulse" />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white italic font-serif leading-none">Not Supported</h3>
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest">{notSupportedCountry} Node Offline</p>
+              </div>
+
+              <p className="text-xs font-bold text-aura-muted leading-relaxed uppercase tracking-wider">
+                Automated peer-to-peer settlement networks for <span className="text-white">{notSupportedCountry}</span> are currently undergoing core maintenance.
+              </p>
+
+              <button 
+                onClick={() => {
+                  setNotSupportedCountry(null);
+                  setShowCountryModal(true);
+                }}
+                className="w-full py-4 bg-white/5 hover:bg-white/10 text-aura-muted hover:text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl transition-all border border-white/5"
+              >
+                Choose Another Region
+              </button>
+
+              <a 
+                href="https://t.me/Aura_support_Bot" 
+                target="_blank" 
+                referrerPolicy="no-referrer"
+                className="w-full py-4 bg-aura-lime text-aura-black font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-lg shadow-aura-lime/15 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
+              >
+                <Send size={12} /> Contact Telegram Support
+              </a>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Premium Desktop Side-by-Side Sidebar and Main Content, and Mobile Wallet Hub */}
+      <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 items-start w-full">
+        {/* LEFT FIXED SIDEBAR FOR DESKTOP */}
+        <div className="hidden lg:block lg:w-72 lg:flex-shrink-0 sticky top-28 space-y-6">
+          <div className="p-6 bg-[#11141b]/95 border border-white/5 rounded-[32px] space-y-6 shadow-2xl backdrop-blur-md">
+            <div className="space-y-1 pb-4 border-b border-white/5">
+              <p className="text-[9px] font-black text-aura-lime uppercase tracking-[0.2em] mb-1">Transit Node</p>
+              <h2 className="text-xl font-black text-white uppercase italic font-serif leading-none">Wave Wallet</h2>
+            </div>
+            
+            <div className="space-y-1">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-aura-muted hover:text-white hover:bg-white/5 transition-all group"
+              >
+                <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 group-hover:scale-110 transition-transform">
+                  <LayoutDashboard size={16} />
+                </div>
+                Dashboard
+              </button>
+
+              <button 
+                onClick={() => navigate('/fund/deposit')}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all group",
+                  tab === 'deposit' 
+                    ? "bg-aura-lime text-aura-black shadow-[0_4px_20px_rgba(204,255,0,0.15)]" 
+                    : "text-aura-muted hover:text-white hover:bg-white/5"
+                )}
+              >
+                <div className={cn("p-2 rounded-xl group-hover:scale-110 transition-transform", tab === 'deposit' ? "bg-aura-black/10 text-aura-black" : "bg-emerald-500/10 text-emerald-400")}>
+                  <PlusCircle size={16} />
+                </div>
+                Deposit
+              </button>
+
+              <button 
+                onClick={() => navigate('/fund/withdraw')}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all group",
+                  tab === 'withdraw' 
+                    ? "bg-aura-lime text-aura-black shadow-[0_4px_20px_rgba(204,255,0,0.15)]" 
+                    : "text-aura-muted hover:text-white hover:bg-white/5"
+                )}
+              >
+                <div className={cn("p-2 rounded-xl group-hover:scale-110 transition-transform", tab === 'withdraw' ? "bg-aura-black/10 text-aura-black" : "bg-rose-500/10 text-rose-400")}>
+                  <MinusCircle size={16} />
+                </div>
+                Withdraw
+              </button>
+
+              <button 
+                onClick={() => navigate('/fund/transactions')}
+                className={cn(
+                  "w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all group",
+                  (tab === 'transactions' || !tab) 
+                    ? "bg-aura-lime text-aura-black shadow-[0_4px_20px_rgba(204,255,0,0.15)]" 
+                    : "text-aura-muted hover:text-white hover:bg-white/5"
+                )}
+              >
+                <div className={cn("p-2 rounded-xl group-hover:scale-110 transition-transform", (tab === 'transactions' || !tab) ? "bg-aura-black/10 text-aura-black" : "bg-purple-500/10 text-purple-400")}>
+                  <History size={16} />
+                </div>
+                History
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-white/5 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[8px] font-black uppercase tracking-wider text-aura-muted opacity-60">System Synchronized</span>
+            </div>
+          </div>
+        </div>
+
+        {/* MAIN WALLET NODE / CONTENT AREA */}
+        <div className="flex-1 w-full space-y-8">
+          
+          {/* MOBILE NAVIGATION HUB BACK-BAR */}
+          {tab && (
+            <div className="lg:hidden flex items-center justify-between pb-2">
+              <button 
+                onClick={() => navigate('/fund')}
+                className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline px-4 py-3 bg-white/5 border border-white/5 rounded-2xl active:scale-95 transition-all"
+              >
+                <ArrowLeft size={14} /> Back to Wallet Hub
+              </button>
+              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-aura-muted bg-white/5 px-3 py-1.5 rounded-md border border-white/5">
+                {tab.toUpperCase()} NODE
+              </span>
             </div>
           )}
-        </motion.div>
-      </AnimatePresence>
+
+          {/* 1. Summary Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
+            <SummaryCard label="Funding Wallet" value={formatCurrency(profile?.funding_balance || 0)} color="text-blue-400" />
+            <SummaryCard label="Available" value={formatCurrency(profile?.available_balance || 0)} color="text-aura-lime" />
+            <SummaryCard label="Total Earnings" value={formatCurrency(profile?.total_earnings || 0)} color="text-purple-400" />
+            <SummaryCard label="Total Invested" value={formatCurrency(profile?.total_invested || 0)} color="text-orange-400" />
+          </div>
+
+          {/* MOBILE WALLET HUB (MAIN VIEW WITH TOUCH CARD CHANNELS) */}
+          {!tab && (
+            <div className="lg:hidden space-y-8 py-2">
+              <div className="text-center space-y-2 py-4">
+                <p className="text-[9px] font-black text-aura-lime uppercase tracking-[0.2em]">Wave Transit Bridge</p>
+                <h2 className="text-3xl font-black text-white italic tracking-tight font-serif uppercase">Premium Hub</h2>
+                <p className="text-xs text-aura-muted uppercase tracking-widest max-w-xs mx-auto leading-relaxed">
+                  Connect and process instant peer-to-peer settlement channels.
+                </p>
+              </div>
+
+              {/* Large touch-friendly premium action buttons/cards */}
+              <div className="grid grid-cols-1 gap-4">
+                {/* DEPOSIT ACTION CARD */}
+                <button 
+                  onClick={() => navigate('/fund/deposit')}
+                  className="p-6 rounded-[32px] bg-gradient-to-br from-[#0c0f16]/95 via-[#0e171b]/80 to-[#10241b]/20 border border-emerald-500/20 group hover:border-emerald-500/40 relative overflow-hidden transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.5)] active:scale-[0.98] text-left animate-fade-in"
+                >
+                  <div className="absolute top-0 right-0 p-4 bg-emerald-500/10 rounded-bl-3xl border-l border-b border-emerald-500/20">
+                    <PlusCircle size={20} className="text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                  </div>
+                  <div className="space-y-1 relative z-10">
+                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Fund Wallet</p>
+                    <h3 className="text-lg font-black text-white uppercase italic tracking-wider font-serif">Deposit Node</h3>
+                    <p className="text-[9.5px] text-aura-muted uppercase tracking-widest leading-relaxed">
+                      Assign localized settlement bridge for instant dollar credits.
+                    </p>
+                  </div>
+                  <div className="absolute inset-0 bg-emerald-500/[0.02] pointer-events-none blur-xl rounded-full" />
+                </button>
+
+                {/* WITHDRAW ACTION CARD */}
+                <button 
+                  onClick={() => navigate('/fund/withdraw')}
+                  className="p-6 rounded-[32px] bg-gradient-to-br from-[#0c0f16]/95 via-[#1d1214]/80 to-[#2e1014]/20 border border-rose-500/20 group hover:border-rose-500/40 relative overflow-hidden transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.5)] active:scale-[0.98] text-left animate-fade-in"
+                >
+                  <div className="absolute top-0 right-0 p-4 bg-rose-500/10 rounded-bl-3xl border-l border-b border-rose-500/20">
+                    <MinusCircle size={20} className="text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.5)]" />
+                  </div>
+                  <div className="space-y-1 relative z-10">
+                    <p className="text-[10px] font-black text-rose-400 uppercase tracking-[0.2em] mb-1">Exchange Out</p>
+                    <h3 className="text-lg font-black text-white uppercase italic tracking-wider font-serif">Withdraw Node</h3>
+                    <p className="text-[9.5px] text-aura-muted uppercase tracking-widest leading-relaxed">
+                      Initiate smart-contracts or bank networks for settlements.
+                    </p>
+                  </div>
+                  <div className="absolute inset-0 bg-rose-400/[0.02] pointer-events-none blur-xl rounded-full" />
+                </button>
+
+                {/* HISTORY ACTION CARD */}
+                <button 
+                  onClick={() => navigate('/fund/transactions')}
+                  className="p-6 rounded-[32px] bg-gradient-to-br from-[#0c0f16]/95 via-[#1b121e]/80 to-[#20102e]/20 border border-purple-500/20 group hover:border-purple-500/40 relative overflow-hidden transition-all duration-300 shadow-[0_15px_30px_rgba(0,0,0,0.5)] active:scale-[0.98] text-left animate-fade-in"
+                >
+                  <div className="absolute top-0 right-0 p-4 bg-purple-500/10 rounded-bl-3xl border-l border-b border-purple-500/20">
+                    <History size={20} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]" />
+                  </div>
+                  <div className="space-y-1 relative z-10">
+                    <p className="text-[10px] font-black text-purple-400 uppercase tracking-[0.2em] mb-1">Ledger Audits</p>
+                    <h3 className="text-lg font-black text-white uppercase italic tracking-wider font-serif">History Node</h3>
+                    <p className="text-[9.5px] text-aura-muted uppercase tracking-widest leading-relaxed">
+                      Verify complete cryptographically-signed records of operations.
+                    </p>
+                  </div>
+                  <div className="absolute inset-0 bg-purple-500/[0.02] pointer-events-none blur-xl rounded-full" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ACTIVE CONTENT BLOCK (DESKTOP OR EMBEDDED STAGES) */}
+          <div className={cn("min-h-[400px]", !tab && "hidden lg:block")}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tab || 'home'}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+              >
+                {tab === 'deposit' && renderDeposit()}
+                {tab === 'withdraw' && renderWithdraw()}
+                {(tab === 'transactions' || !tab) && (
+                  <div className="max-w-4xl mx-auto space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
+                      <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted flex items-center gap-2">
+                        <History size={14} className="text-purple-400" /> Transaction History
+                      </h3>
+                      
+                      <div className="flex flex-wrap gap-2">
+                        <div className="flex bg-[#11141b] p-1 rounded-lg border border-white/5">
+                          {['all', 'deposit', 'withdrawal', 'transfer', 'investment'].map((t) => (
+                            <button
+                              key={t}
+                              onClick={() => setFilterType(t)}
+                              className={cn(
+                                "px-3 py-1 rounded-md text-[7px] font-black uppercase tracking-widest transition-all",
+                                filterType === t ? "bg-aura-lime text-aura-black" : "text-aura-muted hover:text-white"
+                              )}
+                            >
+                              {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {filteredTransactions.length === 0 ? (
+                      <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-[40px] bg-white/5">
+                        <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <History size={32} className="text-white/10" />
+                        </div>
+                        <p className="text-aura-muted text-[10px] font-black uppercase tracking-[0.2em]">No matching records found</p>
+                        {(filterType !== 'all' || filterStatus !== 'all') && (
+                          <button 
+                            onClick={() => { setFilterType('all'); setFilterStatus('all'); }}
+                            className="mt-4 text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline flex items-center gap-2 mx-auto"
+                          >
+                            <X size={12} /> Clear Filters
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="grid gap-3" id="fund-tx-grid">
+                        {filteredTransactions.map((tx, idx) => (
+                          <TransactionTicket 
+                            key={`${tx.type}-${tx.id}-${idx}`}
+                            tx={tx}
+                            currentUserId={user?.uid ?? undefined}
+                            variant="fund"
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }

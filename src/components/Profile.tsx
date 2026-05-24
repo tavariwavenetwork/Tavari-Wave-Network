@@ -49,6 +49,43 @@ export default function Profile() {
   const streamRef = React.useRef<MediaStream | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [showWarningModal, setShowWarningModal] = useState(false);
+
+  React.useEffect(() => {
+    if (profile) {
+      setEditName(profile.name || '');
+      setEditPhone(profile.phone || '');
+    }
+  }, [profile]);
+
+  const handleSaveProfile = async () => {
+    if (!profile?.uid) return;
+    if (!editName.trim()) {
+      toast.error("Full name cannot be empty");
+      return;
+    }
+    
+    setIsUploading(true);
+    try {
+      const userRef = doc(db, 'users', profile.uid);
+      await updateDoc(userRef, {
+        name: editName,
+        phone: editPhone,
+        profile_edited: true
+      });
+      setIsEditing(false);
+      toast.success("Profile updated successfully and locked permanently.");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to update profile details.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const MALE_AVATARS = [
     { id: 'm1', url: 'https://api.dicebear.com/7.x/notionists/svg?seed=Jack' },
     { id: 'm2', url: 'https://api.dicebear.com/7.x/notionists/svg?seed=Oliver' },
@@ -245,20 +282,76 @@ export default function Profile() {
           
           {/* Account Information Section */}
           <section className="space-y-4">
-            <div className="px-2">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                <User size={18} className="text-blue-500" /> Account Information
-              </h3>
-              <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">View and manage your personal account details</p>
+            <div className="px-2 flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                  <User size={18} className="text-blue-500" /> Account Information
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">View and manage your personal account details</p>
+              </div>
+              
+              {!profile?.profile_edited ? (
+                !isEditing ? (
+                  <button 
+                    onClick={() => setIsEditing(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+                  >
+                    Edit Profile
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setIsEditing(false);
+                        setEditName(profile?.name || '');
+                        setEditPhone(profile?.phone || '');
+                      }}
+                      className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white/80 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      Cancel
+                    </button>
+                    <button 
+                      onClick={() => setShowWarningModal(true)}
+                      className="px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md shadow-emerald-500/10"
+                    >
+                      Save
+                    </button>
+                  </div>
+                )
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-white/5 border border-white/10 rounded-xl text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                  <Lock size={10} /> Profile Locked
+                </div>
+              )}
             </div>
             
             <div className="bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm shadow-sm transition-colors">
               <div className="divide-y divide-slate-100 dark:divide-white/5">
-                <InfoRow 
-                  icon={<User size={16} />} 
-                  label="Full Name" 
-                  value={profile?.name || 'N/A'} 
-                />
+                {isEditing ? (
+                  <div className="grid grid-cols-12 gap-3 p-5 items-center bg-white/5">
+                    <div className="col-span-1 text-blue-500">
+                      <User size={16} />
+                    </div>
+                    <div className="col-span-4 md:col-span-3">
+                      <p className="text-[9px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest leading-none">Full Name</p>
+                    </div>
+                    <div className="col-span-7 md:col-span-8">
+                      <input 
+                        type="text" 
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        placeholder="John Doe"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-blue-500 transition-all font-bold"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <InfoRow 
+                    icon={<User size={16} />} 
+                    label="Full Name" 
+                    value={profile?.name || 'N/A'} 
+                  />
+                )}
                 <InfoRow 
                   icon={<Fingerprint size={16} />} 
                   label="Username" 
@@ -269,11 +362,31 @@ export default function Profile() {
                   label="Email Address" 
                   value={profile?.email || 'N/A'} 
                 />
-                <InfoRow 
-                  icon={<Phone size={16} />} 
-                  label="Phone Number" 
-                  value={profile?.phone || 'Not provided'} 
-                />
+                {isEditing ? (
+                  <div className="grid grid-cols-12 gap-3 p-5 items-center bg-white/5">
+                    <div className="col-span-1 text-blue-500">
+                      <Phone size={16} />
+                    </div>
+                    <div className="col-span-4 md:col-span-3">
+                      <p className="text-[9px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest leading-none">Phone Number</p>
+                    </div>
+                    <div className="col-span-7 md:col-span-8">
+                      <input 
+                        type="text" 
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                        placeholder="+1 234 567 890"
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-blue-500 transition-all font-bold"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <InfoRow 
+                    icon={<Phone size={16} />} 
+                    label="Phone Number" 
+                    value={profile?.phone || 'Not provided'} 
+                  />
+                )}
                 <InfoRow 
                   icon={<ShieldCheck size={16} />} 
                   label="User ID" 
@@ -509,6 +622,60 @@ export default function Profile() {
                     )}
                   </div>
                 ) : null}
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {showWarningModal && (
+          <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setShowWarningModal(false)}
+            />
+            <motion.div 
+              initial={{ scale: 0.95, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-[#11141b] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl p-8 space-y-6"
+            >
+              <div className="mx-auto w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-500">
+                <ShieldCheck size={28} className="animate-pulse" />
+              </div>
+
+              <div className="space-y-2 text-center">
+                <h3 className="text-xl font-black text-white italic font-serif leading-none">Confirm Profile Lock</h3>
+                <p className="text-[10px] font-bold text-amber-400 uppercase tracking-widest">Verify identity credentials</p>
+              </div>
+
+              <div className="space-y-4 text-xs font-bold text-aura-muted leading-relaxed uppercase tracking-wider text-center">
+                <p className="text-slate-300">
+                  Please ensure the information entered matches your government-issued ID to avoid withdrawal issues in the future.
+                </p>
+                <p className="text-[10px] text-red-400 font-extrabold text-center border border-red-500/10 bg-red-500/5 p-3 rounded-xl">
+                  WARNING: Under fintech protocol rules, this update is ONE-TIME PERMANENT. Further edits will be locked.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button 
+                  onClick={() => setShowWarningModal(false)}
+                  className="w-full py-4 bg-white/5 hover:bg-white/10 text-aura-muted hover:text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl transition-all border border-white/5"
+                >
+                  Go Back
+                </button>
+                <button 
+                  onClick={async () => {
+                    setShowWarningModal(false);
+                    await handleSaveProfile();
+                  }}
+                  className="w-full py-4 bg-amber-500 text-slate-950 font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-lg shadow-amber-500/25 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                >
+                  Confirm & Save
+                </button>
               </div>
             </motion.div>
           </div>

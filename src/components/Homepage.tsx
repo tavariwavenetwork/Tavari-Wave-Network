@@ -31,6 +31,7 @@ const MemoizedWhyChooseSection = React.memo(WhyChooseSection);
 
 export default function Homepage() {
   const { user, profile } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -217,7 +218,7 @@ export default function Homepage() {
             onClick={() => navigate('/fund/deposit')}
             className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-[0_5px_15px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all"
           >
-            Fund
+            {t('Deposit')}
           </button>
         </div>
 
