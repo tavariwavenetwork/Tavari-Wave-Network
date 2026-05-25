@@ -148,6 +148,23 @@
         "last_updated": { "type": "string", "format": "date-time" }
       },
       "required": ["usd_to_ngn_rate"]
+    },
+    "ReferralClaim": {
+      "title": "Referral Claim",
+      "description": "Records representing a referral cashback or welcome bonus claim.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "type": { "type": "string", "enum": ["referrer", "referred"] },
+        "amount": { "type": "number" },
+        "partner_uid": { "type": "string" },
+        "partner_name": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "claimed"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "claimed_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "type", "amount", "partner_uid", "partner_name", "status", "created_at"]
     }
   },
   "firestore": {
@@ -182,6 +199,10 @@
     "/investment_plans/{id}": {
       "schema": "InvestmentPlan",
       "description": "Dynamic ROI investment plan configurations."
+    },
+    "/referral_claims/{id}": {
+      "schema": "ReferralClaim",
+      "description": "Referral bonus and welcome bonus claims."
     }
   }
 }

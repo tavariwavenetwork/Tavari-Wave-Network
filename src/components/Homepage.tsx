@@ -8,7 +8,10 @@ import {
   Zap,
   Activity,
   Clock,
-  X
+  X,
+  ArrowDownLeft,
+  ArrowUpRight,
+  TrendingUp
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -210,13 +213,8 @@ export default function Homepage() {
           
           <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/95 rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] relative overflow-hidden group-hover:scale-105 group-hover:border-emerald-500/40 transition-all duration-500">
             <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <img 
-              src="/src/assets/images/funding_premium_3d_1779698077464.png" 
-              alt="Funding" 
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-contain filter drop-shadow-[0_5px_8px_rgba(0,0,0,0.5)] transform group-hover:rotate-3 transition-transform duration-500 scale-[1.12]"
+            <ArrowDownLeft 
+              className="w-5 h-5 lg:w-8 lg:h-8 text-emerald-400 filter drop-shadow-[0_4px_10px_rgba(16,185,129,0.3)] transform group-hover:rotate-3 transition-transform duration-500 scale-[1.12]"
             />
           </div>
           <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Funding</h3>
@@ -241,13 +239,8 @@ export default function Homepage() {
 
           <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/95 rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] relative overflow-hidden group-hover:scale-105 group-hover:border-red-500/40 transition-all duration-500">
             <div className="absolute inset-0 bg-gradient-to-tr from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <img 
-              src="/src/assets/images/wallet_premium_3d_1779698096575.png" 
-              alt="Wallet" 
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-contain filter drop-shadow-[0_5px_8px_rgba(0,0,0,0.5)] transform group-hover:-rotate-3 transition-transform duration-500 scale-[1.12]"
+            <ArrowUpRight 
+              className="w-5 h-5 lg:w-8 lg:h-8 text-red-400 filter drop-shadow-[0_4px_10px_rgba(239,68,68,0.3)] transform group-hover:-rotate-3 transition-transform duration-500 scale-[1.12]"
             />
           </div>
           <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Available</h3>
@@ -272,13 +265,8 @@ export default function Homepage() {
 
           <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/95 rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] relative overflow-hidden group-hover:scale-105 group-hover:border-blue-500/40 transition-all duration-500">
             <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <img 
-              src="/src/assets/images/assets_box_premium_3d_1779698117244.png" 
-              alt="Assets Bag" 
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-contain filter drop-shadow-[0_5px_8px_rgba(0,0,0,0.5)] transform group-hover:scale-110 transition-transform duration-500 scale-[1.12]"
+            <TrendingUp 
+              className="w-5 h-5 lg:w-8 lg:h-8 text-blue-400 filter drop-shadow-[0_4px_10px_rgba(59,130,246,0.3)] transform group-hover:scale-110 transition-transform duration-500 scale-[1.12]"
             />
           </div>
           <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Assets</h3>

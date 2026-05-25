@@ -59,6 +59,17 @@ service cloud.firestore {
              data.plan_name is string;
     }
 
+    function isValidReferralClaim(data) {
+      return data.keys().hasAll(['user_id', 'type', 'amount', 'partner_uid', 'partner_name', 'status', 'created_at']) &&
+             data.user_id is string &&
+             data.type in ['referrer', 'referred'] &&
+             data.amount is number &&
+             data.partner_uid is string &&
+             data.partner_name is string &&
+             data.status in ['pending', 'claimed'] &&
+             data.created_at is string;
+    }
+
     function isAdditiveUpdate(field, incoming_data, existing_data) {
       return !(field in incoming_data) || 
              !(field in existing_data) || 
@@ -199,6 +210,24 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow read: if isSignedIn();
       allow update: if isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['used']);
+    }
+
+    match /referral_claims/{id} {
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && isValidReferralClaim(incoming()) && (
+        incoming().user_id == request.auth.uid || 
+        incoming().partner_uid == request.auth.uid
+      );
+      allow update: if isCipher() || (
+        isSignedIn() && 
+        resource.data.user_id == request.auth.uid && 
+        incoming().user_id == resource.data.user_id &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'claimed_at']) && 
+        incoming().status == 'claimed' &&
+        isValidReferralClaim(incoming())
+      );
+      allow delete: if isCipher();
     }
 
     match /newsletter_subscribers/{id} {

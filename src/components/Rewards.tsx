@@ -22,10 +22,12 @@ import {
   AlertCircle,
   PiggyBank,
   Search,
-  ArrowLeft
+  ArrowLeft,
+  Users,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn, isWithdrawalAllowed } from '../lib/utils';
+import { cn, isWithdrawalAllowed, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
 import { useNavigate } from 'react-router-dom';
@@ -232,6 +234,94 @@ export default function Rewards() {
   const [countdownStr, setCountdownStr] = useState('');
   const [isMobile, setIsMobile] = useState(false);
 
+  // Referral System States & Listener
+  const [referralClaims, setReferralClaims] = useState<any[]>([]);
+  const [isClaimingId, setIsClaimingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'referral_claims'),
+      where('user_id', '==', user.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const claims: any[] = [];
+      snapshot.forEach(docSnap => {
+        claims.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      // Sort by created_at desc
+      claims.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setReferralClaims(claims);
+    }, (err) => {
+      console.error("Error fetching referral claims in rewards page:", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  const handleClaimReward = async (claim: any) => {
+    if (!user || !profile) return;
+    if (profile.suspended || profile.banned) {
+      toast.error("Account access restricted by System Protocol.");
+      return;
+    }
+
+    setIsClaimingId(claim.id);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const claimRef = doc(db, 'referral_claims', claim.id);
+        const claimSnap = await transaction.get(claimRef);
+        if (!claimSnap.exists()) throw new Error("Reward claim record not found.");
+        
+        const claimData = claimSnap.data();
+        if (claimData.status !== 'pending') throw new Error("Reward has already been claimed.");
+
+        const userRef = doc(db, 'users', user.uid);
+        
+        // Update user balances (referral_earnings and available_balance)
+        transaction.update(userRef, {
+          available_balance: increment(claim.amount),
+          referral_earnings: increment(claim.amount)
+        });
+
+        // Mark claim as claimed
+        transaction.update(claimRef, {
+          status: 'claimed',
+          claimed_at: new Date().toISOString()
+        });
+
+        // Add history transaction
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: user.uid,
+          type: 'referral_reward',
+          amount: claim.amount,
+          status: 'approved',
+          created_at: new Date().toISOString(),
+          description: claim.type === 'referrer'
+            ? `Referral commission - partner ${claim.partner_name}`
+            : `Welcome referral bonus unlocked`
+        });
+
+        // Add user notification
+        const notificationRef = doc(collection(db, 'notifications'));
+        transaction.set(notificationRef, {
+          user_id: user.uid,
+          title: 'Referral Reward Disbursed',
+          message: `Successfully claimed ${claim.amount} USD to your Referral & Available balances.`,
+          type: 'success',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      });
+
+      toast.success("Bonus Disbursed! Balance Successfully Updated.");
+    } catch (err: any) {
+      toast.error(err.message || "Claim failed.");
+    } finally {
+      setIsClaimingId(null);
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -239,6 +329,17 @@ export default function Rewards() {
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Smooth-scroll helper for the dashboard redirect path
+  useEffect(() => {
+    if (window.location.hash === '#referral-rewards') {
+      const timer = setTimeout(() => {
+        const el = document.getElementById('referral-rewards-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 600);
+      return () => clearTimeout(timer);
+    }
   }, []);
   
   // Points Conversion State
@@ -1405,6 +1506,178 @@ export default function Rewards() {
               </div>
 
             </div>
+          </div>
+
+        </div>
+
+        {/* --- DUAL-COLUMN ELITE REFERRAL MODULE GRID (8 + 4 cols) --- */}
+        <div id="referral-rewards-section" className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
+          
+          {/* Card 1: Redesigned Referral Metrics Card (8 columns) */}
+          <div className="lg:col-span-8 relative overflow-visible rounded-[32px] border-2 border-purple-500/25 bg-gradient-to-br from-[#121524]/95 via-purple-950/20 to-[#0e111a]/95 p-6 md:p-8 shadow-[0_20px_50px_rgba(168,85,247,0.12)] select-none">
+            {/* Background glowing gradients */}
+            <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/10 blur-[90px] rounded-full pointer-events-none" />
+            <div className="absolute -bottom-10 right-10 w-48 h-48 bg-pink-500/10 blur-[90px] rounded-full pointer-events-none" />
+            
+            {/* Extremely Premium overlapping 3D gift/wave visual graphic extending OUTSIDE boundaries */}
+            <div className="absolute -right-6 -bottom-6 w-56 h-56 pointer-events-none opacity-85 hidden sm:block overflow-visible select-none">
+               <svg viewBox="0 0 100 100" className="w-full h-full filter drop-shadow-[0_12px_24px_rgba(168,85,247,0.4)]">
+                 <defs>
+                   <linearGradient id="glowG" x1="0" y1="0" x2="1" y2="1">
+                     <stop offset="0%" stopColor="#ec4899" />
+                     <stop offset="100%" stopColor="#8b5cf6" />
+                   </linearGradient>
+                 </defs>
+                 {/* Floating floating sparks outside the box */}
+                 <polygon points="12,18 18,12 24,18 18,24" fill="#fbbf24" opacity="0.8" />
+                 <polygon points="80,50 84,46 88,50 84,54" fill="#67e8f9" opacity="0.6" />
+                 
+                 {/* Overlay circles for lighting */}
+                 <circle cx="50" cy="50" r="32" fill="none" stroke="url(#glowG)" strokeWidth="0.5" strokeDasharray="3 3" />
+                 
+                 {/* Overlapping box elements */}
+                 <path d="M 30,55 L 70,30 L 50,15 L 10,40 Z" fill="url(#glowG)" opacity="0.15" />
+                 <path d="M 50,55 L 90,30 L 70,15 L 30,40 Z" fill="url(#glowG)" opacity="0.2" />
+                 {/* Premium 3D Box lid and ribbon */}
+                 <path d="M 40,58 L 80,38 L 50,22 L 10,42 Z" fill="url(#glowG)" />
+                 <path d="M 10,42 L 50,62 L 50,95 L 10,75 Z" fill="#6d28d9" />
+                 <path d="M 80,38 L 50,62 L 50,95 L 80,71 Z" fill="#4c1d95" />
+                 <path d="M 50,62 L 50,95" stroke="#f472b6" strokeWidth="2.5" />
+                 <path d="M 30,48 Q 50,25 50,15 Q 50,25 70,48 Q 50,58 30,48 Z" fill="#f43f5e" opacity="0.9" />
+               </svg>
+            </div>
+
+            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-[#A855F7] shadow-[0_4px_20px_rgba(168,85,247,0.2)]">
+                  <Users size={24} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black italic text-white uppercase tracking-tight">Referral Matrix</h3>
+                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Earn spendable payouts of 5.00% under Elite Commission Tier</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Metrics Panel */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
+              <div className="p-5 bg-black/40 border border-white/5 rounded-2xl text-center backdrop-blur-sm">
+                <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Total Network</span>
+                <span className="text-2xl sm:text-3xl font-black text-white italic font-serif leading-none">{profile?.referrals_count || 0}</span>
+                <span className="text-[8px] font-bold text-purple-400 uppercase tracking-widest block mt-1">Partners</span>
+              </div>
+              
+              <div className="p-5 bg-black/40 border border-white/5 rounded-2xl text-center backdrop-blur-sm">
+                <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Active Nodes</span>
+                <span className="text-2xl sm:text-3xl font-black text-emerald-400 italic font-serif leading-none">{profile?.active_referrals || 0}</span>
+                <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest block mt-1">First-Invested</span>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 p-5 bg-gradient-to-br from-purple-500/15 to-pink-500/10 border border-purple-500/20 rounded-2xl text-center backdrop-blur-sm">
+                <span className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Referral Wallet</span>
+                <span className="text-2xl sm:text-3xl font-black text-white italic font-serif leading-none">
+                  {formatCurrency(profile?.referral_earnings || 0)}
+                </span>
+                <span className="text-[8px] font-bold text-pink-400 uppercase tracking-widest block mt-1">Unclaimed Payouts Available</span>
+              </div>
+            </div>
+
+            {/* Connection / Share Area */}
+            <div className="mt-6 p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-4 max-w-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Unique Invite Code</span>
+                  <span className="text-xs font-black text-white tracking-[0.2em]">{profile?.referral_code || '---'}</span>
+                </div>
+                <div className="h-px sm:h-8 w-full sm:w-px bg-white/5" />
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Network Referral Link</span>
+                  <span className="text-[10px] font-bold text-white/50 truncate block mt-0.5 font-mono">
+                    {profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => {
+                    const link = profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`;
+                    navigator.clipboard.writeText(link);
+                    toast.success("Referral invitation link copied to clipboard!");
+                  }}
+                  className="px-4 py-2.5 bg-[#4c1d95] hover:bg-purple-600 active:scale-95 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all self-stretch sm:self-center flex items-center justify-center gap-1.5 border border-purple-500/20 shadow-md cursor-pointer"
+                >
+                  <Copy size={12} /> Copy Share Link
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Card 2: Referral Reward Claim Card (4 columns) */}
+          <div className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[50px] rounded-full pointer-events-none" />
+            
+            <div className="flex items-center gap-2.5 mb-4">
+              <Trophy className="text-purple-400" size={20} />
+              <div>
+                <h3 className="text-sm font-black italic text-white uppercase tracking-tight">Referral Rewards</h3>
+                <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Claim 5.00% pending payouts</p>
+              </div>
+            </div>
+
+            {/* List claims */}
+            <div className="flex-1 mt-2 overflow-y-auto space-y-3.5 pr-1 max-h-[280px] scrollbar-thin scrollbar-thumb-white/5">
+              {referralClaims.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-black/20 border border-white/5 rounded-2xl">
+                  <Gift size={24} className="text-gray-600 mb-2 animate-pulse" />
+                  <span className="text-[9px] font-bold uppercase text-gray-500 tracking-widest leading-normal">
+                    No Payouts Available
+                  </span>
+                  <span className="text-[8px] text-gray-600 leading-normal mt-1 block">
+                    Your referral ledger is pristine. Payouts materialize here when direct partners activate nodes.
+                  </span>
+                </div>
+              ) : (
+                referralClaims.map((claim) => (
+                  <div 
+                    key={claim.id} 
+                    className="p-3.5 bg-black/30 border border-white/5 rounded-2xl flex items-center justify-between gap-3.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[8px] font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                          {claim.type === 'referrer' ? 'Commission' : 'Welcome'}
+                        </span>
+                        <span className="text-[9px] text-gray-400 capitalize truncate max-w-[100px]">
+                          Partner: {claim.partner_name}
+                        </span>
+                      </div>
+                      <div className="text-xs font-black text-white mt-1">
+                        Amount: {formatCurrency(claim.amount)}
+                      </div>
+                      <div className="text-[8px] text-gray-600 mt-0.5">
+                        {new Date(claim.created_at || '').toLocaleDateString()}
+                      </div>
+                    </div>
+                    
+                    <div className="flex-shrink-0">
+                      {claim.status === 'pending' ? (
+                        <button 
+                          onClick={() => handleClaimReward(claim)}
+                          disabled={isClaimingId === claim.id}
+                          className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:brightness-110 active:scale-95 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-pink-500/10 cursor-pointer"
+                        >
+                          {isClaimingId === claim.id ? 'Claiming' : 'Claim'}
+                        </button>
+                      ) : (
+                        <span className="px-2.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase tracking-widest rounded-xl">
+                          Claimed
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
           </div>
 
         </div>

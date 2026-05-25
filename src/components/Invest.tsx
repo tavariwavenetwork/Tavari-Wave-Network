@@ -314,30 +314,50 @@ export default function Invest() {
           referral_bonus_processed: true
         });
 
-        // Referral Bonus Logic
-        if (profile.referred_by && !invData.referral_bonus_processed) {
+        // Referral Bonus Logic (only first investment activated)
+        if (profile.referred_by && !profile.first_investment_activated && !invData.referral_bonus_processed) {
           const bonusAmount = invData.amount * 0.05;
-          const referrerRef = doc(db, 'users', profile.referred_by);
           const userRef = doc(db, 'users', user.uid);
-          
-          // Reward user
+          const referrerRef = doc(db, 'users', profile.referred_by);
+
+          // Mark user's first investment as activated and increment active referrals
           transaction.update(userRef, {
-            available_balance: increment(bonusAmount)
+            first_investment_activated: true
+          });
+          transaction.update(referrerRef, {
+            active_referrals: increment(1)
           });
 
-          // Reward referrer
-          transaction.update(referrerRef, {
-            available_balance: increment(bonusAmount),
-            referral_earnings: increment(bonusAmount),
-            active_referrals: increment(1)
+          // Create pending claim document for User A (referrer)
+          const claimRef1 = doc(collection(db, 'referral_claims'));
+          transaction.set(claimRef1, {
+            user_id: profile.referred_by, // User A (referrer)
+            type: 'referrer',
+            amount: bonusAmount,
+            partner_uid: user.uid, // User B
+            partner_name: profile.username || 'Partner',
+            status: 'pending',
+            created_at: now
+          });
+
+          // Create pending claim document for User B (referred)
+          const claimRef2 = doc(collection(db, 'referral_claims'));
+          transaction.set(claimRef2, {
+            user_id: user.uid, // User B
+            type: 'referred',
+            amount: bonusAmount,
+            partner_uid: profile.referred_by, // User A
+            partner_name: 'Sponsor',
+            status: 'pending',
+            created_at: now
           });
 
           // Notifications
           const notificationRef1 = doc(collection(db, 'notifications'));
           transaction.set(notificationRef1, {
             user_id: user.uid,
-            title: 'Referral Bonus Received',
-            message: `You earned a ${formatCurrency(bonusAmount)} bonus for activating your investment under a referral code!`,
+            title: 'Welcome Referral Reward Pending',
+            message: `You have a pending referral reward of ${formatCurrency(bonusAmount)}! Claim it inside the Reward page.`,
             type: 'success',
             read: false,
             created_at: now
@@ -346,32 +366,17 @@ export default function Invest() {
           const notificationRef2 = doc(collection(db, 'notifications'));
           transaction.set(notificationRef2, {
             user_id: profile.referred_by,
-            title: 'Referral Reward',
-            message: `Your network partner ${profile.username} activated an investment. You earned ${formatCurrency(bonusAmount)}!`,
+            title: 'Referral Reward Pending',
+            message: `Your referral ${profile.username} has activated an investment. Claim your referral reward now.`,
             type: 'success',
             read: false,
             created_at: now
           });
-          
-          // Transaction history for bonuses
-          const txRef1 = doc(collection(db, 'transactions'));
-          transaction.set(txRef1, {
-            user_id: user.uid,
-            type: 'referral_bonus',
-            amount: bonusAmount,
-            status: 'approved',
-            created_at: now,
-            description: 'Self-activation bonus'
-          });
-
-          const txRef2 = doc(collection(db, 'transactions'));
-          transaction.set(txRef2, {
-            user_id: profile.referred_by,
-            type: 'referral_reward',
-            amount: bonusAmount,
-            status: 'approved',
-            created_at: now,
-            description: `From partner ${profile.username}`
+        } else {
+          // If they don't have a referrer or it's not their first investment, we still mark first_investment_activated
+          const userRef = doc(db, 'users', user.uid);
+          transaction.update(userRef, {
+            first_investment_activated: true
           });
         }
       });

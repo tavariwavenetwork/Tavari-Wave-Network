@@ -31,7 +31,10 @@ import {
   ArrowRightLeft,
   Gift,
   Coins,
-  Headset
+  Headset,
+  Share2,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -43,6 +46,7 @@ import TransferModal from './TransferModal';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, limit, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 import MarketTicker from './MarketTicker';
 import Footer from './Footer';
 
@@ -237,6 +241,71 @@ export default function Layout() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const [showTelegramPopup, setShowTelegramPopup] = useState(false);
+
+  // Referral Invite & Real-time Claim Popups State
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [activePendingClaims, setActivePendingClaims] = useState<any[]>([]);
+  const [showClaimToast, setShowClaimToast] = useState<any | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleCopyLink = () => {
+    const code = profile?.referral_code || '';
+    const link = code ? `${window.location.origin}/signup?ref=${code}` : `${window.location.origin}/signup`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    toast.success("Referral invitation link copied to clipboard!");
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  // Trigger modal on login or page refresh event
+  useEffect(() => {
+    if (!user) return;
+    const hasTriggeredThisSession = sessionStorage.getItem('referral_invite_popup_triggered');
+    if (!hasTriggeredThisSession) {
+      sessionStorage.setItem('referral_invite_popup_triggered', 'true');
+      const timer = setTimeout(() => {
+        setShowInviteModal(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
+  // Trigger modal on every visit to the Reward page
+  useEffect(() => {
+    if (location.pathname === '/rewards') {
+      setShowInviteModal(true);
+    }
+  }, [location.pathname]);
+
+  // Listen to Firestore real-time 'referral_claims' and trigger top-right popup toast
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'referral_claims'),
+      where('user_id', '==', user.uid),
+      where('status', '==', 'pending')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const claims: any[] = [];
+      snapshot.forEach(docSnap => {
+        claims.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      setActivePendingClaims(claims);
+      
+      if (claims.length > 0) {
+        // Automatically surface claims to the user immediately as a floating premium popup/toast
+        const latestReferrerClaim = claims.find(c => c.type === 'referrer') || claims[0];
+        if (latestReferrerClaim) {
+          setShowClaimToast(latestReferrerClaim);
+        }
+      } else {
+        setShowClaimToast(null);
+      }
+    }, (err) => {
+      console.error("Error listening to referral claims in layout:", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -1083,6 +1152,205 @@ export default function Layout() {
               </a>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- ELITE INVITE FRIENDS MODAL --- */}
+      <AnimatePresence>
+        {showInviteModal && (
+          <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setShowInviteModal(false)}
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              transition={{ type: "spring", damping: 25, stiffness: 180 }}
+              className="relative w-full max-w-md bg-[#0d1017] border border-purple-500/30 rounded-[36px] p-8 text-center overflow-visible shadow-[0_30px_100px_rgba(168,85,247,0.25)] select-none"
+            >
+              {/* Overlapping top graphic rendering */}
+              <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-32 h-32 overflow-visible pointer-events-none">
+                <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl animate-pulse" />
+                {/* Custom Elegant 3D overlapping visual element (Gift Box + Particles) */}
+                <svg viewBox="0 0 100 100" className="w-full h-full filter drop-shadow-[0_8px_16px_rgba(168,85,247,0.5)]">
+                  <defs>
+                    <linearGradient id="lidGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#ec4899" />
+                      <stop offset="100%" stopColor="#a855f7" />
+                    </linearGradient>
+                    <linearGradient id="boxGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#a855f7" />
+                      <stop offset="100%" stopColor="#6366f1" />
+                    </linearGradient>
+                  </defs>
+                  {/* Floating particles */}
+                  <circle cx="20" cy="30" r="4" fill="#fbbf24" opacity="0.9" className="animate-bounce" />
+                  <circle cx="80" cy="25" r="5" fill="#f43f5e" opacity="0.8" />
+                  <path d="M 50,45 L 85,20 L 50,5 L 15,20 Z" fill="url(#lidGrad)" />
+                  <path d="M 15,24 L 50,49 L 50,90 L 15,65 Z" fill="url(#boxGrad)" />
+                  <path d="M 85,24 L 50,49 L 50,90 L 85,65 Z" fill="url(#boxGrad)" opacity="0.85" />
+                  <path d="M 50,49 L 50,90" stroke="#f472b6" strokeWidth="2" />
+                  <path d="M 32,12 C 40,-5 48,15 50,22 C 52,15 60,-5 68,12 C 73,20 62,25 50,22 C 38,25 27,20 32,12 Z" fill="#ec4899" />
+                </svg>
+              </div>
+
+              {/* Close button */}
+              <button 
+                onClick={() => setShowInviteModal(false)}
+                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors p-2 bg-white/5 hover:bg-white/10 rounded-full"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="mt-14 space-y-4">
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-[9px] font-bold text-purple-300 uppercase tracking-widest leading-none">
+                  <Gift size={10} className="text-purple-400" /> Executive Program
+                </span>
+                
+                <h3 className="text-xl font-black text-white uppercase tracking-wide">
+                  Share the Wave
+                </h3>
+                
+                <p className="text-xs text-white/60 leading-relaxed max-w-sm mx-auto">
+                  Expand your quantum networking tier. Refer a partner and both of you will receive a premium <span className="text-purple-400 font-extrabold">5% bonus</span> on their first active investment node!
+                </p>
+
+                {/* Referral Details Box */}
+                <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left space-y-3 mt-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Referral Code</span>
+                    <span className="text-xs font-black text-white tracking-widest">{profile?.referral_code || '---'}</span>
+                  </div>
+                  <div className="h-px bg-white/5" />
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Invitation Link</span>
+                    <div className="flex items-center gap-2 bg-[#080a0e] border border-white/5 rounded-xl p-2 pl-3">
+                      <span className="text-[10px] font-medium text-white/50 truncate flex-1">
+                        {profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`}
+                      </span>
+                      <button 
+                        onClick={handleCopyLink}
+                        className="p-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors"
+                      >
+                        {copiedLink ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Social Share Grid */}
+                <div className="mt-6">
+                  <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest mb-3">Instant Share Options</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    <a 
+                      href={`https://api.whatsapp.com/send?text=${encodeURIComponent('Join Tavari Wave, the elite high-frequency quant node network! Use my invitation code "' + (profile?.referral_code || '') + '" and get an exclusive 5% bonus reward on your first active node:\n' + (profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider transition-all"
+                    >
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.453L0 24zm6.59-4.846c1.6.95 3.197 1.451 4.811 1.452 5.518 0 10.006-4.495 10.009-10.02.002-2.678-1.04-5.195-2.933-7.091-1.892-1.893-4.41-2.935-7.09-2.936-5.524 0-10.012 4.496-10.015 10.022-.001 1.83.49 3.614 1.42 5.187L1.033 21.01l4.894-1.282c1.697.925 3.551 1.411 5.438 1.412h.002z" />
+                      </svg>
+                      WhatsApp
+                    </a>
+                    
+                    <a 
+                      href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-blue-400 text-[10px] font-bold uppercase tracking-wider transition-all"
+                    >
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
+                        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z" />
+                      </svg>
+                      Facebook
+                    </a>
+                    
+                    <button 
+                      onClick={async () => {
+                        const link = profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`;
+                        const text = `Join Tavari Wave, the elite high-frequency quant node network! Use my invitation code "${profile?.referral_code || ''}" and get an exclusive 5% bonus reward on your first active node:`;
+                        if (navigator.share) {
+                          try {
+                            await navigator.share({
+                              title: 'Tavari Wave',
+                              text: text,
+                              url: link,
+                            });
+                          } catch (e) {
+                            handleCopyLink();
+                          }
+                        } else {
+                          handleCopyLink();
+                        }
+                      }}
+                      className="p-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-purple-400 text-[10px] font-bold uppercase tracking-wider transition-all"
+                    >
+                      <Share2 size={20} />
+                      Share
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- VIP REAL-TIME PENDING CLAIM TOAST POPUP --- */}
+      <AnimatePresence>
+        {showClaimToast && (
+          <motion.div 
+            initial={{ opacity: 0, x: 150, y: 0, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 150, y: 0, scale: 0.9 }}
+            transition={{ type: "spring", damping: 20, stiffness: 200 }}
+            className="fixed right-4 bottom-28 lg:top-24 lg:bottom-auto w-[calc(100vw-32px)] sm:max-w-sm z-[1200] bg-gradient-to-r from-purple-900/90 via-indigo-950/90 to-[#0e1017]/95 border border-purple-500/30 backdrop-blur-xl p-5 rounded-3xl shadow-[0_20px_50px_rgba(168,85,247,0.3)] select-none border-l-4 border-l-purple-500"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0 animate-pulse">
+                <Gift size={20} />
+              </div>
+              <div className="flex-1 space-y-1.5 text-left">
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] font-black uppercase text-purple-400 tracking-wider">Referral Unlocked</span>
+                  <button 
+                    onClick={() => setShowClaimToast(null)}
+                    className="text-white/40 hover:text-white transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <h4 className="text-xs font-bold text-white leading-snug">
+                  Claim Your Reward Now!
+                </h4>
+                <p className="text-[11px] text-white/70 leading-normal">
+                  Your network partner <span className="text-purple-300 font-extrabold">{showClaimToast.partner_name}</span> has initialized a node! Claim your <span className="text-purple-400 font-extrabold">5% bonus</span> now.
+                </p>
+                <div className="pt-2">
+                  <button 
+                    onClick={() => {
+                      setShowClaimToast(null);
+                      navigate('/rewards#referral-rewards');
+                      setTimeout(() => {
+                        const el = document.getElementById('referral-rewards-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 300);
+                    }}
+                    className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 text-center block pointer-events-auto"
+                  >
+                    Claim Reward
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

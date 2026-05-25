@@ -21,7 +21,8 @@ import {
   X,
   RefreshCw,
   User,
-  Bot
+  Bot,
+  Gift
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -526,62 +527,27 @@ export default function Dashboard() {
 
         {/* Right: Referrals & Extra */}
         <div className="lg:col-span-4 space-y-8">
-           <div className="p-8 bg-[#11141b] border border-white/5 rounded-[40px] space-y-8">
-              <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 rounded-xl bg-purple-400/10 flex items-center justify-center text-purple-400">
-                    <Users size={20} />
-                 </div>
-                 <h3 className="text-xs font-black uppercase tracking-[0.2em] text-white">Referral Matrix</h3>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                 <div className="p-6 bg-white/5 rounded-3xl border border-white/5 text-center">
-                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest mb-1">Total Network</p>
-                    <p className="text-2xl font-black text-white italic font-serif">{profile?.referrals_count || 0}</p>
-                 </div>
-                 <div className="p-6 bg-white/5 rounded-3xl border border-white/5 text-center">
-                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest mb-1">Active Nodes</p>
-                    <p className="text-2xl font-black text-aura-lime italic font-serif">{profile?.active_referrals || 0}</p>
-                 </div>
-              </div>
-
-              <div className="p-5 bg-white/5 border border-white/5 rounded-2xl space-y-3">
-                 <div className="flex items-center justify-between">
-                   <span className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Referral Code</span>
-                   <span className="text-[10px] font-black text-white tracking-[0.2em]">{profile?.referral_code || '---'}</span>
-                 </div>
-                 <div className="h-px bg-white/5" />
-                 <div className="flex items-center justify-between gap-4">
-                   <span className="text-[8px] font-black text-aura-muted uppercase tracking-widest flex-shrink-0">Ref Link</span>
-                   <span className="text-[8px] font-black text-white/40 truncate">{`${window.location.origin}/signup?ref=${profile?.referral_code || ''}`}</span>
-                 </div>
-              </div>
-
-              <div className="p-8 bg-primary text-white rounded-[32px] relative overflow-hidden group hover:scale-[1.02] transition-transform shadow-[0_10px_30px_rgba(124,58,237,0.3)]">
-                 <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <TrendingUp size={60} />
-                 </div>
-                 <p className="text-[10px] font-black uppercase tracking-widest mb-2 opacity-60 italic">Referral Earnings</p>
-                 <div className="h-10 lg:h-12 w-full mb-6">
-                    <DynamicBalance 
-                      value={formatCurrency(profile?.referral_earnings || 0)} 
-                      containerClassName="justify-start"
-                      className="text-left"
-                      baseSizeMobile="text-3xl"
-                      baseSizeDesktop="lg:text-4xl"
-                    />
-                 </div>
-                 <button 
-                  onClick={() => navigate('/referrals')}
-                  className="w-full py-3 bg-white text-primary text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg"
-                 >
-                   Manage Network
-                 </button>
-              </div>
-           </div>
-
-            {/* Security Banner removed as per request */}
-         </div>
+           <button 
+             onClick={() => navigate('/rewards#referral-rewards')}
+             className="w-full relative group overflow-hidden rounded-[32px] border border-purple-500/20 p-0.5 bg-gradient-to-br from-purple-500/10 via-pink-500/5 to-transparent backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:border-purple-500/40 hover:shadow-[0_20px_45px_rgba(168,85,247,0.12)] active:scale-95"
+           >
+             <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+             <div className="relative p-6 px-8 flex items-center justify-between rounded-[30px] bg-[#0b0e14]/75 border border-white/5">
+                <div className="flex items-center gap-4 text-left">
+                   <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-purple-500/20">
+                      <Gift size={22} className="animate-pulse" />
+                   </div>
+                   <div>
+                      <span className="text-[10px] font-bold uppercase text-purple-400 tracking-[0.2em] block leading-none mb-1">Earn 5% Bonus</span>
+                      <h4 className="text-sm font-black text-white uppercase tracking-wider">Referral Program</h4>
+                   </div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white transition-transform group-hover:translate-x-1">
+                   <ChevronRight size={16} />
+                </div>
+             </div>
+           </button>
+        </div>
       </div>
     </div>
   );
