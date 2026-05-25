@@ -560,7 +560,7 @@ export default function LandingPage() {
           funding_balance: 0,
           available_balance: 0,
           total_earnings: 0,
-          total_invested: 0,
+          total_invested: 3, // $3 signup bonus directly into Assets Balance
           email_verified: true,
           suspended: false,
           banned: false,
@@ -584,6 +584,17 @@ export default function LandingPage() {
 
         try {
           await setDoc(doc(db, 'users', firebaseUser.uid), newUserProfile);
+          
+          // Generate an idempotent signup bonus transaction record
+          const txId = `signup-bonus-${firebaseUser.uid}`;
+          await setDoc(doc(db, 'transactions', txId), {
+            user_id: firebaseUser.uid,
+            type: 'signup_bonus',
+            amount: 3,
+            created_at: new Date().toISOString(),
+            status: 'approved',
+            description: "Congratulations, you have just received a $3 signup bonus into your assets balance."
+          });
         } catch (setErr) {
           console.warn("Grace-failed setting profile on sign-in, AuthContext will auto-heal:", setErr);
         }
@@ -768,7 +779,7 @@ export default function LandingPage() {
           funding_balance: 0,
           available_balance: 0,
           total_earnings: 0,
-          total_invested: 0,
+          total_invested: 3, // $3 signup bonus directly into Assets Balance
           email_verified: true,
           suspended: false,
           banned: false,
@@ -792,6 +803,17 @@ export default function LandingPage() {
 
         try {
           await setDoc(doc(db, 'users', user.uid), newUserProfile);
+
+          // Generate an idempotent signup bonus transaction record
+          const txId = `signup-bonus-${user.uid}`;
+          await setDoc(doc(db, 'transactions', txId), {
+            user_id: user.uid,
+            type: 'signup_bonus',
+            amount: 3,
+            created_at: new Date().toISOString(),
+            status: 'approved',
+            description: "Congratulations, you have just received a $3 signup bonus into your assets balance."
+          });
         } catch (setErr) {
           console.warn("Grace-failed setting profile on Google sign-in, AuthContext will auto-heal:", setErr);
         }
@@ -853,6 +875,8 @@ export default function LandingPage() {
                 alt={`Welcome Header Slide ${index + 1}`} 
                 className="w-full h-full object-cover object-top block select-none"
                 referrerPolicy="no-referrer"
+                loading="lazy"
+                decoding="async"
               />
             </div>
           ))}
@@ -877,7 +901,7 @@ export default function LandingPage() {
           : "lg:h-24 lg:bg-[#050608]/35 lg:border-transparent lg:shadow-[0_4px_20px_rgba(0,0,0,0.15)]"
       )}>
         <div className={cn("flex items-center gap-1.5 transition-all duration-500", isScrolled ? "scale-90" : "scale-100")}>
-          <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-7 w-auto lg:h-14 object-contain" />
+          <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" loading="lazy" decoding="async" className="h-7 w-auto lg:h-14 object-contain" />
           <span className="text-sm lg:text-3xl font-black uppercase tracking-tighter leading-none">Wave</span>
         </div>
 
@@ -1229,7 +1253,7 @@ export default function LandingPage() {
 
                 {/* Logo & Header */}
                 <div className="flex flex-col items-center text-center mt-6 mb-8">
-                   <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="w-20 h-20 lg:w-24 lg:h-24 object-contain mb-6" />
+                   <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" loading="lazy" decoding="async" className="w-20 h-20 lg:w-24 lg:h-24 object-contain mb-6" />
                    <h2 className="text-3xl font-bold tracking-tight text-white mb-2">
                      {authMode === 'signup' ? 'Create Account' : 'Welcome Back'}
                    </h2>

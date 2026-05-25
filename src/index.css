@@ -211,4 +211,34 @@
   animation-play-state: paused;
 }
 
+/* GPU Hardware Acceleration & Paint Optimization */
+.gpu-accelerate {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.optimize-drawing {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 200px;
+}
+
+.optimize-drawing-large {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 600px;
+}
+
+/* Disable gratuitous visual calculation overhead */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-delay: 0s !important;
+    animation-duration: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
 

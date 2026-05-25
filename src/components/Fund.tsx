@@ -316,6 +316,7 @@ export default function Fund() {
   const [depositStep, setDepositStep] = useState<'input' | 'method' | 'payment' | 'status'>('input');
   const [depositTxId, setDepositTxId] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
+  const [withdrawExchangeRate, setWithdrawExchangeRate] = useState<number>(1400);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDepositSuccess, setShowDepositSuccess] = useState(false);
   const [showWithdrawSuccess, setShowWithdrawSuccess] = useState(false);
@@ -407,7 +408,9 @@ export default function Fund() {
 
     const unsubscribeRate = onSnapshot(doc(db, 'settings', 'system'), (doc) => {
       if (doc.exists()) {
-        setExchangeRate(doc.data().usd_to_ngn_rate || 1400);
+        const data = doc.data();
+        setExchangeRate(data.usd_to_ngn_rate || 1400);
+        setWithdrawExchangeRate(data.usd_to_ngn_withdrawal_rate || data.usd_to_ngn_rate || 1400);
       }
     });
 
@@ -950,6 +953,24 @@ export default function Fund() {
                  </div>
                )}
             </div>
+            
+            {amountNum > 0 && (
+              <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-2 mt-2 animate-fade-in text-left">
+                 <div className="flex justify-between items-center text-[10px] uppercase font-bold text-aura-muted tracking-wider">
+                    <span>Withdrawal Exchange Rate:</span>
+                    <span className="text-white font-mono">₦{withdrawExchangeRate.toLocaleString()}/$</span>
+                 </div>
+                 <div className="flex justify-between items-center text-[10px] uppercase font-bold text-aura-muted tracking-wider">
+                    <span>Equivalent Value:</span>
+                    <span className="text-white font-mono">₦{(amountNum * withdrawExchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                 </div>
+                 <div className="border-t border-white/[0.03] pt-2 flex justify-between items-center">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-red-400">Equivalent Net Payout:</span>
+                    <span className="text-sm font-black text-emerald-400 font-serif">₦{(Math.max(0, receiveAmount) * withdrawExchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                 </div>
+              </div>
+            )}
+
             {isInsufficient && <p className="text-red-500 text-[10px] font-bold uppercase text-center">Insufficient funds</p>}
             {isBelowMin && <p className="text-red-500 text-[10px] font-bold uppercase text-center animate-pulse">Minimum withdrawal threshold is ${withdrawalThreshold}</p>}
           </div>
@@ -995,6 +1016,15 @@ export default function Fund() {
                 <span className="text-[10px] font-black uppercase text-white tracking-widest">Final Amount You Receive</span>
                 <span className="text-xl font-black text-emerald-500 italic font-serif">{formatCurrency(receiveAmount)}</span>
              </div>
+             {withdrawMethod === 'bank' && (
+                <div className="pt-3 border-t border-white/5 flex justify-between items-center">
+                   <div className="text-left">
+                      <span className="text-[10px] font-bold uppercase text-red-400 tracking-widest block">Equivalent NGN Cashout</span>
+                      <span className="text-[8px] font-bold text-aura-muted uppercase tracking-widest font-mono">@ ₦{withdrawExchangeRate.toLocaleString()}/$</span>
+                   </div>
+                   <span className="text-lg font-black text-white italic font-serif">₦{(receiveAmount * withdrawExchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+             )}
           </div>
           
           <div className="flex gap-2">

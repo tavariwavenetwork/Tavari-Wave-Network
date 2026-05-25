@@ -43,6 +43,6 @@ export const EditableImage: React.FC<EditableImageProps> = ({
   const src = config[configKey] || defaultSrc;
 
   return (
-    <img src={src} alt={alt} className={className} referrerPolicy="no-referrer" />
+    <img src={src} alt={alt} className={className} referrerPolicy="no-referrer" loading="lazy" decoding="async" />
   );
 };

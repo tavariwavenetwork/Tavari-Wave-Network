@@ -203,6 +203,7 @@ export default function CipherAdmin() {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
+  const [withdrawExchangeRate, setWithdrawExchangeRate] = useState<number>(1400);
 
   // Broadcaster and monitor session states
   const [seenDepositIds, setSeenDepositIds] = useState<string[]>(() => {
@@ -454,7 +455,9 @@ export default function CipherAdmin() {
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'system'), 
       (doc) => {
         if (doc.exists()) {
-          setExchangeRate(doc.data().usd_to_ngn_rate || 1400);
+          const data = doc.data();
+          setExchangeRate(data.usd_to_ngn_rate || 1400);
+          setWithdrawExchangeRate(data.usd_to_ngn_withdrawal_rate || data.usd_to_ngn_rate || 1400);
         }
       },
       (err) => console.error("System settings sync failed:", err.message)
@@ -874,6 +877,19 @@ export default function CipherAdmin() {
     } catch (error) {
       console.error("RATE UPDATE ERROR:", error);
       toast.error("Failed to update exchange rate");
+    }
+  };
+
+  const updateWithdrawExchangeRate = async (newRate: number) => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { 
+        usd_to_ngn_withdrawal_rate: newRate,
+        last_updated: new Date().toISOString()
+      }, { merge: true });
+      toast.success("Withdrawal exchange rate updated successfully");
+    } catch (error) {
+      console.error("WITHDRAWAL RATE UPDATE ERROR:", error);
+      toast.error("Failed to update withdrawal exchange rate");
     }
   };
 
@@ -2093,6 +2109,36 @@ export default function CipherAdmin() {
                         </button>
                      </div>
                      <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest ml-2 italic underline underline-offset-4 decoration-aura-lime/30">Used globally for Bank Transfer calculations</p>
+                  </div>
+               </div>
+            </div>
+
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
+               <h3 className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
+                 <Building2 size={16} className="text-red-400" /> Withdrawal Exchange Rate
+               </h3>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                     <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">USD to NGN Withdrawal Rate</label>
+                     <div className="flex gap-3">
+                        <div className="relative flex-1">
+                           <div className="absolute inset-y-0 left-6 flex items-center text-red-400 font-bold">₦</div>
+                           <input 
+                              type="number" 
+                              value={withdrawExchangeRate}
+                              onChange={(e) => setWithdrawExchangeRate(parseFloat(e.target.value) || 0)}
+                              placeholder="1400"
+                              className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-base font-bold outline-none focus:border-red-500/50 transition-all text-white"
+                           />
+                        </div>
+                        <button 
+                           onClick={() => updateWithdrawExchangeRate(withdrawExchangeRate)}
+                           className="px-8 py-4 bg-red-400 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl hover:scale-[1.02] transition-all"
+                        >
+                           Update Rate
+                        </button>
+                     </div>
+                     <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest ml-2 italic underline underline-offset-4 decoration-red-500/30">Used specifically for User Withdrawals and Conversion calculations</p>
                   </div>
                </div>
             </div>

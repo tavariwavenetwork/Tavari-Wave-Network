@@ -228,7 +228,7 @@ export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true);
+  const isDark = true;
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isLanguageOpen, setIsLanguageOpen] = useState(false);
@@ -567,10 +567,6 @@ export default function Layout() {
 
         {/* Right: Actions */}
         <div className="flex items-center justify-end gap-2 md:gap-3">
-          <button onClick={() => setIsDark(!isDark)} className="p-2 text-aura-muted hover:text-aura-lime transition-colors">
-            {isDark ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          
           <div className="relative" ref={languageRef}>
             <button 
               onClick={() => setIsLanguageOpen(!isLanguageOpen)}

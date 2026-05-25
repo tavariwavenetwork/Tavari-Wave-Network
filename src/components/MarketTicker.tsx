@@ -191,12 +191,12 @@ export default function MarketTicker({ isDark }: { isDark: boolean }) {
       </div>
 
       <div className="flex h-full items-center relative pl-[110px]"> {/* Offset for the absolute label */}
-        <div className="flex items-center h-full animate-ticker shrink-0" style={{ willChange: 'transform', transform: 'translateZ(0)' }}>
+        <div className="flex items-center h-full animate-ticker shrink-0 gpu-accelerate">
           {data.map((item, i) => (
             <TickerCard key={`set1-${item.symbol}-${i}`} item={item} isDark={isDark} renderSparkline={renderSparkline} />
           ))}
         </div>
-        <div className="flex items-center h-full animate-ticker shrink-0" style={{ willChange: 'transform', transform: 'translateZ(0)' }} aria-hidden="true">
+        <div className="flex items-center h-full animate-ticker shrink-0 gpu-accelerate" aria-hidden="true">
           {data.map((item, i) => (
             <TickerCard key={`set2-${item.symbol}-${i}`} item={item} isDark={isDark} renderSparkline={renderSparkline} />
           ))}

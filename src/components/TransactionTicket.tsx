@@ -75,6 +75,8 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
     displayType = 'Investment Bonus Claim';
   } else if (tx.type === 'rewards_conversion') {
     displayType = 'PTS → USD Conversion';
+  } else if (tx.type === 'signup_bonus') {
+    displayType = 'Signup Welcome Bonus';
   }
 
   // Determine status display and behavior
