@@ -1159,11 +1159,38 @@ export default function Layout() {
       <AnimatePresence>
         {showInviteModal && (
           <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4">
+            <style>{`
+              @keyframes floatMoney1 {
+                0% { transform: translateY(0) translateX(0) scale(0.6) rotate(0deg); opacity: 0; }
+                15% { opacity: 1; }
+                85% { opacity: 1; }
+                100% { transform: translateY(-75px) translateX(-45px) scale(1) rotate(-30deg); opacity: 0; }
+              }
+              @keyframes floatMoney2 {
+                0% { transform: translateY(0) translateX(0) scale(0.6) rotate(0deg); opacity: 0; }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateY(-85px) translateX(45px) scale(1.1) rotate(25deg); opacity: 0; }
+              }
+              @keyframes floatMoney3 {
+                0% { transform: translateY(0) translateX(0) scale(0.5) rotate(0deg); opacity: 0; }
+                10% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateY(-100px) translateX(-5px) scale(0.9) rotate(-15deg); opacity: 0; }
+              }
+              @keyframes floatMoney4 {
+                0% { transform: translateY(0) translateX(0) scale(0.5) rotate(0deg); opacity: 0; }
+                15% { opacity: 1; }
+                85% { opacity: 1; }
+                100% { transform: translateY(-65px) translateX(25px) scale(0.85) rotate(15deg); opacity: 0; }
+              }
+            `}</style>
+            
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
               onClick={() => setShowInviteModal(false)}
             />
             
@@ -1172,106 +1199,178 @@ export default function Layout() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 30 }}
               transition={{ type: "spring", damping: 25, stiffness: 180 }}
-              className="relative w-full max-w-md bg-[#0d1017] border border-purple-500/30 rounded-[36px] p-8 text-center overflow-visible shadow-[0_30px_100px_rgba(168,85,247,0.25)] select-none"
+              className="relative w-full max-w-[360px] bg-gradient-to-b from-[#11131e]/95 via-[#0b0c14]/98 to-[#07080e]/98 border border-purple-500/25 rounded-[30px] p-6 text-center overflow-visible shadow-[0_25px_60px_rgba(168,85,247,0.18),inset_0_1px_1px_rgba(255,255,255,0.05)] select-none"
             >
-              {/* Overlapping top graphic rendering */}
-              <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-32 h-32 overflow-visible pointer-events-none">
-                <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl animate-pulse" />
-                {/* Custom Elegant 3D overlapping visual element (Gift Box + Particles) */}
-                <svg viewBox="0 0 100 100" className="w-full h-full filter drop-shadow-[0_8px_16px_rgba(168,85,247,0.5)]">
+              {/* Premium Top-Left Brand Logo inside Popup */}
+              <div className="absolute top-5 left-6 flex items-center gap-1.5 pointer-events-none select-none">
+                <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-4.5 w-auto object-contain brightness-110" />
+                <span className="text-[10px] font-serif font-black tracking-tighter uppercase italic leading-none text-white/90">Wave</span>
+              </div>
+
+              {/* Overlapping top realistic 3D box plus animated floaters extending outside boundaries */}
+              <div className="absolute -top-[52px] left-1/2 -translate-x-1/2 w-28 h-28 overflow-visible pointer-events-none z-20">
+                <div className="absolute inset-2 bg-purple-500/25 rounded-full blur-2xl animate-pulse" />
+                
+                {/* Embedded Animated Floating Cash / Sparks */}
+                <div className="absolute top-8 left-10 text-emerald-400 font-extrabold text-sm select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(52,211,153,0.5)] animate-[floatMoney1_3.5s_infinite_linear]">
+                  $
+                </div>
+                <div className="absolute top-6 right-10 text-emerald-300 font-black text-xs select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(52,211,153,0.5)] animate-[floatMoney2_3s_infinite_linear_0.6s]">
+                  $
+                </div>
+                <div className="absolute top-10 left-12 select-none pointer-events-none animate-[floatMoney3_4.2s_infinite_linear_1.2s]">
+                  <div className="bg-gradient-to-r from-emerald-500 via-green-500 to-emerald-600 text-[8px] px-1 py-0.5 rounded border border-emerald-400/20 text-white font-mono font-black shadow-lg">
+                    $100
+                  </div>
+                </div>
+                <div className="absolute top-8 right-12 text-pink-400 font-black text-sm select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(244,114,182,0.4)] animate-[floatMoney4_3.8s_infinite_linear_1.8s]">
+                  ✦
+                </div>
+                <div className="absolute top-4 left-14 text-amber-300 font-extrabold text-xs select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(251,191,36,0.4)] animate-[floatMoney1_4.5s_infinite_linear_0.8s]">
+                  ✦
+                </div>
+
+                {/* Highly Realistic 3D SVG Gift Box Design */}
+                <svg viewBox="0 0 100 100" className="w-full h-full filter drop-shadow-[0_8px_18px_rgba(168,85,247,0.45)]">
                   <defs>
-                    <linearGradient id="lidGrad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#ec4899" />
-                      <stop offset="100%" stopColor="#a855f7" />
+                    <linearGradient id="goldRib" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#FFF2AC" />
+                      <stop offset="35%" stopColor="#F5B21D" />
+                      <stop offset="70%" stopColor="#9E6900" />
+                      <stop offset="100%" stopColor="#FFF2AC" />
                     </linearGradient>
-                    <linearGradient id="boxGrad" x1="0" y1="0" x2="1" y2="1">
-                      <stop offset="0%" stopColor="#a855f7" />
-                      <stop offset="100%" stopColor="#6366f1" />
+                    <linearGradient id="goldTop" x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor="#F5B21D" />
+                      <stop offset="50%" stopColor="#FFF2AC" />
+                      <stop offset="100%" stopColor="#9E6900" />
+                    </linearGradient>
+                    <linearGradient id="boxWallL" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#818CF8" />
+                      <stop offset="40%" stopColor="#4F46E5" />
+                      <stop offset="100%" stopColor="#31108F" />
+                    </linearGradient>
+                    <linearGradient id="boxWallR" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#6366F1" />
+                      <stop offset="40%" stopColor="#4338CA" />
+                      <stop offset="100%" stopColor="#1E1B4B" />
+                    </linearGradient>
+                    <linearGradient id="lidGlass" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#EC4899" />
+                      <stop offset="40%" stopColor="#D946EF" />
+                      <stop offset="100%" stopColor="#701A75" />
                     </linearGradient>
                   </defs>
-                  {/* Floating particles */}
-                  <circle cx="20" cy="30" r="4" fill="#fbbf24" opacity="0.9" className="animate-bounce" />
-                  <circle cx="80" cy="25" r="5" fill="#f43f5e" opacity="0.8" />
-                  <path d="M 50,45 L 85,20 L 50,5 L 15,20 Z" fill="url(#lidGrad)" />
-                  <path d="M 15,24 L 50,49 L 50,90 L 15,65 Z" fill="url(#boxGrad)" />
-                  <path d="M 85,24 L 50,49 L 50,90 L 85,65 Z" fill="url(#boxGrad)" opacity="0.85" />
-                  <path d="M 50,49 L 50,90" stroke="#f472b6" strokeWidth="2" />
-                  <path d="M 32,12 C 40,-5 48,15 50,22 C 52,15 60,-5 68,12 C 73,20 62,25 50,22 C 38,25 27,20 32,12 Z" fill="#ec4899" />
+
+                  {/* Box Main Body */}
+                  <path d="M 15,48 L 50,70 L 50,95 L 15,73 Z" fill="url(#boxWallL)" />
+                  <path d="M 85,48 L 50,70 L 50,95 L 85,73 Z" fill="url(#boxWallR)" />
+                  
+                  {/* Left Face Ribbon */}
+                  <path d="M 29,56.5 L 29,81.5 L 35,85.2 L 35,60.2 Z" fill="url(#goldRib)" />
+                  {/* Right Face Ribbon */}
+                  <path d="M 71,56.5 L 71,81.5 L 65,85.2 L 65,60.2 Z" fill="url(#goldRib)" />
+
+                  {/* Raised Lid Section */}
+                  <path d="M 11,46 L 50,68 L 89,46" stroke="#000000" strokeWidth="2.5" opacity="0.35" strokeLinecap="round" />
+                  <path d="M 50,44 L 85,24 L 50,8 L 15,24 Z" fill="url(#lidGlass)" />
+                  <path d="M 15,24 L 50,44 L 50,50 L 15,30 Z" fill="#9D174D" />
+                  <path d="M 85,24 L 50,44 L 50,50 L 85,30 Z" fill="#701A75" />
+
+                  {/* Lid Surface Ribbons */}
+                  <polygon points="30,15.5 36,12 70,32 64,35.5" fill="url(#goldRib)" />
+                  <polygon points="70,15.5 64,12 30,32 36,35.5" fill="url(#goldRib)" />
+                  
+                  {/* Lid Side Edge Ribbons */}
+                  <polygon points="30,32.8 36,36 36,42 30,38.8" fill="url(#goldTop)" />
+                  <polygon points="70,32.8 64,36 64,42 70,38.8" fill="url(#goldTop)" />
+
+                  {/* Glorious Shiny Deluxe Bow Loops */}
+                  <path d="M 50,18 C 30,1 21,24 50,18 Z" fill="url(#goldTop)" stroke="#F5B21D" strokeWidth="0.5" />
+                  <path d="M 50,18 C 70,1 79,24 50,18 Z" fill="url(#goldTop)" stroke="#F5B21D" strokeWidth="0.5" />
+                  {/* Ribbon tails hanging down gracefully */}
+                  <path d="M 50,18 Q 39,29 36,42 Q 39,29 50,18 Z" fill="url(#goldTop)" />
+                  <path d="M 50,18 Q 61,29 64,42 Q 61,29 50,18 Z" fill="url(#goldTop)" />
+                  {/* Center glowing bead */}
+                  <circle cx="50" cy="18" r="4.5" fill="#FFF2AC" />
+                  <circle cx="48.5" cy="16.5" r="1.5" fill="#FFFFFF" />
                 </svg>
               </div>
 
-              {/* Close button */}
+              {/* Close button with soft transition */}
               <button 
                 onClick={() => setShowInviteModal(false)}
-                className="absolute top-4 right-4 text-white/50 hover:text-white transition-colors p-2 bg-white/5 hover:bg-white/10 rounded-full"
+                className="absolute top-4 right-4 text-white/50 hover:text-white transition-all p-1.5 bg-white/5 hover:bg-white/10 rounded-full cursor-pointer hover:rotate-90 duration-300"
               >
-                <X size={16} />
+                <X size={14} />
               </button>
 
-              <div className="mt-14 space-y-4">
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-500/10 border border-purple-500/20 rounded-full text-[9px] font-bold text-purple-300 uppercase tracking-widest leading-none">
-                  <Gift size={10} className="text-purple-400" /> Executive Program
+              <div className="mt-11 space-y-3.5">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-purple-500/10 border border-purple-500/15 rounded-full text-[8px] font-bold text-purple-300 uppercase tracking-widest leading-none">
+                  <Gift size={9} className="text-purple-400" /> Executive Program
                 </span>
                 
-                <h3 className="text-xl font-black text-white uppercase tracking-wide">
+                <h3 className="text-lg font-black text-white uppercase tracking-wide">
                   Share the Wave
                 </h3>
                 
-                <p className="text-xs text-white/60 leading-relaxed max-w-sm mx-auto">
-                  Expand your quantum networking tier. Refer a partner and both of you will receive a premium <span className="text-purple-400 font-extrabold">5% bonus</span> on their first active investment node!
+                <p className="text-[11px] text-white/60 leading-relaxed max-w-xs mx-auto">
+                  Expand your quantum networking tier. Refer partners and both will receive a premium <span className="text-purple-400 font-extrabold">5% bonus</span> on their first active investment node!
                 </p>
 
-                {/* Referral Details Box */}
-                <div className="p-4 bg-white/5 border border-white/5 rounded-2xl text-left space-y-3 mt-4">
+                {/* Referral Details Glass Box */}
+                <div className="p-3 bg-white/[0.03] border border-white/5 rounded-2xl text-left space-y-2 mt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Referral Code</span>
+                    <span className="text-[9px] font-bold uppercase text-white/40 tracking-wider">Referral Code</span>
                     <span className="text-xs font-black text-white tracking-widest">{profile?.referral_code || '---'}</span>
                   </div>
                   <div className="h-px bg-white/5" />
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-[10px] font-bold uppercase text-white/40 tracking-wider">Invitation Link</span>
-                    <div className="flex items-center gap-2 bg-[#080a0e] border border-white/5 rounded-xl p-2 pl-3">
-                      <span className="text-[10px] font-medium text-white/50 truncate flex-1">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-bold uppercase text-white/40 tracking-wider">Invitation Link</span>
+                    <div className="flex items-center gap-2 bg-black/40 border border-white/5 rounded-xl p-1.5 pl-2.5">
+                      <span className="text-[9px] font-medium text-white/50 truncate flex-1">
                         {profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`}
                       </span>
                       <button 
                         onClick={handleCopyLink}
-                        className="p-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors"
+                        className="p-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
                       >
-                        {copiedLink ? <CheckCircle2 size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                        {copiedLink ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Social Share Grid */}
-                <div className="mt-6">
-                  <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest mb-3">Instant Share Options</p>
-                  <div className="grid grid-cols-3 gap-3">
+                {/* Modernized Luxury Share Grid */}
+                <div className="mt-4">
+                  <p className="text-[8px] font-bold uppercase text-white/40 tracking-widest mb-2.5">Instant Share Options</p>
+                  <div className="grid grid-cols-3 gap-2.5">
+                    {/* Official WhatsApp style green gradient button */}
                     <a 
                       href={`https://api.whatsapp.com/send?text=${encodeURIComponent('Join Tavari Wave, the elite high-frequency quant node network! Use my invitation code "' + (profile?.referral_code || '') + '" and get an exclusive 5% bonus reward on your first active node:\n' + (profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`))}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-emerald-400 text-[10px] font-bold uppercase tracking-wider transition-all"
+                      className="p-2.5 bg-gradient-to-b from-[#25D366] to-[#1EBE5A] hover:brightness-110 border border-emerald-400/20 rounded-2xl flex flex-col items-center justify-center gap-1 text-white text-[9px] font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/10 cursor-pointer active:scale-95"
                     >
-                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
-                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.453L0 24zm6.59-4.846c1.6.95 3.197 1.451 4.811 1.452 5.518 0 10.006-4.495 10.009-10.02.002-2.678-1.04-5.195-2.933-7.091-1.892-1.893-4.41-2.935-7.09-2.936-5.524 0-10.012 4.496-10.015 10.022-.001 1.83.49 3.614 1.42 5.187L1.033 21.01l4.894-1.282c1.697.925 3.551 1.411 5.438 1.412h.002z" />
+                      <svg viewBox="0 0 24 24" className="w-5.5 h-5.5 fill-current filter drop-shadow-[0_1px_3px_rgba(0,0,0,0.25)]">
+                        <path d="M12.004 2C6.48 2 2 6.48 2 12c0 1.76.46 3.48 1.33 5L2 22l5.15-1.35c1.5.82 3.19 1.25 4.85 1.25 5.52 0 10-4.48 10-10S17.52 2 12.004 2zm3.96 13.9c-.21.58-.81 1.07-1.38 1.25-.57.18-1.31.29-3.7-.7a11.9 11.9 0 01-5-4.43c-.87-1.15-1.38-2.54-1.38-3.95 0-1.72.89-2.54 1.25-2.91.24-.25.54-.34.78.34.19.55.77 1.88.84 2.01.07.14.07.29-.02.48l-.51.64c-.16.19-.34.4-.14.73.53.88 1.15 1.57 1.95 2.21.75.6 1.48.96 1.87 1.15.34.16.54.1.73-.13.2-.23.83-.97 1.05-1.3s.44-.27.73-.16c.3.11 1.88.89 2.21 1.05.32.16.54.24.62.38.08.14.08.82-.13 1.4z" />
                       </svg>
                       WhatsApp
                     </a>
                     
+                    {/* Official Facebook style blue gradient button */}
                     <a 
                       href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-blue-400 text-[10px] font-bold uppercase tracking-wider transition-all"
+                      className="p-2.5 bg-gradient-to-b from-[#1877F2] to-[#1565C0] hover:brightness-110 border border-blue-400/20 rounded-2xl flex flex-col items-center justify-center gap-1 text-white text-[9px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-500/10 cursor-pointer active:scale-95"
                     >
-                      <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
-                        <path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c4.56-.93 8-4.96 8-9.75z" />
+                      <svg viewBox="0 0 24 24" className="w-5.5 h-5.5 fill-current filter drop-shadow-[0_1px_3px_rgba(0,0,0,0.25)]">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
                       </svg>
                       Facebook
                     </a>
                     
+                    {/* Custom Ultimate realistic Share gradient button */}
                     <button 
                       onClick={async () => {
                         const link = profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`;
@@ -1290,9 +1389,9 @@ export default function Layout() {
                           handleCopyLink();
                         }
                       }}
-                      className="p-3 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-2xl flex flex-col items-center justify-center gap-1.5 text-purple-400 text-[10px] font-bold uppercase tracking-wider transition-all"
+                      className="p-2.5 bg-gradient-to-b from-[#8B5CF6] to-[#6D28D9] hover:brightness-110 border border-purple-400/20 rounded-2xl flex flex-col items-center justify-center gap-1 text-white text-[9px] font-black uppercase tracking-wider transition-all shadow-lg shadow-purple-500/10 cursor-pointer active:scale-95"
                     >
-                      <Share2 size={20} />
+                      <Share2 size={22} className="filter drop-shadow-[0_1px_3px_rgba(0,0,0,0.25)] animate-pulse" />
                       Share
                     </button>
                   </div>
