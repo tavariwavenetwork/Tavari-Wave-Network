@@ -30,7 +30,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn, isWithdrawalAllowed, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
 import rewardHeaderImage from '../assets/images/reward_header_1779476104728.png';
 import { 
@@ -225,6 +225,36 @@ export default function Rewards() {
   const { user, profile } = useAuth();
   const { config: uiConfig } = useUIConfig();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.hash) {
+      const elementId = location.hash.substring(1);
+      const checkAndScroll = () => {
+        const element = document.getElementById(elementId);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('ring-2', 'ring-purple-500', 'ring-offset-2', 'ring-offset-black', 'transition-all', 'duration-500');
+          setTimeout(() => {
+            element.classList.remove('ring-2', 'ring-purple-500', 'ring-offset-2', 'ring-offset-black');
+          }, 3000);
+          return true;
+        }
+        return false;
+      };
+
+      if (!checkAndScroll()) {
+        let attempts = 0;
+        const interval = setInterval(() => {
+          attempts++;
+          if (checkAndScroll() || attempts > 10) {
+            clearInterval(interval);
+          }
+        }, 150);
+        return () => clearInterval(interval);
+      }
+    }
+  }, [location.hash]);
 
   // Component States
   const [activeInvestments, setActiveInvestments] = useState<Investment[]>([]);
@@ -1396,7 +1426,7 @@ export default function Rewards() {
           </div>
 
           {/* Correct highlightable investment node rewards cards (4 columns) */}
-          <div className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden">
+          <div id="active-node-multipliers" className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden">
             <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 blur-[80px] rounded-full pointer-events-none" />
             
             <div className="flex items-center gap-2.5 mb-6">
@@ -1612,7 +1642,7 @@ export default function Rewards() {
           </div>
 
           {/* Card 2: Referral Reward Claim Card (4 columns) */}
-          <div className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden shadow-2xl">
+          <div id="referral-rewards" className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden shadow-2xl">
             <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[50px] rounded-full pointer-events-none" />
             
             <div className="flex items-center gap-2.5 mb-4">

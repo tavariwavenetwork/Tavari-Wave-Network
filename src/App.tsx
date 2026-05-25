@@ -163,6 +163,10 @@ function CipherProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
   return (
     <Router>
       <ScrollToTop />

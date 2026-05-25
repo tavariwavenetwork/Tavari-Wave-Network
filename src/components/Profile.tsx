@@ -368,10 +368,10 @@ export default function Profile() {
           <section className="space-y-4">
             <div className="px-2 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <User size={18} className="text-blue-500" /> Account Information
                 </h3>
-                <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">View and manage your personal account details</p>
+                <p className="text-slate-400 text-xs mt-0.5">View and manage your personal account details</p>
               </div>
               
               {!profile?.profile_edited ? (
@@ -409,15 +409,15 @@ export default function Profile() {
               )}
             </div>
             
-            <div className="bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm shadow-sm transition-colors">
-              <div className="divide-y divide-slate-100 dark:divide-white/5">
+            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-sm shadow-sm transition-colors">
+              <div className="divide-y divide-white/5">
                 {isEditing ? (
                   <div className="grid grid-cols-12 gap-3 p-5 items-center bg-white/5">
                     <div className="col-span-1 text-blue-500">
                       <User size={16} />
                     </div>
                     <div className="col-span-4 md:col-span-3">
-                      <p className="text-[9px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest leading-none">Full Name</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Full Name</p>
                     </div>
                     <div className="col-span-7 md:col-span-8">
                       <input 
@@ -452,7 +452,7 @@ export default function Profile() {
                       <Phone size={16} />
                     </div>
                     <div className="col-span-4 md:col-span-3">
-                      <p className="text-[9px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest leading-none">Phone Number</p>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">Phone Number</p>
                     </div>
                     <div className="col-span-7 md:col-span-8">
                       <input 
@@ -503,11 +503,11 @@ export default function Profile() {
           </div>
 
           {/* Verification Banner */}
-          <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 flex items-center gap-4 transition-colors">
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 flex items-center gap-4 transition-colors">
             <div className="p-2.5 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-500">
               <Check size={20} strokeWidth={3} />
             </div>
-            <p className="text-slate-600 dark:text-slate-400 text-sm">
+            <p className="text-slate-400 text-sm">
               Your <span className="text-blue-500 font-bold">account is verified.</span> You have full access to all platform features.
             </p>
           </div>
@@ -775,12 +775,12 @@ function SettingsSidebar({ navigate, logout }: { navigate: any, logout?: any }) 
       {/* Account Security Card */}
       <section className="space-y-4">
         <div className="px-2">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <ShieldCheck size={18} className="text-blue-500" /> Account Security
           </h3>
-          <p className="text-slate-500 dark:text-slate-400 text-xs mt-0.5">Keep your account safe and secure</p>
+          <p className="text-slate-400 text-xs mt-0.5">Keep your account safe and secure</p>
         </div>
-        <div className="bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-4 transition-colors shadow-sm">
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 transition-colors shadow-sm">
           <button 
             onClick={() => navigate('/settings')}
             className="w-full p-4 border border-blue-500/20 bg-blue-500/5 rounded-xl flex items-center justify-between text-blue-500 group transition-all"
@@ -797,12 +797,12 @@ function SettingsSidebar({ navigate, logout }: { navigate: any, logout?: any }) 
       {/* Quick Actions Card */}
       <section className="space-y-4">
         <div className="px-2">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <Zap size={18} className="text-blue-500" /> Quick Actions
           </h3>
         </div>
-        <div className="bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl overflow-hidden transition-colors shadow-sm">
-          <ul className="divide-y divide-slate-100 dark:divide-white/5">
+        <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden transition-colors shadow-sm">
+          <ul className="divide-y divide-white/5">
             <QuickAction label="Change Password" icon={<Lock size={14} />} onClick={() => navigate('/settings')} />
             <QuickAction label="Enable Two-Factor Auth" icon={<ShieldCheck size={14} />} onClick={() => navigate('/settings')} />
             <QuickAction label="Manage Devices" icon={<Monitor size={14} />} onClick={() => navigate('/settings')} />
@@ -835,10 +835,10 @@ function InfoRow({
         {icon}
       </div>
       <div className="col-span-4 md:col-span-3">
-        <p className="text-[9px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-widest leading-none">{label}</p>
+        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">{label}</p>
       </div>
       <div className="col-span-7 md:col-span-8 flex items-center justify-between gap-3 overflow-hidden">
-        <p className={cn("text-xs font-bold text-slate-800 dark:text-slate-200", truncate ? "truncate" : "break-words")}>
+        <p className={cn("text-xs font-bold text-slate-200", truncate ? "truncate" : "break-words")}>
           {value}
         </p>
         {onCopy && (
@@ -861,7 +861,7 @@ function QuickAction({ label, icon, onClick, isDanger }: { label: string, icon?:
         onClick={onClick}
         className={cn(
           "w-full px-6 py-4.5 flex items-center justify-between text-xs font-bold transition-all group",
-          isDanger ? "text-red-500 hover:bg-red-500/10" : "text-slate-700 dark:text-slate-300 hover:bg-slate-500/5"
+          isDanger ? "text-red-500 hover:bg-red-500/10" : "text-white/80 hover:text-white hover:bg-white/5"
         )}
       >
         <div className="flex items-center gap-3">

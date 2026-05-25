@@ -223,7 +223,7 @@ const RealisticCardIcon = () => (
 
 export default function Invest() {
   const { user, profile, plans } = useAuth();
-  const { setDistractionFree } = useUI();
+  const { setDistractionFree, setMrBActivationPopup } = useUI();
   const { config: uiConfig } = useUIConfig();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
@@ -380,6 +380,14 @@ export default function Invest() {
           });
         }
       });
+
+      // Trigger the 2% activation bonus popup for Mr. B
+      if (setMrBActivationPopup) {
+        setMrBActivationPopup({
+          planName: inv.plan_name,
+          amount: inv.amount
+        });
+      }
 
       toast.success("Node Pulse Detected. Core Cycle Initiated + Referral Bonuses Dispersed.");
     } catch (error: any) {
@@ -938,7 +946,7 @@ export default function Invest() {
                                     type="text"
                                     value={transactionId}
                                     onChange={(e) => setTransactionId(e.target.value)}
-                                    placeholder="Transaction ID"
+                                    placeholder="Transaction ID or Username"
                                     className="w-full bg-white/5 border border-white/5 rounded-xl px-4 py-4 text-xs font-mono focus:bg-white/10 focus:border-primary/50 outline-none transition-all text-white"
                                   />
                                 </div>

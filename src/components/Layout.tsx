@@ -228,7 +228,7 @@ interface Notification {
 export default function Layout() {
   const { user, profile, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
-  const { isTransferModalOpen, openTransferModal, closeTransferModal, isDistractionFree } = useUI();
+  const { isTransferModalOpen, openTransferModal, closeTransferModal, isDistractionFree, mrBActivationPopup, setMrBActivationPopup } = useUI();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -247,6 +247,10 @@ export default function Layout() {
   const [activePendingClaims, setActivePendingClaims] = useState<any[]>([]);
   const [showClaimToast, setShowClaimToast] = useState<any | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Investment Promo State
+  const [showInvestPromoModal, setShowInvestPromoModal] = useState(false);
+  const [promoTriggered, setPromoTriggered] = useState(false);
 
   const handleCopyLink = () => {
     const code = profile?.referral_code || '';
@@ -270,10 +274,31 @@ export default function Layout() {
     }
   }, [user]);
 
-  // Trigger modal on every visit to the Reward page
+  // Trigger investment promotion modal after login or page refresh with randomized delay (2s to 10s)
+  useEffect(() => {
+    if (!user || promoTriggered) return;
+    setPromoTriggered(true);
+    
+    // Choose randomly from standard delay options: 2s, 3s, 4s, 5s, 7s, 8s, 10s
+    const delayOptions = [2000, 3000, 4000, 5000, 7000, 8000, 10000];
+    const selectedDelay = delayOptions[Math.floor(Math.random() * delayOptions.length)];
+    
+    const timer = setTimeout(() => {
+      setShowInvestPromoModal(true);
+    }, selectedDelay);
+    
+    return () => clearTimeout(timer);
+  }, [user, promoTriggered]);
+
+  // Trigger modal on every visit to the Reward page with randomized delay
   useEffect(() => {
     if (location.pathname === '/rewards') {
-      setShowInviteModal(true);
+      const delays = [1500, 2000, 3000, 5000, 9000, 10000];
+      const randomDelay = delays[Math.floor(Math.random() * delays.length)];
+      const timer = setTimeout(() => {
+        setShowInviteModal(true);
+      }, randomDelay);
+      return () => clearTimeout(timer);
     }
   }, [location.pathname]);
 
@@ -1199,7 +1224,7 @@ export default function Layout() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 30 }}
               transition={{ type: "spring", damping: 25, stiffness: 180 }}
-              className="relative w-full max-w-[360px] bg-gradient-to-b from-[#11131e]/95 via-[#0b0c14]/98 to-[#07080e]/98 border border-purple-500/25 rounded-[30px] p-6 text-center overflow-visible shadow-[0_25px_60px_rgba(168,85,247,0.18),inset_0_1px_1px_rgba(255,255,255,0.05)] select-none"
+              className="relative w-full max-w-[360px] bg-gradient-to-br from-[#1b1035]/95 via-[#0b0c14]/98 to-[#20092c]/95 border-2 border-purple-500 rounded-[30px] p-6 text-center overflow-visible shadow-[0_25px_60px_rgba(168,85,247,0.3),inset_0_1px_1px_rgba(255,255,255,0.1)] select-none"
             >
               {/* Premium Top-Left Brand Logo inside Popup */}
               <div className="absolute top-5 left-6 flex items-center gap-1.5 pointer-events-none select-none">
@@ -1402,47 +1427,271 @@ export default function Layout() {
         )}
       </AnimatePresence>
 
-      {/* --- VIP REAL-TIME PENDING CLAIM TOAST POPUP --- */}
+      {/* --- EXQUISITE COGNITIVE INVESTMENT PROMOTION POPUP --- */}
       <AnimatePresence>
-        {showClaimToast && (
-          <motion.div 
-            initial={{ opacity: 0, x: 150, y: 0, scale: 0.9 }}
-            animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 150, y: 0, scale: 0.9 }}
-            transition={{ type: "spring", damping: 20, stiffness: 200 }}
-            className="fixed right-4 bottom-28 lg:top-24 lg:bottom-auto w-[calc(100vw-32px)] sm:max-w-sm z-[1200] bg-gradient-to-r from-purple-900/90 via-indigo-950/90 to-[#0e1017]/95 border border-purple-500/30 backdrop-blur-xl p-5 rounded-3xl shadow-[0_20px_50px_rgba(168,85,247,0.3)] select-none border-l-4 border-l-purple-500"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0 animate-pulse">
-                <Gift size={20} />
+        {showInvestPromoModal && (
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+            <style>{`
+              @keyframes floatCoin1 {
+                0% { transform: translateY(0) translateX(0) scale(0.6) rotate(0deg); opacity: 0; }
+                15% { opacity: 1; }
+                85% { opacity: 1; }
+                100% { transform: translateY(-90px) translateX(-35px) scale(1) rotate(-45deg); opacity: 0; }
+              }
+              @keyframes floatCoin2 {
+                0% { transform: translateY(0) translateX(0) scale(0.6) rotate(0deg); opacity: 0; }
+                20% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateY(-110px) translateX(40px) scale(1.1) rotate(45deg); opacity: 0; }
+              }
+              @keyframes floatROI {
+                0% { transform: translateY(0) translateX(0) scale(0.5); opacity: 0; }
+                10% { opacity: 1; }
+                80% { opacity: 1; }
+                100% { transform: translateY(-120px) translateX(10px) scale(1); opacity: 0; }
+              }
+              @keyframes animGlow {
+                0%, 100% { filter: drop-shadow(0 0 15px rgba(168,85,247,0.4)); }
+                50% { filter: drop-shadow(0 0 30px rgba(236,72,153,0.6)); }
+              }
+            `}</style>
+            
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-[4px]"
+              onClick={() => setShowInvestPromoModal(false)}
+            />
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.85, y: 50 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 50 }}
+              transition={{ type: "spring", damping: 22, stiffness: 150 }}
+              className="relative w-full max-w-[360px] bg-gradient-to-br from-[#12072b]/95 via-[#0b0c15]/98 to-[#1f0535]/95 border-2 border-purple-500/80 rounded-[30px] p-6 text-center overflow-visible shadow-[0_30px_70px_rgba(168,85,247,0.4),0_0_40px_rgba(236,72,153,0.15),inset_0_1px_1px_rgba(255,255,255,0.15)] select-none"
+            >
+              {/* Premium Top-Left Brand Logo inside Popup */}
+              <div className="absolute top-5 left-6 flex items-center gap-1.5 pointer-events-none select-none">
+                <img src="https://i.imgur.com/wU33xy3.png" alt="Wave Logo" className="h-4.5 w-auto object-contain brightness-110" />
+                <span className="text-[10px] font-serif font-black tracking-tighter uppercase italic leading-none text-white/95">Wave</span>
               </div>
-              <div className="flex-1 space-y-1.5 text-left">
-                <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-black uppercase text-purple-400 tracking-wider">Referral Unlocked</span>
+
+              {/* Overlapping top realistic 3D Vector Globe & Charts with Sparkline floaters */}
+              <div className="absolute -top-[55px] left-1/2 -translate-x-1/2 w-28 h-28 overflow-visible pointer-events-none z-20">
+                <div className="absolute inset-2 bg-gradient-to-tr from-purple-500 via-pink-500 to-indigo-500 rounded-full blur-2xl opacity-40 animate-[animGlow_4s_infinite_ease-in-out]" />
+                
+                {/* Floating elements inside / around graphics boundary */}
+                <div className="absolute top-8 left-6 text-amber-400 font-extrabold text-sm select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(245,158,11,0.5)] animate-[floatCoin1_3.8s_infinite_linear]">
+                  $
+                </div>
+                <div className="absolute top-4 right-6 text-purple-300 font-black text-xs select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(168,85,247,0.5)] animate-[floatCoin2_3.2s_infinite_linear_0.5s]">
+                  $
+                </div>
+                <div className="absolute top-10 left-10 select-none pointer-events-none animate-[floatROI_4.5s_infinite_linear_1.1s]">
+                  <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-green-600 text-[8px] px-1.5 py-0.5 rounded-full border border-emerald-400/20 text-white font-mono font-black shadow-lg">
+                    +2.9% Daily
+                  </div>
+                </div>
+                <div className="absolute top-12 right-12 text-pink-400 font-black text-sm select-none pointer-events-none filter drop-shadow-[0_2px_6px_rgba(244,114,182,0.4)] animate-[floatCoin1_3.5s_infinite_linear_1.8s]">
+                  ✦
+                </div>
+
+                {/* Highly Luxe Neon Fintech SVG Trend Chart Visualizer */}
+                <svg viewBox="0 0 100 100" className="w-full h-full filter drop-shadow-[0_8px_20px_rgba(236,72,153,0.4)]">
+                  <defs>
+                    <linearGradient id="glowGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#A855F7" />
+                      <stop offset="100%" stopColor="#EC4899" />
+                    </linearGradient>
+                    <linearGradient id="radialHolo" x1="0.5" y1="0.5" r="0.5">
+                      <stop offset="0%" stopColor="#EC4899" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#3B82F6" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+
+                  {/* Holographic background sphere */}
+                  <circle cx="50" cy="50" r="32" fill="url(#radialHolo)" opacity="0.45" />
+
+                  {/* Outer Orbit Ring with nodes */}
+                  <circle cx="50" cy="50" r="30" fill="none" stroke="#A855F7" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
+                  <circle cx="20" cy="50" r="2" fill="#EC4899" />
+                  <circle cx="80" cy="50" r="2.5" fill="#3B82F6" />
+                  <circle cx="50" cy="20" r="2" fill="#F5B21D" />
+
+                  {/* Futuristic Core Sphere */}
+                  <circle cx="50" cy="50" r="22" fill="#0c0e17" stroke="url(#glowGrad)" strokeWidth="2.5" />
+                  
+                  {/* Glowing neon graph pattern inside core */}
+                  <path d="M 38,58 L 44,48 L 50,52 L 56,40 L 62,44" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  
+                  {/* Nodes on points */}
+                  <circle cx="38" cy="58" r="1.5" fill="#22C55E" />
+                  <circle cx="44" cy="48" r="1.5" fill="#22C55E" />
+                  <circle cx="50" cy="52" r="1.5" fill="#22C55E" />
+                  <circle cx="56" cy="40" r="1.5" fill="#22C55E" />
+                  <circle cx="62" cy="44" r="1.5" fill="#22C55E" />
+
+                  {/* Emerging upward green indicator arrow */}
+                  <path d="M 62,44 L 62,38 L 56,38" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  
+                  {/* Digital interface rings */}
+                  <circle cx="50" cy="50" r="15" fill="none" stroke="#EC4899" strokeWidth="0.5" strokeDasharray="10 5" opacity="0.8" />
+                </svg>
+              </div>
+
+              {/* Close button with sweet transition */}
+              <button 
+                onClick={() => setShowInvestPromoModal(false)}
+                className="absolute top-4 right-4 text-white/50 hover:text-white transition-all p-1.5 bg-white/5 hover:bg-white/10 rounded-full cursor-pointer hover:rotate-90 duration-300"
+              >
+                <X size={14} />
+              </button>
+
+              <div className="mt-12 space-y-4">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-full text-[8.5px] font-black text-purple-300 uppercase tracking-widest leading-none">
+                  <TrendingUp size={10} className="text-pink-400 animate-pulse" /> HIGH-YIELD QUANT NODE
+                </span>
+                
+                <h3 className="text-base font-black text-white uppercase tracking-wide leading-tight max-w-[280px] mx-auto filter drop-shadow-md">
+                  Start Your Investment Journey With WAVE Now
+                </h3>
+                
+                <p className="text-[11px] text-white/70 leading-relaxed max-w-[260px] mx-auto font-medium">
+                  Utilize artificial neural nodes to execute institutional arbitrage in real-time. <span className="text-purple-400 font-extrabold">Earn up to 2.9% daily returns</span> with secure high-frequency yield.
+                </p>
+
+                {/* Features list */}
+                <div className="p-3.5 bg-white/[0.02] border border-white/5 rounded-2xl text-left space-y-2 mt-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold text-white/80">Automated Yield Compounding</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold text-white/80">Instant Profit Claim At Any Hour</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold text-white/80">Insured Node Allocation Strategy</span>
+                  </div>
+                </div>
+
+                {/* Ultimate Premium Call To Action */}
+                <button 
+                  onClick={() => {
+                    setShowInvestPromoModal(false);
+                    navigate('/invest');
+                  }}
+                  className="w-full mt-3 py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 hover:from-purple-600 hover:via-pink-600 hover:to-purple-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_12px_24px_rgba(236,72,153,0.3)] flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  Invest Now <ArrowRightLeft size={10} className="ml-1" />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- PREMIUM REAL-TIME REFERRAL & ACTIVATION POPUPS --- */}
+      {/* 1. MR. A REFERRAL REWARD POPUP */}
+      <AnimatePresence>
+        {showClaimToast && showClaimToast.type === 'referrer' && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 30 }}
+            transition={{ type: "spring", damping: 25, stiffness: 350 }}
+            className="fixed bottom-6 right-4 md:right-6 max-w-[380px] w-[calc(100vw-32px)] z-[1200] rounded-2xl bg-[#090b10]/90 backdrop-blur-xl border border-purple-500/20 shadow-[0_25px_60px_-15px_rgba(147,51,234,0.3)] p-5 select-none text-left overflow-hidden border-l-4 border-l-purple-500"
+          >
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-indigo-500 opacity-80" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 blur-2xl rounded-full pointer-events-none" />
+
+            <div className="flex gap-4 items-start relative z-10">
+              <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 flex-shrink-0">
+                <Trophy size={18} className="animate-pulse" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] uppercase font-semibold text-purple-400 tracking-wider">Referral Reward Active</span>
                   <button 
                     onClick={() => setShowClaimToast(null)}
-                    className="text-white/40 hover:text-white transition-colors"
+                    className="text-gray-400 hover:text-white transition-colors cursor-pointer"
                   >
                     <X size={14} />
                   </button>
                 </div>
-                <h4 className="text-xs font-bold text-white leading-snug">
-                  Claim Your Reward Now!
+                <h4 className="text-sm font-bold text-white tracking-tight leading-snug">
+                  Claim Referral Reward
                 </h4>
-                <p className="text-[11px] text-white/70 leading-normal">
-                  Your network partner <span className="text-purple-300 font-extrabold">{showClaimToast.partner_name}</span> has initialized a node! Claim your <span className="text-purple-400 font-extrabold">5% bonus</span> now.
+                <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
+                  Your referral <span className="text-purple-300 font-extrabold">{showClaimToast.partner_name}</span> has activated an investment successfully. Claim your referral reward now.
                 </p>
-                <div className="pt-2">
+                <div className="mt-3.5">
                   <button 
                     onClick={() => {
                       setShowClaimToast(null);
                       navigate('/rewards#referral-rewards');
-                      setTimeout(() => {
-                        const el = document.getElementById('referral-rewards-section');
-                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                      }, 300);
                     }}
-                    className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md active:scale-95 text-center block pointer-events-auto"
+                    className="w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white text-[10px] uppercase font-semibold tracking-widest rounded-xl transition-all shadow-lg active:scale-95 text-center cursor-pointer block"
+                  >
+                    Claim Now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 2. MR. B INVESTMENT ACTIVATION POPUP */}
+      <AnimatePresence>
+        {mrBActivationPopup && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 30 }}
+            transition={{ type: "spring", damping: 25, stiffness: 350 }}
+            className="fixed bottom-6 right-4 md:right-6 max-w-[380px] w-[calc(100vw-32px)] z-[1200] rounded-2xl bg-[#090b10]/95 backdrop-blur-xl border border-emerald-500/20 shadow-[0_25px_60px_-15px_rgba(16,185,129,0.3)] p-5 select-none text-left overflow-hidden border-l-4 border-l-emerald-500"
+          >
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 opacity-80" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full pointer-events-none" />
+
+            <div className="flex gap-4 items-start relative z-10">
+              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <Gift size={18} className="animate-pulse" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] uppercase font-semibold text-emerald-400 tracking-wider">Node Active</span>
+                  <button 
+                    onClick={() => setMrBActivationPopup(null)}
+                    className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <h4 className="text-sm font-bold text-white tracking-tight leading-snug">
+                  Investment Plan Activated
+                </h4>
+                <div className="mt-1.5 p-2 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                  <p className="text-[10px] text-gray-400">
+                    Plan: <span className="text-white font-semibold uppercase">{mrBActivationPopup.planName}</span>
+                  </p>
+                  <p className="text-[10px] text-gray-400">
+                    Amount: <span className="text-emerald-400 font-bold font-mono">${mrBActivationPopup.amount.toFixed(2)}</span>
+                  </p>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                  You have successfully activated your investment plan. Claim your activation reward now.
+                </p>
+                <div className="mt-3.5">
+                  <button 
+                    onClick={() => {
+                      setMrBActivationPopup(null);
+                      navigate('/rewards#active-node-multipliers');
+                    }}
+                    className="w-full py-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white text-[10px] uppercase font-semibold tracking-widest rounded-xl transition-all shadow-lg active:scale-95 text-center cursor-pointer block"
                   >
                     Claim Reward
                   </button>

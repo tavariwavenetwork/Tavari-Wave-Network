@@ -27,7 +27,7 @@ import {
 import { cn, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, getDocs, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 import { AnimatePresence } from 'motion/react';
@@ -67,7 +67,7 @@ const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, hi
 
 export default function Dashboard() {
   const { user, profile } = useAuth();
-  const { isTransferModalOpen, openTransferModal, closeTransferModal } = useUI();
+  const { isTransferModalOpen, openTransferModal, closeTransferModal, setMrBActivationPopup } = useUI();
   const navigate = useNavigate();
   const [recentTx, setRecentTx] = useState<any[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
@@ -178,24 +178,114 @@ export default function Dashboard() {
   }, [user]);
 
   const activateInvestment = async (invId: string) => {
+    if (!user || !profile) return;
     setIsActivating(invId);
     const path = `investments/${invId}`;
     try {
       const now = new Date().toISOString();
-      const userRef = doc(db, 'users', user!.uid);
-      
-      // Update investment
-      await updateDoc(doc(db, 'investments', invId), {
-        status: 'active',
-        activated_at: now,
-        last_sync: now,
-        total_earned: 0
+      let activatedPlanName = '';
+      let activatedAmount = 0;
+
+      await runTransaction(db, async (transaction) => {
+        const invRef = doc(db, 'investments', invId);
+        const invSnap = await transaction.get(invRef);
+        
+        if (!invSnap.exists()) throw new Error("Investment not found.");
+        const invData = invSnap.data();
+        
+        if (invData.status !== 'inactive') throw new Error("Investment cannot be activated.");
+
+        activatedPlanName = invData.plan_name;
+        activatedAmount = invData.amount;
+
+        // Update Investment
+        transaction.update(invRef, {
+          status: 'active',
+          activated_at: now,
+          last_sync: now,
+          total_earned: 0,
+          referral_bonus_processed: true
+        });
+
+        const userRef = doc(db, 'users', user.uid);
+
+        // If this is the first active investment, start the ROI cycle
+        if (activeCount === 0) {
+          transaction.update(userRef, {
+            roi_cycle_start: now
+          });
+        }
+
+        // Referral Bonus Logic (only first investment activated)
+        if (profile.referred_by && !profile.first_investment_activated && !invData.referral_bonus_processed) {
+          const bonusAmount = invData.amount * 0.05;
+          const referrerRef = doc(db, 'users', profile.referred_by);
+
+          // Mark user's first investment as activated and increment active referrals
+          transaction.update(userRef, {
+            first_investment_activated: true
+          });
+          transaction.update(referrerRef, {
+            active_referrals: increment(1)
+          });
+
+          // Create pending claim document for User A (referrer)
+          const claimRef1 = doc(collection(db, 'referral_claims'));
+          transaction.set(claimRef1, {
+            user_id: profile.referred_by, // User A (referrer)
+            type: 'referrer',
+            amount: bonusAmount,
+            partner_uid: user.uid, // User B
+            partner_name: profile.username || 'Partner',
+            status: 'pending',
+            created_at: now
+          });
+
+          // Create pending claim document for User B (referred)
+          const claimRef2 = doc(collection(db, 'referral_claims'));
+          transaction.set(claimRef2, {
+            user_id: user.uid, // User B
+            type: 'referred',
+            amount: bonusAmount,
+            partner_uid: profile.referred_by, // User A
+            partner_name: 'Sponsor',
+            status: 'pending',
+            created_at: now
+          });
+
+          // Notifications
+          const notificationRef1 = doc(collection(db, 'notifications'));
+          transaction.set(notificationRef1, {
+            user_id: user.uid,
+            title: 'Welcome Referral Reward Pending',
+            message: `You have a pending referral reward of ${formatCurrency(bonusAmount)}! Claim it inside the Reward page.`,
+            type: 'success',
+            read: false,
+            created_at: now
+          });
+
+          const notificationRef2 = doc(collection(db, 'notifications'));
+          transaction.set(notificationRef2, {
+            user_id: profile.referred_by,
+            title: 'Referral Reward Pending',
+            message: `Your referral ${profile.username} has activated an investment. Claim your referral reward now.`,
+            type: 'success',
+            read: false,
+            created_at: now
+          });
+        } else {
+          // If they don't have a referrer or it's not their first investment, we still mark first_investment_activated
+          transaction.update(userRef, {
+            first_investment_activated: true
+          });
+        }
       });
 
-      // If this is the first active investment, start the ROI cycle
-      if (activeCount === 0) {
-        await updateDoc(userRef, {
-          roi_cycle_start: now
+      // Trigger Mr B's activation reward popup
+      if (setMrBActivationPopup) {
+        setMrBActivationPopup({
+          planName: activatedPlanName,
+          amount: activatedAmount
         });
       }
 

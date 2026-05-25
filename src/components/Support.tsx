@@ -161,7 +161,7 @@ export default function Support() {
         <div className="lg:col-span-12 xl:col-span-4 flex flex-col gap-6 order-2 xl:order-1">
           <section className="space-y-4">
             <div className="px-2">
-              <h3 className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-2 uppercase tracking-tighter">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2 uppercase tracking-tighter">
                 <ShieldCheck size={18} className="text-blue-500" /> Instant Contact
               </h3>
             </div>
@@ -246,10 +246,10 @@ export default function Support() {
 
         {/* Ticket Form */}
         <div className="lg:col-span-12 xl:col-span-8 space-y-6 order-1 xl:order-2">
-          <section className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-sm">
+          <section className="bg-white/5 border border-white/10 rounded-3xl p-8 shadow-sm backdrop-blur-sm">
              <div className="mb-8">
-               <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight italic font-serif">Open Priority Ticket</h2>
-               <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Our support team typically responds within 2-4 hours.</p>
+               <h2 className="text-2xl font-black text-white uppercase tracking-tight italic font-serif">Open Priority Ticket</h2>
+               <p className="text-slate-400 text-sm mt-1">Our support team typically responds within 2-4 hours.</p>
              </div>
 
              <form onSubmit={handleTicketSubmit} className="space-y-6">
@@ -262,7 +262,7 @@ export default function Support() {
                           type="text"
                           readOnly
                           value={ticketForm.username}
-                          className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-200 outline-none"
                         />
                      </div>
                    </div>
@@ -274,7 +274,7 @@ export default function Support() {
                           type="text"
                           readOnly
                           value={ticketForm.userId}
-                          className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none"
+                          className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-200 outline-none"
                         />
                      </div>
                    </div>
@@ -288,7 +288,7 @@ export default function Support() {
                         type="email"
                         readOnly
                         value={ticketForm.email}
-                        className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-800 dark:text-slate-200 outline-none"
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-sm font-bold text-slate-200 outline-none"
                       />
                    </div>
                 </div>
@@ -301,7 +301,7 @@ export default function Support() {
                      value={ticketForm.message}
                      onChange={(e) => setTicketForm(prev => ({ ...prev, message: e.target.value }))}
                      rows={6}
-                     className="w-full bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-3xl py-4 px-6 text-sm font-medium text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500 transition-all resize-none"
+                     className="w-full bg-white/5 border border-white/10 rounded-3xl py-4 px-6 text-sm font-medium text-slate-200 outline-none focus:border-blue-500 transition-all resize-none"
                    />
                 </div>
 
@@ -334,7 +334,7 @@ export default function Support() {
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.9 }}
-            className="fixed bottom-6 right-6 z-[2000] w-[350px] md:w-[400px] h-[500px] md:h-[600px] bg-white dark:bg-[#0a0c10] border border-slate-200 dark:border-white/10 rounded-[32px] shadow-2xl flex flex-col overflow-hidden"
+            className="fixed bottom-6 right-6 z-[2000] w-[350px] md:w-[400px] h-[500px] md:h-[600px] bg-[#0a0c10] border border-white/10 rounded-[32px] shadow-2xl flex flex-col overflow-hidden"
           >
              {/* Chat Header */}
              <div className="bg-slate-900 p-5 flex items-center justify-between text-white border-b border-white/5">
@@ -356,7 +356,7 @@ export default function Support() {
              </div>
 
              {/* Chat Messages */}
-             <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-hide bg-slate-50 dark:bg-transparent">
+             <div className="flex-1 overflow-y-auto p-5 space-y-4 scrollbar-hide bg-transparent">
                 {messages.map((msg) => (
                   <div 
                     key={msg.id}
@@ -369,7 +369,7 @@ export default function Support() {
                       "p-4 text-xs font-medium leading-relaxed leading-relaxed",
                       msg.role === 'user' 
                         ? "bg-blue-600 text-white rounded-t-2xl rounded-bl-2xl shadow-md" 
-                        : "bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-800 dark:text-slate-200 rounded-t-2xl rounded-br-2xl shadow-sm"
+                        : "bg-white/5 border border-white/10 text-slate-200 rounded-t-2xl rounded-br-2xl shadow-sm"
                     )}>
                        {msg.text}
                     </div>
@@ -380,7 +380,7 @@ export default function Support() {
                 ))}
                 {isTyping && (
                   <div className="flex flex-col items-start space-y-1 max-w-[85%]">
-                    <div className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 p-4 rounded-t-2xl rounded-br-2xl">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-t-2xl rounded-br-2xl">
                        <div className="flex gap-1">
                          <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1 }} className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
                          <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1, delay: 0.2 }} className="w-1.5 h-1.5 bg-slate-400 rounded-full" />
@@ -393,7 +393,7 @@ export default function Support() {
              </div>
 
              {/* Chat Input */}
-             <div className="p-4 bg-white dark:bg-[#0a0c10] border-t border-slate-100 dark:border-white/10">
+             <div className="p-4 bg-[#0a0c10] border-t border-white/10">
                 <div className="relative">
                    <input 
                      type="text"
@@ -401,12 +401,12 @@ export default function Support() {
                      value={chatInput}
                      onChange={(e) => setChatInput(e.target.value)}
                      onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                     className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl py-4 pl-5 pr-14 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none focus:border-blue-500 transition-all"
+                     className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-5 pr-14 text-xs font-bold text-slate-200 outline-none focus:border-blue-500 transition-all"
                    />
                    <button 
                      onClick={handleSendMessage}
                      disabled={!chatInput.trim() || isTyping}
-                     className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-slate-900 dark:bg-aura-lime text-white dark:text-slate-950 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100"
+                     className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-aura-lime text-slate-950 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:scale-100"
                    >
                      <Send size={16} />
                    </button>
@@ -425,7 +425,7 @@ function ContactCard({ icon, label, value, href, brandColor = "text-blue-500", b
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-5 rounded-2xl flex items-center justify-between group hover:border-emerald-500/30 transition-all backdrop-blur-sm"
+      className="bg-white/5 border border-white/10 p-5 rounded-2xl flex items-center justify-between group hover:border-emerald-500/30 transition-all backdrop-blur-sm"
     >
       <div className="flex items-center gap-4">
         <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform", bgColor, brandColor)}>
@@ -433,7 +433,7 @@ function ContactCard({ icon, label, value, href, brandColor = "text-blue-500", b
         </div>
         <div>
           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none mb-1">{label}</p>
-          <p className="text-xs font-black text-slate-800 dark:text-slate-200 tracking-tight">{value}</p>
+          <p className="text-xs font-black text-slate-100 tracking-tight">{value}</p>
         </div>
       </div>
       <ExternalLink size={14} className="text-slate-300 dark:text-slate-700 group-hover:text-emerald-500 transition-colors" />
