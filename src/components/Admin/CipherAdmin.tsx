@@ -61,7 +61,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, getRoiByAmountDynamic } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { logAudit } from '../../lib/auth_security';
 
@@ -95,6 +95,96 @@ const AdminNotificationItem = ({ email, username, date, type }: { email: string,
     </div>
   );
 };
+
+interface AdminROIEngineCardProps {
+  userValue: any;
+  userInvestments: any[];
+  plans: any[];
+  key?: any;
+}
+
+function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngineCardProps) {
+  const activeCount = userInvestments.length;
+  const yieldSum = useMemo(() => 
+    userInvestments.reduce((acc, curr: any) => acc + (curr.amount * getRoiByAmountDynamic(curr.amount, plans || [])), 0),
+  [userInvestments, plans]);
+
+  const [progress, setProgress] = useState(0);
+  const [timeLeft, setTimeLeft] = useState("24:00:00");
+  const [liveEarnings, setLiveEarnings] = useState(0);
+
+  useEffect(() => {
+    if (activeCount === 0) return;
+
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const totalDuration = 24 * 60 * 60 * 1000;
+      const cycleStart = new Date(userValue.roi_cycle_start || userValue.created_at || now).getTime();
+      const elapsed = now - cycleStart;
+      
+      const currentCycleElapsed = elapsed % totalDuration;
+      const currentProgress = (currentCycleElapsed / totalDuration) * 100;
+      
+      setProgress(currentProgress);
+      setLiveEarnings(yieldSum * (currentProgress / 100));
+
+      const diff = Math.max(0, totalDuration - currentCycleElapsed);
+      const h = Math.floor(diff / (1000 * 60 * 60));
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const s = Math.floor((diff % (1000 * 60)) / 1000);
+      setTimeLeft(`${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [userValue.roi_cycle_start, userValue.created_at, activeCount, yieldSum]);
+
+  if (activeCount === 0) return null;
+
+  return (
+    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4 hover:border-aura-lime/20 hover:bg-white/[0.03] transition-all relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-aura-lime/5 blur-2xl rounded-full pointer-events-none" />
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-aura-lime flex items-center justify-center text-black shrink-0 shadow-[0_0_15px_rgba(168,251,60,0.2)]">
+            <Zap size={14} className="animate-pulse" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="text-xs font-black uppercase text-white truncate max-w-[150px]">{userValue.name}</h4>
+            <span className="text-[8px] text-aura-lime font-black uppercase tracking-wider block">
+              {activeCount} active node{activeCount > 1 ? 's' : ''} • {userValue.email}
+            </span>
+          </div>
+        </div>
+        <div className="text-left sm:text-right">
+          <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Time Remaining</p>
+          <p className="text-xs font-black font-mono text-white mt-0.5">{timeLeft}</p>
+        </div>
+      </div>
+
+      <div className="space-y-2 bg-white/[0.01] p-3 rounded-xl border border-white/5">
+        <div className="flex justify-between items-center text-[9px] font-bold text-white">
+          <span className="text-emerald-400 font-black">{formatCurrency(liveEarnings)} / {formatCurrency(yieldSum)} Day</span>
+          <span className="font-mono text-aura-muted">({progress.toFixed(1)}%)</span>
+        </div>
+        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+          <div 
+            style={{ width: `${progress}%` }}
+            className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
+          />
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-1">
+        {userInvestments.map(inv => (
+          <div key={inv.id} className="text-[8px] font-bold uppercase px-2 py-0.5 bg-white/5 text-gray-300 border border-white/5 rounded">
+            {inv.plan_name}: <span className="text-white font-black">{formatCurrency(inv.amount)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function SidebarItem({ icon, label, active, onClick, badge }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, badge?: number }) {
   return (
@@ -163,6 +253,7 @@ export default function CipherAdmin() {
   const [userDevices, setUserDevices] = useState<any[]>([]);
   const [securityLogs, setSecurityLogs] = useState<any[]>([]);
   const [isDetailView, setIsDetailView] = useState(false);
+  const [expandedActivityUserId, setExpandedActivityUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [userFilter, setUserFilter] = useState<'all' | 'active' | 'suspended' | 'banned' | 'inactive'>('all');
   
@@ -281,6 +372,74 @@ export default function CipherAdmin() {
         };
       });
   }, [subscribers]);
+
+  const effectiveFilter = activeTab === 'cinactiveusers' ? 'inactive' : userFilter;
+
+  // 1. Newly Registered Users
+  const newlyRegisteredUsers = useMemo(() => {
+    return [...users]
+      .filter(u => u.created_at || u.joined_at)
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at || a.joined_at || 0).getTime();
+        const dateB = new Date(b.created_at || b.joined_at || 0).getTime();
+        return dateB - dateA;
+      });
+  }, [users]);
+
+  // 2. Filtered Users for Dashboard
+  const filteredUsers = useMemo(() => {
+    return users.filter(u => {
+      const matchesSearch = 
+        u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.username && u.username.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const hasActiveNode = investments.some(i => i.user_id === u.id && i.status === 'active');
+
+      if (effectiveFilter === 'all') return matchesSearch;
+      if (effectiveFilter === 'active') return matchesSearch && hasActiveNode;
+      if (effectiveFilter === 'inactive') return matchesSearch && !hasActiveNode;
+      if (effectiveFilter === 'suspended') return matchesSearch && u.suspended;
+      if (effectiveFilter === 'banned') return matchesSearch && u.banned;
+      return matchesSearch;
+    });
+  }, [users, investments, effectiveFilter, searchTerm]);
+
+  // 3. Active Users with Combined Activities
+  const activeUsersWithActivities = useMemo(() => {
+    return users.map(user => {
+      const userTx = transactions
+        .filter((tx: any) => tx.user_id === user.id || tx.sender_id === user.id || tx.receiver_id === user.id)
+        .map((tx: any) => ({
+          id: tx.id,
+          action: tx.type || 'Transaction',
+          description: tx.description || `${tx.type?.replace(/_/g, ' ')} completed`,
+          amount: tx.amount || 0,
+          timestamp: tx.created_at ? new Date(tx.created_at).getTime() : 0,
+        }));
+
+      const userLogs = securityLogs
+        .filter((log: any) => log.user_id === user.id)
+        .map((log: any) => ({
+          id: log.id,
+          action: log.action || 'System Action',
+          description: log.details || log.action?.replace(/_/g, ' ') || 'Action recorded',
+          amount: 0,
+          timestamp: log.timestamp?.seconds ? log.timestamp.seconds * 1000 : log.timestamp ? new Date(log.timestamp).getTime() : 0,
+        }));
+
+      const combined = [...userTx, ...userLogs].sort((a, b) => b.timestamp - a.timestamp);
+      const latestTime = combined.length > 0 ? combined[0].timestamp : 0;
+
+      return {
+        user,
+        activities: combined,
+        latestTime
+      };
+    })
+    .filter(item => item.activities.length > 0)
+    .sort((a, b) => b.latestTime - a.latestTime);
+  }, [users, transactions, securityLogs]);
 
   useEffect(() => {
     if (users.length > 0) {
@@ -1007,7 +1166,7 @@ export default function CipherAdmin() {
                 >
                   <div className="flex items-center gap-3">
                     <Users size={18} />
-                    <span className="text-[10px] uppercase tracking-widest">Users</span>
+                    <span className="text-[10px] uppercase tracking-widest">Users Control Panel</span>
                   </div>
                 </button>
 
@@ -1159,7 +1318,7 @@ export default function CipherAdmin() {
           <SidebarItem icon={<CreditCard size={18} />} label="Deposits" active={activeTab === 'cdeposits'} onClick={() => handleTabChange('cdeposits')} badge={pendingDepositsUnseenCount} />
           <SidebarItem icon={<ArrowDownLeft size={18} />} label="Withdrawals" active={activeTab === 'cwithdrawals'} onClick={() => handleTabChange('cwithdrawals')} badge={pendingWithdrawalsUnseenCount} />
           <SidebarItem icon={<Zap size={18} />} label="Investments" active={activeTab === 'cinvestments'} onClick={() => handleTabChange('cinvestments')} badge={pendingInvestmentsUnseenCount} />
-          <SidebarItem icon={<Users size={18} />} label="Users" active={activeTab === 'cuser'} onClick={() => handleTabChange('cuser')} />
+          <SidebarItem icon={<Users size={18} />} label="Users Control Panel" active={activeTab === 'cuser'} onClick={() => handleTabChange('cuser')} />
           <SidebarItem icon={<UserMinus size={18} />} label="Inactive" active={activeTab === 'cinactiveusers'} onClick={() => handleTabChange('cinactiveusers')} />
           <SidebarItem icon={<IdCard size={18} />} label="KYC Control" active={activeTab === 'ckycs'} onClick={() => handleTabChange('ckycs')} />
           <SidebarItem icon={<ShieldCheck size={18} />} label="Security" active={activeTab === 'csecurity'} onClick={() => handleTabChange('csecurity')} />
@@ -1186,8 +1345,8 @@ export default function CipherAdmin() {
       <main className="flex-1 p-6 lg:p-12 pt-24 lg:pt-12 overflow-y-auto max-h-screen">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
-            <h1 className="text-4xl lg:text-6xl font-black tracking-[-0.05em] leading-[0.85] text-white font-serif italic mb-2 capitalize">
-              {activeTab.substring(1)}.
+            <h1 className="text-4xl lg:text-3xl font-black tracking-[-0.05em] leading-[0.85] text-white font-serif italic mb-2 capitalize">
+              {(activeTab === 'cuser' || activeTab === 'cinactiveusers') ? 'Users Control Panel' : activeTab.substring(1)}.
             </h1>
             <p className="text-aura-muted text-[10px] font-bold uppercase tracking-[0.3em]">System Level Access: root_alpha</p>
           </div>
@@ -1688,127 +1847,324 @@ export default function CipherAdmin() {
         )}
 
         {(activeTab === 'cuser' || activeTab === 'cinactiveusers') && (
-          <div className="space-y-8">
-            {activeTab === 'cuser' && !isDetailView && recentUserNotifications.length > 0 && (
-              <div className="p-6 bg-white/[0.01] border border-[#9333ea]/20 rounded-[32px] space-y-4">
-                <div className="flex items-center gap-2">
-                  <Bell size={16} className="text-[#a855f7]" />
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-white">System Alerts: New Registrations</h3>
-                </div>
-                <div className="grid grid-cols-1 gap-3">
-                  {recentUserNotifications.map(notif => (
-                    <AdminNotificationItem
-                      key={notif.id}
-                      email={notif.email}
-                      username={notif.username}
-                      date={notif.date}
-                      type="user"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
+          <div className="space-y-8 pb-20">
             {!isDetailView ? (
-              <div className="space-y-6">
-                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                   <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
-                      {['all', 'active', 'suspended', 'banned'].map((f) => (
+              <div className="space-y-12">
+                
+                {/* SECTION 1 — NEW REGISTRATIONS */}
+                <section className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                      <UserPlus size={18} className="text-aura-lime animate-pulse" />
+                      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">New Registrations</h2>
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Live Stream</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {newlyRegisteredUsers.slice(0, 6).map((u: any) => (
+                      <div 
+                        key={u.id}
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setIsDetailView(true);
+                        }}
+                        className="p-5 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-aura-lime/30 rounded-3xl transition-all cursor-pointer flex items-center justify-between group animate-fade-in"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-xl bg-aura-lime/10 border border-aura-lime/20 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
+                            {u.name?.[0]?.toUpperCase() || 'U'}
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="text-xs font-bold text-white truncate max-w-[120px]">{u.name || 'Anonymous'}</h4>
+                            <p className="text-[9px] text-aura-muted font-bold truncate max-w-[120px] font-mono">{u.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-aura-lime/10 text-aura-lime rounded">New</span>
+                          <p className="text-[8px] text-aura-muted font-mono mt-1">
+                            {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Just now'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                {/* SECTION 2 — USERS DASHBOARD */}
+                <section id="users-dashboard" className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
+                  <div className="flex flex-col gap-6">
+                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between pb-4 border-b border-white/5">
+                      <div className="flex items-center gap-2">
+                        <Users size={18} className="text-aura-lime" />
+                        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">Users Dashboard</h2>
+                      </div>
+
+                      <div className="flex items-center gap-4 bg-white/5 border border-white/5 rounded-2xl px-4 py-2 w-full md:w-80">
+                        <Search size={16} className="text-aura-muted" />
+                        <input 
+                          type="text" 
+                          placeholder="Search Identity..." 
+                          className="bg-transparent border-none outline-none text-[10px] font-bold tracking-widest uppercase text-white w-full"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto max-w-full">
+                      {[
+                        { key: 'all', label: 'All Users' },
+                        { key: 'active', label: 'Active Users' },
+                        { key: 'inactive', label: 'Inactive Users' },
+                        { key: 'suspended', label: 'Suspended' },
+                        { key: 'banned', label: 'Banned' }
+                      ].map((f) => (
                         <button 
-                          key={f}
-                          onClick={() => setUserFilter(f as any)}
+                          key={f.key}
+                          onClick={() => {
+                            if (activeTab === 'cinactiveusers' && f.key !== 'inactive') {
+                              handleTabChange('cuser');
+                            }
+                            setUserFilter(f.key as any);
+                          }}
                           className={cn(
-                            "px-6 py-2 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all",
-                            userFilter === f ? "bg-white/10 text-white" : "text-aura-muted hover:text-white"
+                            "px-6 py-2 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all whitespace-nowrap",
+                            effectiveFilter === f.key ? "bg-white/10 text-white" : "text-aura-muted hover:text-white"
                           )}
                         >
-                          {f}
+                          {f.label}
                         </button>
                       ))}
-                   </div>
-                   {activeTab === 'cinactiveusers' && (
-                     <div className="text-[10px] font-black uppercase text-aura-lime bg-aura-lime/10 px-4 py-2 rounded-xl animate-pulse">
-                        Filtering Inactive Nodes Only
-                     </div>
-                   )}
-                   <div className="flex items-center gap-4 bg-white/5 border border-white/5 rounded-2xl px-4 py-2 w-full md:w-80">
-                      <Search size={16} className="text-aura-muted" />
-                      <input 
-                        type="text" 
-                        placeholder="Search Identity..." 
-                        className="bg-transparent border-none outline-none text-[10px] font-bold tracking-widest uppercase text-white w-full"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                      />
-                   </div>
-                </div>
+                    </div>
+                  </div>
 
-                <div className="bg-white/5 border border-white/5 rounded-[40px] overflow-hidden">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="border-b border-white/5">
-                        <th className="px-8 py-6 text-[9px] font-black uppercase tracking-widest text-aura-muted">Identity</th>
-                        <th className="px-8 py-6 text-[9px] font-black uppercase tracking-widest text-aura-muted">Balances</th>
-                        <th className="px-8 py-6 text-[9px] font-black uppercase tracking-widest text-aura-muted text-center">Nodes</th>
-                        <th className="px-8 py-6 text-[9px] font-black uppercase tracking-widest text-aura-muted">Status</th>
-                        <th className="px-8 py-6 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Access</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.02]">
-                      {users
-                        .filter(u => {
-                          const matchesSearch = u.name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email?.toLowerCase().includes(searchTerm.toLowerCase());
-                          if (activeTab === 'cinactiveusers') {
-                             const hasActiveNodes = investments.some(i => i.user_id === u.id && i.status === 'active');
-                             if (hasActiveNodes) return false;
-                          }
-                          if (userFilter === 'all') return matchesSearch;
-                          if (userFilter === 'active') return matchesSearch && !u.suspended && !u.banned;
-                          if (userFilter === 'suspended') return matchesSearch && u.suspended;
-                          if (userFilter === 'banned') return matchesSearch && u.banned;
-                          return matchesSearch;
-                        })
-                        .map((user: any) => (
-                        <tr key={user.id} className="group hover:bg-white/[0.02] transition-colors cursor-pointer" onClick={() => { setSelectedUser(user); setIsDetailView(true); }}>
-                          <td className="px-8 py-6">
-                            <div className="flex items-center gap-4">
-                              {user.photoURL ? (
-                                <img src={user.photoURL} className="w-10 h-10 rounded-xl object-cover border border-white/10" alt="" />
-                              ) : (
-                                <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-xs text-aura-lime">{user.name?.[0] || 'U'}</div>
-                              )}
-                              <div>
-                                <p className="text-sm font-bold tracking-tight">{user.name}</p>
-                                <p className="text-[9px] text-aura-muted font-bold uppercase tracking-widest">{user.email}</p>
+                  <div className="bg-[#090b10] border border-white/5 rounded-[32px] overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-white/5">
+                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Identity</th>
+                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Balances</th>
+                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-center">Nodes / Plan Details</th>
+                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Status</th>
+                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Access</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.02]">
+                          {filteredUsers.map((u: any) => {
+                            const userActiveInvestments = investments.filter(i => i.user_id === u.id && i.status === 'active');
+                            const isActiveNodeUser = userActiveInvestments.length > 0;
+                            
+                            return (
+                              <tr 
+                                key={u.id} 
+                                className="group hover:bg-white/[0.02] transition-colors cursor-pointer" 
+                                onClick={() => { 
+                                  setSelectedUser(u); 
+                                  setIsDetailView(true); 
+                                }}
+                              >
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    {u.photoURL ? (
+                                      <img src={u.photoURL} className="w-9 h-9 rounded-xl object-cover border border-white/10" alt="" />
+                                    ) : (
+                                      <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
+                                        {u.name?.[0]?.toUpperCase() || 'U'}
+                                      </div>
+                                    )}
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold tracking-tight text-white truncate max-w-[150px]">{u.name || 'Anonymous'}</p>
+                                      <p className="text-[9px] text-aura-muted font-bold truncate max-w-[150px] uppercase tracking-widest font-mono">{u.email}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="text-xs font-black font-serif italic text-white">{formatCurrency(u.available_balance || 0)}</p>
+                                  <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Total: {formatCurrency((u.available_balance || 0) + (u.funding_balance || 0))}</p>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  {isActiveNodeUser ? (
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="text-[9px] font-black text-aura-lime bg-aura-lime/10 px-2.5 py-1 rounded-full border border-aura-lime/20 flex items-center gap-1">
+                                        <Zap size={10} className="animate-pulse" /> {userActiveInvestments.length} Active Plan{userActiveInvestments.length > 1 ? 's' : ''}
+                                      </span>
+                                      <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mt-1">
+                                        {userActiveInvestments.map((inv: any) => (
+                                          <span key={inv.id} className="text-[8px] font-bold uppercase bg-white/5 px-2 py-0.5 rounded text-[#a855f7] border border-white/5">
+                                            {inv.plan_name}: ${inv.amount.toLocaleString()} ({inv.status})
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-[8px] font-black text-gray-500 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                                      No Active Nodes
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4">
+                                  {u.banned ? (
+                                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-red-500/10 text-red-500 rounded-full flex items-center gap-1 w-fit"><Ban size={10} /> Banned</span>
+                                  ) : u.suspended ? (
+                                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center gap-1 w-fit"><Pause size={10} /> Suspended</span>
+                                  ) : (
+                                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-aura-lime/10 text-aura-lime rounded-full flex items-center gap-1 w-fit"><ShieldCheck size={10} /> Verified</span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 text-right text-aura-muted group-hover:text-aura-lime transition-all">
+                                  <ChevronRight size={14} className="inline" />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </section>
+
+                {/* SECTION 3 — USER ACTIVITIES ENGINE */}
+                <section className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                      <Activity size={18} className="text-aura-lime" />
+                      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">User Activities Engine</h2>
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Live Activities Matrix</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-1">
+                    {activeUsersWithActivities.map((item: any) => {
+                      const now = new Date().getTime();
+                      const elapsedMin = (now - item.latestTime) / (1000 * 60);
+                      const isOnlineNow = elapsedMin < 10;
+                      const isRecent = elapsedMin < 60;
+
+                      return (
+                        <div 
+                          key={item.user.id}
+                          className={cn(
+                            "p-5 border rounded-3xl transition-all relative overflow-hidden flex flex-col justify-between",
+                            expandedActivityUserId === item.user.id 
+                              ? "bg-white/[0.04] border-aura-lime/40" 
+                              : "bg-white/[0.01] border-white/5 hover:border-white/10"
+                          )}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
+                                {item.user.name?.[0]?.toUpperCase() || 'U'}
+                              </div>
+                              <div className="min-w-0">
+                                <h4 className="text-xs font-bold text-white truncate max-w-[120px]">{item.user.name || 'Anonymous'}</h4>
+                                <p className="text-[9px] text-aura-muted font-bold truncate max-w-[120px] uppercase font-mono">{item.user.email}</p>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-8 py-6">
-                            <p className="text-sm font-black font-serif italic text-white">{formatCurrency(user.available_balance || 0)}</p>
-                            <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Total: {formatCurrency((user.available_balance || 0) + (user.funding_balance || 0))}</p>
-                          </td>
-                          <td className="px-8 py-6 text-center">
-                            <span className="text-[10px] font-black text-aura-lime bg-aura-lime/10 px-3 py-1 rounded-full border border-aura-lime/20">
-                              {investments.filter(i => i.user_id === user.id && i.status === 'active').length} Active
+
+                            {/* Signal Pulser Dot */}
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className={cn(
+                                "w-2.5 h-2.5 rounded-full relative",
+                                isOnlineNow ? "bg-green-500 animate-pulse-green shadow-[0_0_10px_rgba(34,197,94,0.5)]" : isRecent ? "bg-blue-505 bg-blue-500" : "bg-gray-600"
+                              )}>
+                                {isOnlineNow && (
+                                  <span className="absolute -inset-0.5 rounded-full bg-green-500/50 animate-ping" />
+                                )}
+                                {isRecent && !isOnlineNow && (
+                                  <span className="absolute -inset-0.5 rounded-full bg-blue-500/50 animate-ping text-[6px]" />
+                                )}
+                              </div>
+                              <span className="text-[8px] font-bold text-aura-muted uppercase tracking-widest font-mono">
+                                {isOnlineNow ? 'Active' : isRecent ? 'Recent' : 'Idle'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 flex items-center justify-between text-[10px] font-bold text-aura-muted border-t border-white/[0.02] pt-3">
+                            <span className="truncate max-w-[120px] font-mono">
+                              Last Action: {item.activities[0]?.action?.replace(/_/g, ' ')}
                             </span>
-                          </td>
-                          <td className="px-8 py-6">
-                             {user.banned ? (
-                               <span className="text-[8px] font-black uppercase tracking-widest px-3 py-1 bg-red-500/10 text-red-500 rounded-full flex items-center gap-1 w-fit"><Ban size={10} /> Banned</span>
-                             ) : user.suspended ? (
-                               <span className="text-[8px] font-black uppercase tracking-widest px-3 py-1 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center gap-1 w-fit"><Pause size={10} /> Suspended</span>
-                             ) : (
-                               <span className="text-[8px] font-black uppercase tracking-widest px-3 py-1 bg-aura-lime/10 text-aura-lime rounded-full flex items-center gap-1 w-fit"><ShieldCheck size={10} /> Verified</span>
-                             )}
-                          </td>
-                          <td className="px-8 py-6 text-right text-aura-muted group-hover:text-aura-lime transition-all">
-                             <ChevronRight size={16} className="inline" />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                            <button 
+                              onClick={() => setExpandedActivityUserId(expandedActivityUserId === item.user.id ? null : item.user.id)}
+                              className="text-[9px] font-black uppercase text-aura-lime hover:underline tracking-widest flex items-center gap-1"
+                            >
+                              {expandedActivityUserId === item.user.id ? 'Close' : 'View Logs'}
+                              <ChevronRight size={10} className={cn("transition-transform", expandedActivityUserId === item.user.id ? "rotate-90" : "")} />
+                            </button>
+                          </div>
+
+                          {/* TIMELINE SEQUENCE EXPANSION */}
+                          {expandedActivityUserId === item.user.id && (
+                            <div className="mt-4 p-4 bg-black/60 border border-white/5 rounded-2xl space-y-4 max-h-[250px] overflow-y-auto">
+                              <div className="text-[8px] font-black uppercase text-aura-muted tracking-widest border-b border-white/5 pb-2">
+                                Activity Sequences ({item.activities.length} signals)
+                              </div>
+                              <div className="relative pl-3 border-l border-white/10 space-y-4">
+                                {item.activities.map((act: any) => {
+                                  const isSecLog = !act.amount;
+                                  return (
+                                    <div key={act.id} className="relative">
+                                      <div className={cn(
+                                        "absolute -left-[16px] top-1 w-2.5 h-2.5 rounded-full ring-2 ring-[#090b10]",
+                                        isSecLog ? "bg-blue-500" : "bg-aura-lime"
+                                      )} />
+                                      <div className="space-y-0.5">
+                                        <div className="flex items-center gap-1.5 justify-between">
+                                          <span className="text-[9px] font-black uppercase text-white tracking-wide">
+                                            {act.action?.replace(/_/g, ' ')}
+                                          </span>
+                                          {act.amount > 0 && (
+                                            <span className="text-[9px] font-black text-aura-lime px-1 rounded bg-aura-lime/10">
+                                              +{formatCurrency(act.amount)}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-[9px] text-aura-muted font-mono">{act.description}</p>
+                                        <p className="text-[7px] text-aura-muted/60 font-mono italic">
+                                          {new Date(act.timestamp).toLocaleString()}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* SECTION 4 — USER ROI ENGINE */}
+                <section className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
+                    <div className="flex items-center gap-2">
+                      <Zap size={18} className="text-aura-lime animate-bounce" />
+                      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">User ROI Engine</h2>
+                    </div>
+                    <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Accumulator Matrix</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {users
+                      .filter(u => investments.some(inv => inv.user_id === u.id && inv.status === 'active'))
+                      .map((u: any) => {
+                        const userActiveInvestments = investments.filter(inv => inv.user_id === u.id && inv.status === 'active');
+                        return (
+                          <AdminROIEngineCard 
+                            key={u.id}
+                            userValue={u}
+                            userInvestments={userActiveInvestments}
+                            plans={plans}
+                          />
+                        );
+                      })}
+                  </div>
+                </section>
+
               </div>
             ) : (
               // USER DETAIL PANEL

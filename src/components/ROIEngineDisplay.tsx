@@ -78,13 +78,14 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
             <div 
               className="p-10 bg-[#11141b] border border-white/5 rounded-[40px] flex flex-col items-center justify-center text-center space-y-3 min-h-[300px] relative overflow-visible gpu-accelerate"
             >
-               {/* Glowing Green/Emerald Indicator at the upper left-hand corner */}
-               <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50">
-                 <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
-               </div>
-               
-               <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-aura-muted/20 mb-2">
-                 <Bot size={32} />
+               <div className="relative mb-2">
+                 <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-aura-muted/20">
+                   <Bot size={32} />
+                 </div>
+                 {/* Glowing Green/Emerald Indicator on the top right edge of the small card element */}
+                 <div className="absolute top-0 right-0 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50 pointer-events-none">
+                   <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                 </div>
                </div>
                <h3 className="text-xl font-black text-white uppercase tracking-widest">No active investment</h3>
                <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest max-w-[200px]">Pulse detected, but no core active. Activate one to start earning.</p>
@@ -95,49 +96,50 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
         <div 
         className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-4 lg:p-8 flex flex-col items-center justify-center text-center aspect-square lg:aspect-auto lg:min-h-full relative overflow-visible group gpu-accelerate"
         >
-        {/* Glowing Green/Emerald Indicator at the upper left-hand corner */}
-        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50">
-          <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
-        </div>
-
         <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.01]" />
         
         {/* Increased robot size inside the exact same container frame */}
-        <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-white/10 flex items-center justify-center mb-4 lg:mb-8 relative z-10 overflow-hidden shadow-inner">
-          <motion.div 
-            animate={{
-              scale: [0.95, 1.05, 0.95],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="w-11 h-11 lg:w-18 lg:h-18 relative flex items-center justify-center"
-          >
-            <img 
-              src="https://i.imgur.com/swuDIvl.png" 
-              alt="Premium AI Bot Offline" 
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-60"
-            />
-            {/* Blinking eyes overlay in off-state */}
-            <div className="absolute top-[42%] left-[34%] right-[34%] flex justify-between pointer-events-none z-20">
-              <motion.div 
-                animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                transition={{ duration: 0.08, ease: "easeInOut" }}
-                className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff]/60 rounded-full shadow-[0_0_6px_rgba(0,255,255,0.8)]"
+        <div className="relative mb-4 lg:mb-8 z-10 group/bot">
+          <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
+            <motion.div 
+              animate={{
+                scale: [1.8, 2.0, 1.8],
+              }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              className="w-11 h-11 lg:w-18 lg:h-18 relative flex items-center justify-center"
+            >
+              <img 
+                src="https://i.imgur.com/swuDIvl.png" 
+                alt="Premium AI Bot Offline" 
+                referrerPolicy="no-referrer"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-60"
               />
-              <motion.div 
-                animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                transition={{ duration: 0.08, ease: "easeInOut" }}
-                className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff]/60 rounded-full shadow-[0_0_6px_rgba(0,255,255,0.8)]"
-              />
-            </div>
-          </motion.div>
+              {/* Blinking eyes overlay in off-state */}
+              <div className="absolute top-[42%] left-[34%] right-[34%] flex justify-between pointer-events-none z-20">
+                <motion.div 
+                  animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                  transition={{ duration: 0.08, ease: "easeInOut" }}
+                  className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff]/60 rounded-full shadow-[0_0_6px_rgba(0,255,255,0.8)]"
+                />
+                <motion.div 
+                  animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                  transition={{ duration: 0.08, ease: "easeInOut" }}
+                  className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff]/60 rounded-full shadow-[0_0_6px_rgba(0,255,255,0.8)]"
+                />
+              </div>
+            </motion.div>
+          </div>
+          {/* Glowing Green/Emerald Indicator sitting across the border edge of the small robot card */}
+          <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full shadow-[0_0_14px_#10b981] z-50 pointer-events-none">
+            <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+          </div>
         </div>
         
         <div className="relative z-10 space-y-2 lg:space-y-4 px-2">
@@ -156,20 +158,20 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
             style={{ willChange: 'transform, opacity' }}
             className="p-10 bg-[#11141b] border border-white/5 rounded-[40px] relative overflow-visible group"
         >
-            {/* Glowing Green/Emerald Indicator at the upper left-hand corner */}
-            <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50">
-              <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
-            </div>
             <div className="h-32 mb-10 relative overflow-visible border-b border-white/5">
                 <div className="absolute inset-0 flex items-end justify-between px-4 gap-2 opacity-40 lg:opacity-50">
                     <CandlestickChart count={30} />
                 </div>
                 
                 <div className="absolute top-4 left-4 lg:top-4 lg:left-6 flex flex-col items-start translate-y-0">
-                    <div className="w-10 h-10 lg:w-14 lg:h-14 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-primary shadow-xl">
-                    <Bot className="w-5 h-5 lg:w-7 lg:h-7 animate-bounce" />
-                    <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full animate-ping" />
-                    <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-emerald-500 rounded-full" />
+                    <div className="relative group/bot">
+                      <div className="w-10 h-10 lg:w-14 lg:h-14 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-primary shadow-xl">
+                        <Bot className="w-5 h-5 lg:w-7 lg:h-7 animate-bounce" />
+                      </div>
+                      {/* Repositioned green indicator to top-right edge in dashboard variant */}
+                      <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-2.5 h-2.5 lg:w-3.5 lg:h-3.5 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50 pointer-events-none">
+                        <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                      </div>
                     </div>
                 </div>
 
@@ -223,11 +225,6 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
     <div 
         className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] overflow-visible flex flex-col relative group aspect-square lg:aspect-auto gpu-accelerate"
     >
-        {/* Glowing Green/Emerald Indicator at the upper left-hand corner */}
-        <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50">
-          <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
-        </div>
-
         {/* Subtle 3D glossy highlight line overlay */}
         <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none z-20" />
         
@@ -237,42 +234,47 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
             </div>
             
             <div className="absolute top-4 left-4 lg:top-6 lg:left-6 flex flex-col items-start lg:translate-y-0">
-                <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-[#00ffff] shadow-xl overflow-hidden relative">
-                  <motion.div 
-                    animate={{
-                      scale: [0.93, 1.07, 0.93]
-                    }}
-                    transition={{
-                      duration: 3.5,
-                      repeat: Infinity,
-                      ease: "easeInOut"
-                    }}
-                    className="w-9 h-9 lg:w-14 lg:h-14 relative flex items-center justify-center"
-                  >
-                    <img 
-                      src="https://i.imgur.com/swuDIvl.png" 
-                      alt="Premium AI Bot Active" 
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)]"
-                    />
-                    {/* Blinking eyes overlay */}
-                    <div className="absolute top-[42%] left-[34%] right-[34%] flex justify-between pointer-events-none z-20">
-                      <motion.div 
-                        animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                        transition={{ duration: 0.08, ease: "easeInOut" }}
-                        className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff] rounded-full shadow-[0_0_8px_rgba(0,255,255,0.9),0_0_15px_rgba(0,255,255,0.6)]"
+                <div className="relative group/bot">
+                  {/* Small robot card */}
+                  <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-[#00ffff] shadow-xl overflow-hidden relative">
+                    <motion.div 
+                      animate={{
+                        scale: [1.75, 2.05, 1.75]
+                      }}
+                      transition={{
+                        duration: 3.5,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className="w-9 h-9 lg:w-14 lg:h-14 relative flex items-center justify-center"
+                    >
+                      <img 
+                        src="https://i.imgur.com/swuDIvl.png" 
+                        alt="Premium AI Bot Active" 
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
+                        className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)]"
                       />
-                      <motion.div 
-                        animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                        transition={{ duration: 0.08, ease: "easeInOut" }}
-                        className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff] rounded-full shadow-[0_0_8px_rgba(0,255,255,0.9),0_0_15px_rgba(0,255,255,0.6)]"
-                      />
-                    </div>
-                  </motion.div>
-                  <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-[#00ffff] rounded-full animate-ping z-30" />
-                  <div className="absolute -top-1 -right-1 w-2 h-2 lg:w-3 lg:h-3 bg-[#00ffff] rounded-full z-30" />
+                      {/* Blinking eyes overlay */}
+                      <div className="absolute top-[42%] left-[34%] right-[34%] flex justify-between pointer-events-none z-20">
+                        <motion.div 
+                          animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                          transition={{ duration: 0.08, ease: "easeInOut" }}
+                          className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff] rounded-full shadow-[0_0_8px_rgba(0,255,255,0.9),0_0_15px_rgba(0,255,255,0.6)]"
+                        />
+                        <motion.div 
+                          animate={{ scaleY: isBlinking ? 0.08 : 1 }}
+                          transition={{ duration: 0.08, ease: "easeInOut" }}
+                          className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff] rounded-full shadow-[0_0_8px_rgba(0,255,255,0.9),0_0_15px_rgba(0,255,255,0.6)]"
+                        />
+                      </div>
+                    </motion.div>
+                  </div>
+                  {/* Glowing Green/Emerald Indicator sitting across top right edge of small card */}
+                  <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full shadow-[0_0_14px_#10b981] z-50 pointer-events-none">
+                    <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                  </div>
                 </div>
             </div>
 
