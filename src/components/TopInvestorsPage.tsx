@@ -6,6 +6,39 @@ import { TOP_INVESTORS, Investor } from '../constants/landingData';
 import { cn, formatCurrency, getFlagEmoji } from '../lib/utils';
 import Footer from './Footer';
 
+const ALL_AVATARS = [
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Jack',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Oliver',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=James',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Leo',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Ryan',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Alex',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Ben',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Chris',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Eric',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Dan',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Sarah',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Lily',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Ada',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Eva',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Mia',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Chloe',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Zoe',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Ruby',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Ivy',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Maya',
+];
+
+const getAvatarForUser = (investor: Investor) => {
+  const key = investor.id || investor.name || '';
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % ALL_AVATARS.length;
+  return ALL_AVATARS[index];
+};
+
 const InvestorPodium: React.FC<{ investor: Investor, rank: number }> = ({ investor, rank }) => {
   const isFirst = rank === 1;
 
@@ -34,13 +67,12 @@ const InvestorPodium: React.FC<{ investor: Investor, rank: number }> = ({ invest
             "w-20 h-20 md:w-32 md:h-32 rounded-full flex items-center justify-center relative overflow-hidden transition-all duration-700 group-hover:rotate-3",
             "bg-[#0a0c10] border border-white/5 shadow-2xl"
           )}>
-             {investor.photoURL ? (
-              <img src={investor.photoURL} alt={investor.name} className="w-full h-full object-cover grayscale-[0.5] group-hover:grayscale-0 transition-all duration-500" />
-            ) : (
-              <div className="text-3xl md:text-5xl font-black italic font-serif text-white/10 uppercase">
-                {investor.name.charAt(0)}
-              </div>
-            )}
+            <img 
+              src={getAvatarForUser(investor)} 
+              alt={investor.name} 
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" 
+            />
             
             {/* Rank Badge */}
             <div className={cn(
@@ -97,13 +129,12 @@ const ExtendedLeaderboardRow: React.FC<{ investor: Investor }> = ({ investor }) 
           {/* Avatar + Rank Badge */}
           <div className="relative shrink-0">
             <div className="w-12 h-12 md:w-20 md:h-20 bg-white/5 rounded-2xl md:rounded-3xl overflow-hidden flex items-center justify-center border border-white/10 group-hover:border-primary/30 transition-all duration-500 shadow-xl group-hover:scale-105">
-              {investor.photoURL ? (
-                <img src={investor.photoURL} alt={investor.name} className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-500" />
-              ) : (
-                <span className="text-xl md:text-3xl font-black italic font-serif text-white/10 group-hover:text-white/20">
-                  {investor.name.charAt(0)}
-                </span>
-              )}
+              <img 
+                src={getAvatarForUser(investor)} 
+                alt={investor.name} 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500" 
+              />
             </div>
             {/* Overlapping Rank Badge */}
             <div className="absolute -top-1.5 -left-1.5 w-6 h-6 md:w-9 md:h-9 bg-[#050608] border border-primary/40 rounded-lg flex items-center justify-center font-black text-[9px] md:text-sm text-primary shadow-[0_4px_10px_rgba(0,0,0,0.5)] z-20">

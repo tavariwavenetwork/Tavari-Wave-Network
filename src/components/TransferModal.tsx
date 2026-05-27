@@ -42,7 +42,7 @@ import { toast } from 'sonner';
 import { logAudit } from '../lib/auth_security';
 
 type TransferType = 'internal' | 'user';
-type WalletType = 'funding_balance' | 'available_balance' | 'referral_earnings';
+type WalletType = 'funding_balance' | 'available_balance' | 'referral_earnings' | 'reward_dollar_balance';
 
 interface TransferModalProps {
   isOpen: boolean;
@@ -52,11 +52,19 @@ interface TransferModalProps {
 const WALLET_NAMES: Record<WalletType, string> = {
   funding_balance: 'Funding Wallet',
   available_balance: 'Available Balance',
-  referral_earnings: 'Referral Earnings'
+  referral_earnings: 'Referral Earnings',
+  reward_dollar_balance: 'Reward Wallet'
 };
 
 export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
   const { user, profile } = useAuth();
+  const getProfileWalletBalance = (key: WalletType) => {
+    if (!profile) return 0;
+    if (key === 'reward_dollar_balance') {
+      return profile.withdraw_methods?.reward_dollar_balance ?? profile.reward_dollar_balance ?? 0;
+    }
+    return profile[key] || 0;
+  };
   const [step, setStep] = useState<'selection' | 'form' | 'pin-setup' | 'forgot-pin' | 'pin-confirm' | 'success'>('selection');
   const [type, setType] = useState<TransferType>('internal');
   
@@ -190,7 +198,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
       return;
     }
 
-    const currentBalance = profile?.[fromWallet] || 0;
+    const currentBalance = getProfileWalletBalance(fromWallet);
     if (amountNum > currentBalance) {
       toast.error("Insufficient balance");
       return;
@@ -214,7 +222,9 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
         }
 
         const senderData = senderSnap.data();
-        const senderBalance = senderData[fromWallet] || 0;
+        const senderBalance = fromWallet === 'reward_dollar_balance'
+          ? (senderData.withdraw_methods?.reward_dollar_balance ?? senderData.reward_dollar_balance ?? 0)
+          : (senderData[fromWallet] || 0);
 
         if (senderBalance < amountNum) {
           throw new Error("Insufficient balance");
@@ -226,10 +236,30 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
         const actualDeduction = isFullTransfer ? -senderBalance : -amountNum;
 
         if (type === 'internal') {
-          transaction.update(senderRef, {
-            [fromWallet]: increment(actualDeduction),
-            [toWallet]: increment(amountNum)
-          });
+          const updates: any = {};
+          if (fromWallet === 'reward_dollar_balance') {
+            const existingWithdrawMethods = senderData.withdraw_methods || {};
+            const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance ?? senderData.reward_dollar_balance ?? 0;
+            updates.withdraw_methods = {
+              ...existingWithdrawMethods,
+              reward_dollar_balance: oldRewardDollarBalance + actualDeduction
+            };
+          } else {
+            updates[fromWallet] = increment(actualDeduction);
+          }
+
+          if (toWallet === 'reward_dollar_balance') {
+            const existingWithdrawMethods = updates.withdraw_methods || senderData.withdraw_methods || {};
+            const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance ?? senderData.reward_dollar_balance ?? 0;
+            updates.withdraw_methods = {
+              ...existingWithdrawMethods,
+              reward_dollar_balance: oldRewardDollarBalance + amountNum
+            };
+          } else {
+            updates[toWallet] = increment(amountNum);
+          }
+
+          transaction.update(senderRef, updates);
 
           const txRef = doc(collection(db, 'transactions'));
           transaction.set(txRef, {
@@ -250,9 +280,20 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             throw new Error("Recipient no longer exists");
           }
           
-          transaction.update(senderRef, {
-            [fromWallet]: increment(actualDeduction)
-          });
+          if (fromWallet === 'reward_dollar_balance') {
+            const existingWithdrawMethods = senderData.withdraw_methods || {};
+            const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance ?? senderData.reward_dollar_balance ?? 0;
+            transaction.update(senderRef, {
+              withdraw_methods: {
+                ...existingWithdrawMethods,
+                reward_dollar_balance: oldRewardDollarBalance + actualDeduction
+              }
+            });
+          } else {
+            transaction.update(senderRef, {
+              [fromWallet]: increment(actualDeduction)
+            });
+          }
 
           transaction.update(receiverRef, {
             funding_balance: increment(amountNum)
@@ -407,7 +448,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                         className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                       >
                         {Object.entries(WALLET_NAMES).map(([key, name]) => (
-                          <option key={key} value={key}>{name} ({formatCurrency(profile?.[key as WalletType] || 0)})</option>
+                          <option key={key} value={key}>{name} ({formatCurrency(getProfileWalletBalance(key as WalletType))})</option>
                         ))}
                       </select>
                     </div>
@@ -432,7 +473,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                         <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Balance:</span>
                         <div className="w-24 h-4">
                             <DynamicBalance 
-                                value={fromWallet ? formatCurrency(profile?.[fromWallet] || 0) : "$0"} 
+                                value={fromWallet ? formatCurrency(getProfileWalletBalance(fromWallet)) : "$0"} 
                                 containerClassName="justify-start"
                                 className="text-left"
                                 baseSizeMobile="text-[9px]"
@@ -454,14 +495,14 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                       <button 
                         type="button"
                         onClick={() => {
-                          const balance = profile?.[fromWallet] || 0;
+                          const balance = getProfileWalletBalance(fromWallet);
                           setAmount(balance.toFixed(2));
                         }}
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-600 hover:text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg transition-all active:scale-95"
                       >
                         MAX
                       </button>
-                      {amount && parseFloat(amount) > (profile?.[fromWallet] || 0) && (
+                      {amount && parseFloat(amount) > getProfileWalletBalance(fromWallet) && (
                         <div className="absolute -bottom-6 left-0 flex items-center gap-1.5 text-red-500">
                           <AlertCircle size={10} />
                           <span className="text-[9px] font-bold uppercase tracking-widest">Insufficient funds</span>
@@ -562,7 +603,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                           className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
                         >
                           {Object.entries(WALLET_NAMES).map(([key, name]) => (
-                            <option key={key} value={key}>{name} ({formatCurrency(profile?.[key as WalletType] || 0)})</option>
+                            <option key={key} value={key}>{name} ({formatCurrency(getProfileWalletBalance(key as WalletType))})</option>
                           ))}
                         </select>
                       </div>
@@ -574,7 +615,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                             <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Balance:</span>
                             <div className="w-24 h-4">
                                 <DynamicBalance 
-                                    value={fromWallet ? formatCurrency(profile?.[fromWallet] || 0) : "$0"} 
+                                    value={fromWallet ? formatCurrency(getProfileWalletBalance(fromWallet)) : "$0"} 
                                     containerClassName="justify-start"
                                     className="text-left"
                                     baseSizeMobile="text-[9px]"
@@ -595,14 +636,14 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                           <button 
                             type="button"
                             onClick={() => {
-                              const balance = profile?.[fromWallet] || 0;
+                              const balance = getProfileWalletBalance(fromWallet);
                               setAmount(balance.toFixed(2));
                             }}
                             className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-blue-600 hover:text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg transition-all active:scale-95"
                           >
                             MAX
                           </button>
-                          {amount && parseFloat(amount) > (profile?.[fromWallet] || 0) && (
+                          {amount && parseFloat(amount) > getProfileWalletBalance(fromWallet) && (
                             <div className="absolute -bottom-6 left-0 flex items-center gap-1.5 text-red-500">
                               <AlertCircle size={10} />
                               <span className="text-[9px] font-bold uppercase tracking-widest">Insufficient funds</span>
@@ -617,7 +658,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             </div>
 
             <button 
-              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > (profile?.[fromWallet] || 0) || (type === 'user' && !targetUser)}
+              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > getProfileWalletBalance(fromWallet) || (type === 'user' && !targetUser)}
               onClick={() => setShowPinModal(true)}
               className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-600/20 disabled:grayscale disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] mt-4"
             >

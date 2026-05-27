@@ -40,7 +40,12 @@ import {
   Copy,
   X,
   Menu,
-  Bell
+  Bell,
+  Megaphone,
+  Image as ImageIcon,
+  Eye,
+  Trash2,
+  Plus
 } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
@@ -239,7 +244,7 @@ function StatCard({ label, value, icon: Icon, color, onClick }: { label: string,
 export default function CipherAdmin() {
   const { user, profile, logout, plans } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings'>('canalytics');
+  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings' | 'cadverts'>('canalytics');
   const [isMobileAdminMenuOpen, setIsMobileAdminMenuOpen] = useState(false);
   const [initialUsersCount, setInitialUsersCount] = useState<number | null>(null);
   const [initialSubscribersCount, setInitialSubscribersCount] = useState<number | null>(null);
@@ -257,10 +262,44 @@ export default function CipherAdmin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [userFilter, setUserFilter] = useState<'all' | 'active' | 'suspended' | 'banned' | 'inactive'>('all');
   
+  const [usersSubTab, setUsersSubTab] = useState<'new_registrations' | 'users_dashboard' | 'activities_engine' | 'roi_engine'>('new_registrations');
+  const [selectedRegUser, setSelectedRegUser] = useState<any>(null);
+  const [focusedActivityUserId, setFocusedActivityUserId] = useState<string | null>(null);
+
+  const [maintenanceMode, setMaintenanceMode] = useState<boolean>(false);
+  const [maintenanceTitle, setMaintenanceTitle] = useState<string>("System Upgrading");
+  const [maintenanceMessage, setMaintenanceMessage] = useState<string>("We are updating our nodes. Normal services will resume shortly.");
+  const [maintenanceEta, setMaintenanceEta] = useState<string>("");
+  
   // UI History System
   const [uiVersions, setUiVersions] = useState<any[]>([]);
   const [uiConfig, setUiConfig] = useState<any>({});
   const [selectedVersion, setSelectedVersion] = useState<any>(null);
+
+  // Adverts System State
+  const [adverts, setAdverts] = useState<any[]>([]);
+  const [isAdvertsLoading, setIsAdvertsLoading] = useState(true);
+
+  // Advert Creation / Editing Form States
+  const [editingAdvertId, setEditingAdvertId] = useState<string | null>(null);
+  const [advImageUrl, setAdvImageUrl] = useState("");
+  const [advTitle, setAdvTitle] = useState("");
+  const [advMessage, setAdvMessage] = useState("");
+  const [advCtaText, setAdvCtaText] = useState("");
+  const [advRedirectLink, setAdvRedirectLink] = useState("");
+  const [advStyleTemplate, setAdvStyleTemplate] = useState("glass");
+  const [advPopupType, setAdvPopupType] = useState("center");
+  const [advSize, setAdvSize] = useState("medium");
+  const [advWidth, setAdvWidth] = useState("");
+  const [advHeight, setAdvHeight] = useState("");
+  const [advPosition, setAdvPosition] = useState("center");
+  const [advSchedulingType, setAdvSchedulingType] = useState("every-refresh");
+  const [advIntervalMinutes, setAdvIntervalMinutes] = useState(30);
+  const [advStartDate, setAdvStartDate] = useState("");
+  const [advEndDate, setAdvEndDate] = useState("");
+  const [advPageTargetingType, setAdvPageTargetingType] = useState("all");
+  const [advCustomPath, setAdvCustomPath] = useState("");
+  const [advIsActive, setAdvIsActive] = useState(true);
 
   // Admin Security Logic
   useEffect(() => {
@@ -329,10 +368,10 @@ export default function CipherAdmin() {
   // Broadcast Notification Form and Targeting Panel States
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
-  const [notifTarget, setNotifTarget] = useState<'all' | 'selected' | 'inactive' | 'inactive_investors'>('all');
+  const [notifTarget, setNotifTarget] = useState<'all' | 'selected' | 'active_users' | 'inactive_users'>('all');
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [notifSearchTerm, setNotifSearchTerm] = useState('');
-  const [notifUserFilter, setNotifUserFilter] = useState<'all' | 'inactive' | 'inactive_investors'>('all');
+  const [notifUserFilter, setNotifUserFilter] = useState<'all' | 'active_users' | 'inactive_users'>('all');
   const [isSendingNotif, setIsSendingNotif] = useState(false);
 
   const recentUserNotifications = useMemo(() => {
@@ -399,8 +438,8 @@ export default function CipherAdmin() {
       if (effectiveFilter === 'all') return matchesSearch;
       if (effectiveFilter === 'active') return matchesSearch && hasActiveNode;
       if (effectiveFilter === 'inactive') return matchesSearch && !hasActiveNode;
-      if (effectiveFilter === 'suspended') return matchesSearch && u.suspended;
-      if (effectiveFilter === 'banned') return matchesSearch && u.banned;
+      if (effectiveFilter === 'suspended') return matchesSearch && u.suspended && !u.banned;
+      if (effectiveFilter === 'banned') return matchesSearch && u.banned && !u.suspended;
       return matchesSearch;
     });
   }, [users, investments, effectiveFilter, searchTerm]);
@@ -617,6 +656,10 @@ export default function CipherAdmin() {
           const data = doc.data();
           setExchangeRate(data.usd_to_ngn_rate || 1400);
           setWithdrawExchangeRate(data.usd_to_ngn_withdrawal_rate || data.usd_to_ngn_rate || 1400);
+          setMaintenanceMode(!!data.maintenance_mode);
+          setMaintenanceTitle(data.maintenance_title || "System Upgrading");
+          setMaintenanceMessage(data.maintenance_message || "We are updating our nodes. Normal services will resume shortly.");
+          setMaintenanceEta(data.maintenance_eta || "");
         }
       },
       (err) => console.error("System settings sync failed:", err.message)
@@ -674,6 +717,22 @@ export default function CipherAdmin() {
         setUiVersions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       },
       (err) => console.error("UI Versions sync failed:", err.message)
+    );
+
+    const unsubscribeAdverts = onSnapshot(doc(db, 'settings', 'adverts'),
+      (snap) => {
+        setIsAdvertsLoading(false);
+        if (snap.exists()) {
+          const data = snap.data();
+          setAdverts(data.adverts || []);
+        } else {
+          setAdverts([]);
+        }
+      },
+      (err) => {
+        setIsAdvertsLoading(false);
+        console.error("Adverts sync failed:", err.message);
+      }
     );
 
     let intervalId: any;
@@ -745,6 +804,7 @@ export default function CipherAdmin() {
       unsubscribeAudit();
       unsubscribeUI();
       unsubscribeUIVersions();
+      unsubscribeAdverts();
       unsubscribeTransactions();
       if (unsubscribeNewsletterSubscribers) unsubscribeNewsletterSubscribers();
       if (intervalId) clearInterval(intervalId);
@@ -789,16 +849,13 @@ export default function CipherAdmin() {
       let targetUsers: any[] = [];
       if (notifTarget === 'all') {
         targetUsers = users;
-      } else if (notifTarget === 'inactive') {
+      } else if (notifTarget === 'active_users') {
         targetUsers = users.filter(u => {
-          const hasActiveNodes = investments.some(i => i.user_id === u.id && i.status === 'active');
-          return !hasActiveNodes;
+          return investments.some(i => i.user_id === u.id && i.status === 'active');
         });
-      } else if (notifTarget === 'inactive_investors') {
+      } else if (notifTarget === 'inactive_users') {
         targetUsers = users.filter(u => {
-          const hasActiveNodes = investments.some(i => i.user_id === u.id && i.status === 'active');
-          const hasAnyNodes = investments.some(i => i.user_id === u.id);
-          return !hasActiveNodes && hasAnyNodes;
+          return !investments.some(i => i.user_id === u.id && i.status === 'active');
         });
       } else if (notifTarget === 'selected') {
         targetUsers = users.filter(u => selectedUserIds.includes(u.id));
@@ -949,10 +1006,10 @@ export default function CipherAdmin() {
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: withdrawal.user_id,
-          type: 'adjustment',
+          type: 'Reversed',
           amount: withdrawal.amount,
           description: `Withdrawal Rejection Refund (${withdrawal.id})`,
-          status: 'approved',
+          status: 'Declined',
           created_at: new Date().toISOString()
         });
       });
@@ -1050,6 +1107,146 @@ export default function CipherAdmin() {
       console.error("WITHDRAWAL RATE UPDATE ERROR:", error);
       toast.error("Failed to update withdrawal exchange rate");
     }
+  };
+
+  const updateMaintenanceSettings = async (mode: boolean, title: string, msg: string, eta: string) => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { 
+        maintenance_mode: mode,
+        maintenance_title: title,
+        maintenance_message: msg,
+        maintenance_eta: eta || "",
+        last_updated: new Date().toISOString()
+      }, { merge: true });
+      toast.success("Maintenance settings updated successfully");
+    } catch (error) {
+      console.error("MAINTENANCE UPDATE ERROR:", error);
+      toast.error("Failed to update maintenance settings");
+    }
+  };
+
+  // --- ADVERTS OPERATIONS ---
+  const handleSaveAdvert = async () => {
+    if (!advTitle.trim() || !advMessage.trim()) {
+      toast.error("Title and Message are required");
+      return;
+    }
+
+    try {
+      const advertId = editingAdvertId || 'adv_' + Date.now().toString(36);
+      const newAdv = {
+        id: advertId,
+        imageUrl: advImageUrl || "",
+        title: advTitle,
+        message: advMessage,
+        ctaText: advCtaText || "OK",
+        redirectLink: advRedirectLink || "",
+        styleTemplate: advStyleTemplate,
+        popupType: advPopupType,
+        size: advSize,
+        width: advWidth || "",
+        height: advHeight || "",
+        position: advPosition,
+        active: advIsActive,
+        scheduling: {
+          type: advSchedulingType,
+          intervalMinutes: Number(advIntervalMinutes) || 30,
+          startDate: advStartDate || "",
+          endDate: advEndDate || "",
+        },
+        pageTargeting: {
+          type: advPageTargetingType,
+          customPath: advCustomPath || "",
+        }
+      };
+
+      let updatedAdvertsList = [...adverts];
+      if (editingAdvertId) {
+        updatedAdvertsList = updatedAdvertsList.map(a => a.id === editingAdvertId ? newAdv : a);
+      } else {
+        updatedAdvertsList.push(newAdv);
+      }
+
+      const docRef = doc(db, 'settings', 'adverts');
+      await setDoc(docRef, { adverts: updatedAdvertsList }, { merge: true });
+
+      toast.success(editingAdvertId ? "Advert updated successfully!" : "Advert published successfully!");
+      handleResetAdvertForm();
+    } catch (err: any) {
+      console.error("ADVERT SAVE ERROR:", err);
+      toast.error("Failed to save advert: " + err.message);
+    }
+  };
+
+  const handleEditAdvert = (adv: any) => {
+    setEditingAdvertId(adv.id);
+    setAdvImageUrl(adv.imageUrl || "");
+    setAdvTitle(adv.title || "");
+    setAdvMessage(adv.message || "");
+    setAdvCtaText(adv.ctaText || "Continue");
+    setAdvRedirectLink(adv.redirectLink || "");
+    setAdvStyleTemplate(adv.styleTemplate || "glass");
+    setAdvPopupType(adv.popupType || "center");
+    setAdvSize(adv.size || "medium");
+    setAdvWidth(adv.width || "");
+    setAdvHeight(adv.height || "");
+    setAdvPosition(adv.position || "center");
+    setAdvSchedulingType(adv.scheduling?.type || "every-refresh");
+    setAdvIntervalMinutes(adv.scheduling?.intervalMinutes || 30);
+    setAdvStartDate(adv.scheduling?.startDate || "");
+    setAdvEndDate(adv.scheduling?.endDate || "");
+    setAdvPageTargetingType(adv.pageTargeting?.type || "all");
+    setAdvCustomPath(adv.pageTargeting?.customPath || "");
+    setAdvIsActive(adv.active !== false);
+  };
+
+  const handleDeleteAdvert = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this advertisement?")) return;
+
+    try {
+      const updatedAdvertsList = adverts.filter(a => a.id !== id);
+      const docRef = doc(db, 'settings', 'adverts');
+      await setDoc(docRef, { adverts: updatedAdvertsList }, { merge: true });
+      toast.success("Advert deleted successfully");
+      if (editingAdvertId === id) handleResetAdvertForm();
+    } catch (err: any) {
+      console.error("ADVERT DELETE ERROR:", err);
+      toast.error("Failed to delete advert: " + err.message);
+    }
+  };
+
+  const handleToggleAdvertStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      const updatedAdvertsList = adverts.map(a => a.id === id ? { ...a, active: !currentStatus } : a);
+      const docRef = doc(db, 'settings', 'adverts');
+      await setDoc(docRef, { adverts: updatedAdvertsList }, { merge: true });
+      toast.success(currentStatus ? "Advert paused" : "Advert activated");
+    } catch (err: any) {
+      console.error("ADVERT TOGGLE ERROR:", err);
+      toast.error("Failed to toggle status: " + err.message);
+    }
+  };
+
+  const handleResetAdvertForm = () => {
+    setEditingAdvertId(null);
+    setAdvImageUrl("");
+    setAdvTitle("");
+    setAdvMessage("");
+    setAdvCtaText("");
+    setAdvRedirectLink("");
+    setAdvStyleTemplate("glass");
+    setAdvPopupType("center");
+    setAdvSize("medium");
+    setAdvWidth("");
+    setAdvHeight("");
+    setAdvPosition("center");
+    setAdvSchedulingType("every-refresh");
+    setAdvIntervalMinutes(30);
+    setAdvStartDate("");
+    setAdvEndDate("");
+    setAdvPageTargetingType("all");
+    setAdvCustomPath("");
+    setAdvIsActive(true);
   };
 
   const handleTabChange = (tab: any) => {
@@ -1275,6 +1472,19 @@ export default function CipherAdmin() {
                 </button>
 
                 <button
+                  onClick={() => { handleTabChange('cadverts'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cadverts' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Megaphone size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Adverts</span>
+                  </div>
+                </button>
+
+                <button
                   onClick={() => { handleTabChange('csettings'); setIsMobileAdminMenuOpen(false); }}
                   className={cn(
                     "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
@@ -1327,6 +1537,7 @@ export default function CipherAdmin() {
           <SidebarItem icon={<Mail size={18} />} label="Newsletter" active={activeTab === 'cnewsletter'} onClick={() => handleTabChange('cnewsletter')} />
           <SidebarItem icon={<Mail size={18} />} label="Notifications" active={activeTab === 'cnotifications'} onClick={() => handleTabChange('cnotifications')} />
           <SidebarItem icon={<History size={18} />} label="Transactions" active={activeTab === 'ctransactions'} onClick={() => handleTabChange('ctransactions')} />
+          <SidebarItem icon={<Megaphone size={18} />} label="Adverts" active={activeTab === 'cadverts'} onClick={() => handleTabChange('cadverts')} />
           <SidebarItem icon={<Settings size={18} />} label="Settings" active={activeTab === 'csettings'} onClick={() => handleTabChange('csettings')} />
         </nav>
 
@@ -1346,7 +1557,7 @@ export default function CipherAdmin() {
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
           <div>
             <h1 className="text-4xl lg:text-3xl font-black tracking-[-0.05em] leading-[0.85] text-white font-serif italic mb-2 capitalize">
-              {(activeTab === 'cuser' || activeTab === 'cinactiveusers') ? 'Users Control Panel' : activeTab.substring(1)}.
+              {activeTab === 'cadverts' ? 'Global Advertising' : (activeTab === 'cuser' || activeTab === 'cinactiveusers') ? 'Users Control Panel' : activeTab.substring(1)}
             </h1>
             <p className="text-aura-muted text-[10px] font-bold uppercase tracking-[0.3em]">System Level Access: root_alpha</p>
           </div>
@@ -1848,194 +2059,514 @@ export default function CipherAdmin() {
 
         {(activeTab === 'cuser' || activeTab === 'cinactiveusers') && (
           <div className="space-y-8 pb-20">
+            {/* TOP SUB-TAB NAVIGATION BAR */}
+            <div className="border-b border-white/5 pb-4 mb-2">
+              {/* Desktop version */}
+              <div className="hidden md:flex items-center gap-2 bg-white/5 p-1 rounded-2xl border border-white/5 w-fit">
+                {[
+                  { id: 'new_registrations', label: 'New Registrations', icon: <UserPlus size={14} /> },
+                  { id: 'users_dashboard', label: 'Users Dashboard', icon: <Users size={14} /> },
+                  { id: 'activities_engine', label: 'Users Activities Engine', icon: <Activity size={14} /> },
+                  { id: 'roi_engine', label: 'Users ROI Engine', icon: <Zap size={14} /> }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setUsersSubTab(tab.id as any);
+                      setIsDetailView(false);
+                      setFocusedActivityUserId(null);
+                    }}
+                    className={cn(
+                      "px-6 py-2.5 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all whitespace-nowrap flex items-center gap-2 cursor-pointer select-none",
+                      usersSubTab === tab.id 
+                        ? "bg-aura-lime text-aura-black shadow-[0_4px_12px_rgba(168,251,60,0.2)]" 
+                        : "text-aura-muted hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Mobile responsive dropdown */}
+              <div className="block md:hidden">
+                <label className="text-[9px] font-black uppercase text-aura-muted tracking-widest mb-2 block">Choose Users Category Tab</label>
+                <div className="relative">
+                  <select
+                    value={usersSubTab}
+                    onChange={(e) => {
+                      setUsersSubTab(e.target.value as any);
+                      setIsDetailView(false);
+                      setFocusedActivityUserId(null);
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4.5 px-5 text-xs font-black uppercase tracking-widest text-white outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="new_registrations" className="bg-[#090b10] text-white">New Registrations</option>
+                    <option value="users_dashboard" className="bg-[#090b10] text-white">Users Dashboard (All / Active / Inactive / Suspended / Banned)</option>
+                    <option value="activities_engine" className="bg-[#090b10] text-white">Users Activities Engine</option>
+                    <option value="roi_engine" className="bg-[#090b10] text-white">Users ROI Engine</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-white/50">
+                    <ChevronRight size={16} className="rotate-90" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {!isDetailView ? (
               <div className="space-y-12">
                 
                 {/* SECTION 1 — NEW REGISTRATIONS */}
-                <section className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <UserPlus size={18} className="text-aura-lime animate-pulse" />
-                      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">New Registrations</h2>
+                {usersSubTab === 'new_registrations' && (
+                  <div className="space-y-6 animate-fade-in pb-10">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-white/5">
+                      <div>
+                        <h2 className="text-lg font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
+                          <UserPlus size={20} className="text-aura-lime animate-pulse" /> New Registrations
+                        </h2>
+                        <p className="text-[9px] text-aura-muted uppercase tracking-widest mt-1">Real-time chronicle of newly registered terminal identities</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Live Stream</span>
                     </div>
-                    <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Live Stream</span>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {newlyRegisteredUsers.slice(0, 6).map((u: any) => (
-                      <div 
-                        key={u.id}
-                        onClick={() => {
-                          setSelectedUser(u);
-                          setIsDetailView(true);
-                        }}
-                        className="p-5 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 hover:border-aura-lime/30 rounded-3xl transition-all cursor-pointer flex items-center justify-between group animate-fade-in"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-xl bg-aura-lime/10 border border-aura-lime/20 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
-                            {u.name?.[0]?.toUpperCase() || 'U'}
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-bold text-white truncate max-w-[120px]">{u.name || 'Anonymous'}</h4>
-                            <p className="text-[9px] text-aura-muted font-bold truncate max-w-[120px] font-mono">{u.email}</p>
-                          </div>
+                    <div className="space-y-4">
+                      {newlyRegisteredUsers.length === 0 ? (
+                        <div className="p-12 text-center text-xs font-bold uppercase text-aura-muted tracking-widest bg-white/[0.01] border border-white/5 rounded-3xl">
+                          No registered users found
                         </div>
-                        <div className="text-right shrink-0">
-                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 bg-aura-lime/10 text-aura-lime rounded">New</span>
-                          <p className="text-[8px] text-aura-muted font-mono mt-1">
-                            {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Just now'}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
-                {/* SECTION 2 — USERS DASHBOARD */}
-                <section id="users-dashboard" className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
-                  <div className="flex flex-col gap-6">
-                    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between pb-4 border-b border-white/5">
-                      <div className="flex items-center gap-2">
-                        <Users size={18} className="text-aura-lime" />
-                        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">Users Dashboard</h2>
-                      </div>
-
-                      <div className="flex items-center gap-4 bg-white/5 border border-white/5 rounded-2xl px-4 py-2 w-full md:w-80">
-                        <Search size={16} className="text-aura-muted" />
-                        <input 
-                          type="text" 
-                          placeholder="Search Identity..." 
-                          className="bg-transparent border-none outline-none text-[10px] font-bold tracking-widest uppercase text-white w-full"
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto max-w-full">
-                      {[
-                        { key: 'all', label: 'All Users' },
-                        { key: 'active', label: 'Active Users' },
-                        { key: 'inactive', label: 'Inactive Users' },
-                        { key: 'suspended', label: 'Suspended' },
-                        { key: 'banned', label: 'Banned' }
-                      ].map((f) => (
-                        <button 
-                          key={f.key}
-                          onClick={() => {
-                            if (activeTab === 'cinactiveusers' && f.key !== 'inactive') {
-                              handleTabChange('cuser');
-                            }
-                            setUserFilter(f.key as any);
-                          }}
-                          className={cn(
-                            "px-6 py-2 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all whitespace-nowrap",
-                            effectiveFilter === f.key ? "bg-white/10 text-white" : "text-aura-muted hover:text-white"
-                          )}
-                        >
-                          {f.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="bg-[#090b10] border border-white/5 rounded-[32px] overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="border-b border-white/5">
-                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Identity</th>
-                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Balances</th>
-                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-center">Nodes / Plan Details</th>
-                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Status</th>
-                            <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Access</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/[0.02]">
-                          {filteredUsers.map((u: any) => {
-                            const userActiveInvestments = investments.filter(i => i.user_id === u.id && i.status === 'active');
-                            const isActiveNodeUser = userActiveInvestments.length > 0;
-                            
-                            return (
-                              <tr 
-                                key={u.id} 
-                                className="group hover:bg-white/[0.02] transition-colors cursor-pointer" 
-                                onClick={() => { 
-                                  setSelectedUser(u); 
-                                  setIsDetailView(true); 
-                                }}
-                              >
-                                <td className="px-6 py-4">
-                                  <div className="flex items-center gap-3">
-                                    {u.photoURL ? (
-                                      <img src={u.photoURL} className="w-9 h-9 rounded-xl object-cover border border-white/10" alt="" />
-                                    ) : (
-                                      <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
-                                        {u.name?.[0]?.toUpperCase() || 'U'}
-                                      </div>
-                                    )}
-                                    <div className="min-w-0">
-                                      <p className="text-xs font-bold tracking-tight text-white truncate max-w-[150px]">{u.name || 'Anonymous'}</p>
-                                      <p className="text-[9px] text-aura-muted font-bold truncate max-w-[150px] uppercase tracking-widest font-mono">{u.email}</p>
-                                    </div>
+                      ) : (
+                        newlyRegisteredUsers.map((u: any) => {
+                          const authStatus = u.banned ? 'Banned' : u.suspended ? 'Suspended' : 'Verified';
+                          const joinedDate = u.created_at || u.joined_at;
+                          return (
+                            <div 
+                              key={u.id}
+                              onClick={() => {
+                                setSelectedRegUser(u);
+                                // Pre-fetch devices as well
+                                setUserDevices([]);
+                                const fetchUDecs = async () => {
+                                  try {
+                                    const snap = await getDocs(collection(db, `users/${u.id}/devices`));
+                                    setUserDevices(snap.docs.map(d => d.data()));
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                };
+                                fetchUDecs();
+                              }}
+                              className="p-5 bg-[#090b10] hover:bg-white/[0.02] border border-white/5 hover:border-aura-lime/30 rounded-2xl transition-all cursor-pointer flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group"
+                            >
+                              <div className="flex items-center gap-4 min-w-0 flex-1">
+                                <div className="w-12 h-12 rounded-xl bg-aura-lime/5 border border-aura-lime/10 flex items-center justify-center font-black text-sm text-aura-lime shrink-0">
+                                  {u.name?.[0]?.toUpperCase() || 'U'}
+                                </div>
+                                <div className="min-w-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-1 flex-1">
+                                  <div className="min-w-0">
+                                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Full Name</p>
+                                    <h4 className="text-xs font-bold text-white truncate">{u.name || 'Anonymous'}</h4>
                                   </div>
-                                </td>
-                                <td className="px-6 py-4">
-                                  <p className="text-xs font-black font-serif italic text-white">{formatCurrency(u.available_balance || 0)}</p>
-                                  <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Total: {formatCurrency((u.available_balance || 0) + (u.funding_balance || 0))}</p>
-                                </td>
-                                <td className="px-6 py-4 text-center">
-                                  {isActiveNodeUser ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <span className="text-[9px] font-black text-aura-lime bg-aura-lime/10 px-2.5 py-1 rounded-full border border-aura-lime/20 flex items-center gap-1">
-                                        <Zap size={10} className="animate-pulse" /> {userActiveInvestments.length} Active Plan{userActiveInvestments.length > 1 ? 's' : ''}
-                                      </span>
-                                      <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mt-1">
-                                        {userActiveInvestments.map((inv: any) => (
-                                          <span key={inv.id} className="text-[8px] font-bold uppercase bg-white/5 px-2 py-0.5 rounded text-[#a855f7] border border-white/5">
-                                            {inv.plan_name}: ${inv.amount.toLocaleString()} ({inv.status})
-                                          </span>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-[8px] font-black text-gray-500 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
-                                      No Active Nodes
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4">
-                                  {u.banned ? (
-                                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-red-500/10 text-red-500 rounded-full flex items-center gap-1 w-fit"><Ban size={10} /> Banned</span>
-                                  ) : u.suspended ? (
-                                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center gap-1 w-fit"><Pause size={10} /> Suspended</span>
-                                  ) : (
-                                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-aura-lime/10 text-aura-lime rounded-full flex items-center gap-1 w-fit"><ShieldCheck size={10} /> Verified</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-right text-aura-muted group-hover:text-aura-lime transition-all">
-                                  <ChevronRight size={14} className="inline" />
-                                </td>
+                                  <div className="min-w-0">
+                                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Email Address</p>
+                                    <p className="text-xs font-semibold text-white/80 truncate font-mono">{u.email}</p>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Username</p>
+                                    <p className="text-xs font-semibold text-white/80 truncate">@{u.username || u.name?.toLowerCase().replace(/\s+/g, '_') || 'user'}</p>
+                                  </div>
+                                  <div className="min-w-0">
+                                    <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">UID</p>
+                                    <p className="text-xs font-semibold text-white/50 truncate font-mono">{u.id}</p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center gap-6 justify-between md:justify-end shrink-0 w-full md:w-auto pt-3 md:pt-0 border-t border-white/[0.02] md:border-0 font-bold">
+                                <div>
+                                  <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest md:text-right">Referral Code</p>
+                                  <p className="text-xs font-mono font-black text-aura-lime md:text-right">{u.referral_code || '---'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest md:text-right">Registered On</p>
+                                  <p className="text-xs font-sans font-bold text-white md:text-right">
+                                    {joinedDate ? new Date(joinedDate).toLocaleDateString() : 'Recent'}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest md:text-right">Auth Status</p>
+                                  <span className={cn(
+                                    "text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded block text-center mt-1",
+                                    authStatus === 'Banned' ? 'bg-red-500/10 text-red-500' : authStatus === 'Suspended' ? 'bg-yellow-500/10 text-yellow-500' : 'bg-aura-lime/10 text-aura-lime'
+                                  )}>
+                                    {authStatus}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* REGISTRATION POPUP MODAL (Excludes all financial data metrics) */}
+                    {selectedRegUser && (
+                      <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                        <div className="bg-[#090b10] border border-white/10 p-6 sm:p-8 rounded-[40px] w-full max-w-xl relative animate-scale-in space-y-6">
+                          <button 
+                            type="button"
+                            onClick={() => setSelectedRegUser(null)}
+                            className="absolute top-6 right-6 p-2 bg-white/5 border border-white/5 text-aura-muted hover:text-white rounded-xl transition-all cursor-pointer"
+                          >
+                            <X size={16} />
+                          </button>
+
+                          <div>
+                            <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1 bg-[#a855f7]/10 text-[#a855f7] rounded-full border border-[#a855f7]/20">
+                              System Registry Audit Signature
+                            </span>
+                            <h3 className="text-xl font-black font-serif italic text-white mt-3">Identity Registration profile</h3>
+                            <p className="text-[9px] text-aura-muted uppercase tracking-wide">Terminal hardware, authentication status, and indexing parameters</p>
+                          </div>
+
+                          <div className="space-y-4 divide-y divide-white/[0.04]">
+                            <div className="grid grid-cols-2 gap-4 pt-1 text-white">
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Full Registered Name</p>
+                                <p className="text-xs font-bold">{selectedRegUser.name || 'Anonymous'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Email Address</p>
+                                <p className="text-xs font-mono font-bold truncate">{selectedRegUser.email}</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-4 text-white">
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Chosen Username</p>
+                                <p className="text-xs font-bold">@{selectedRegUser.username || selectedRegUser.name?.toLowerCase().replace(/\s+/g, '_') || 'user'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Firestore uid Node</p>
+                                <p className="text-xs font-mono text-aura-lime font-black truncate">{selectedRegUser.id}</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-4 text-white">
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Global Dashboard user ID</p>
+                                <p className="text-xs font-mono font-bold">{selectedRegUser.id?.substring(0, 12).toUpperCase()}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Registration Timestamp</p>
+                                <p className="text-xs font-mono font-bold">
+                                  {selectedRegUser.created_at || selectedRegUser.joined_at 
+                                    ? new Date(selectedRegUser.created_at || selectedRegUser.joined_at).toUTCString() 
+                                    : 'N/A'
+                                  }
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-4 text-white">
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Self Referral Code</p>
+                                <p className="text-xs font-mono text-[#a855f7] font-black">{selectedRegUser.referral_code || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Referred By Code / Origin</p>
+                                <p className="text-xs font-mono text-[#a855f7] font-black">{selectedRegUser.referred_by || 'Organic sign-up'}</p>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 pt-4 text-white">
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Authentication Profile Level</p>
+                                <span className={cn(
+                                  "text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded w-fit block mt-1",
+                                  selectedRegUser.banned ? 'bg-red-500/10 text-red-500' : selectedRegUser.suspended ? 'bg-yellow-500/10 text-yellow-500' : 'bg-aura-lime/10 text-aura-lime'
+                                )}>
+                                  {selectedRegUser.banned ? 'Banned' : selectedRegUser.suspended ? 'Suspended' : 'Verified Client'}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">Logged Devices Signature</p>
+                                <p className="text-xs font-semibold text-white/70">
+                                  {userDevices.length > 0 
+                                    ? `${userDevices.length} Terminal Signature${userDevices.length !== 1 ? 's' : ''} Synced`
+                                    : '1 Standard Session Registered'
+                                  }
+                                </p>
+                              </div>
+                            </div>
+
+                            {userDevices.length > 0 && (
+                              <div className="pt-4 max-h-[100px] overflow-y-auto space-y-1 scrollbar-none">
+                                <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest mb-1.5">Hardware handshake parameters</p>
+                                {userDevices.map((dev: any, idx: number) => (
+                                  <div key={idx} className="p-2 bg-white/5 rounded-lg border border-white/5 text-[9px] font-mono text-white/60 flex justify-between gap-4">
+                                    <span>{dev.browser || 'Unknown Browser'} ({dev.os || 'Unknown OS'})</span>
+                                    <span className="text-aura-lime font-black">{dev.ip || 'Local Node'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t border-white/5 flex gap-3">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedRegUser(null)}
+                              className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl transition-all cursor-pointer"
+                            >
+                              Exit Audit
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 2. USERS DASHBOARD PAGE */}
+                {usersSubTab === 'users_dashboard' && (
+                  <div className="space-y-6 animate-fade-in">
+                    <section id="users-dashboard" className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
+                      <div className="flex flex-col gap-6">
+                        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between pb-4 border-b border-white/5">
+                          <div className="flex items-center gap-2">
+                            <Users size={18} className="text-aura-lime" />
+                            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">Users Dashboard</h2>
+                          </div>
+
+                          <div className="flex items-center gap-4 bg-white/5 border border-white/5 rounded-2xl px-4 py-2 w-full md:w-80">
+                            <Search size={16} className="text-aura-muted" />
+                            <input 
+                              type="text" 
+                              placeholder="Search Identity..." 
+                              className="bg-transparent border-none outline-none text-[10px] font-bold tracking-widest uppercase text-white w-full"
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 overflow-x-auto max-w-full">
+                          {[
+                            { key: 'all', label: 'All Users' },
+                            { key: 'active', label: 'Active Users' },
+                            { key: 'inactive', label: 'Inactive Users' },
+                            { key: 'suspended', label: 'Suspended Users ONLY' },
+                            { key: 'banned', label: 'Banned Users ONLY' }
+                          ].map((f) => (
+                            <button 
+                              key={f.key}
+                              onClick={() => {
+                                if (activeTab === 'cinactiveusers' && f.key !== 'inactive') {
+                                  handleTabChange('cuser');
+                                }
+                                setUserFilter(f.key as any);
+                              }}
+                              className={cn(
+                                "px-6 py-2 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all whitespace-nowrap cursor-pointer select-none",
+                                effectiveFilter === f.key ? "bg-white/10 text-white" : "text-aura-muted hover:text-white"
+                              )}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="bg-[#090b10] border border-white/5 rounded-[32px] overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left">
+                            <thead>
+                              <tr className="border-b border-white/5">
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Identity</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Balances</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-center">Nodes / Plan Details</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted">Status</th>
+                                <th className="px-6 py-4 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Access</th>
                               </tr>
+                            </thead>
+                            <tbody className="divide-y divide-white/[0.02]">
+                              {filteredUsers.length === 0 ? (
+                                <tr>
+                                  <td colSpan={5} className="px-6 py-8 text-center text-xs font-bold uppercase text-aura-muted tracking-widest bg-white/[0.01]">
+                                    No {effectiveFilter !== 'all' ? `${effectiveFilter}` : ''} users currently indexed
+                                  </td>
+                                </tr>
+                              ) : (
+                                filteredUsers.map((u: any) => {
+                                  const userActiveInvestments = investments.filter(i => i.user_id === u.id && i.status === 'active');
+                                  const isActiveNodeUser = userActiveInvestments.length > 0;
+                                  
+                                  return (
+                                    <tr 
+                                      key={u.id} 
+                                      className="group hover:bg-white/[0.02] transition-colors cursor-pointer" 
+                                      onClick={() => { 
+                                        setSelectedUser(u); 
+                                        setIsDetailView(true); 
+                                      }}
+                                    >
+                                      <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                          {u.photoURL ? (
+                                            <img src={u.photoURL} className="w-9 h-9 rounded-xl object-cover border border-white/10" alt="" />
+                                          ) : (
+                                            <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
+                                              {u.name?.[0]?.toUpperCase() || 'U'}
+                                            </div>
+                                          )}
+                                          <div className="min-w-0">
+                                            <p className="text-xs font-bold tracking-tight text-white truncate max-w-[150px]">{u.name || 'Anonymous'}</p>
+                                            <p className="text-[9px] text-aura-muted font-bold truncate max-w-[150px] uppercase tracking-widest font-mono">{u.email}</p>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        <p className="text-xs font-black font-serif italic text-white">{formatCurrency(u.available_balance || 0)}</p>
+                                        <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Total: {formatCurrency((u.available_balance || 0) + (u.funding_balance || 0))}</p>
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                        {isActiveNodeUser ? (
+                                          <div className="flex flex-col items-center gap-1">
+                                            <span className="text-[9px] font-black text-aura-lime bg-aura-lime/10 px-2.5 py-1 rounded-full border border-aura-lime/20 flex items-center gap-1">
+                                              <Zap size={10} className="animate-pulse" /> {userActiveInvestments.length} Active Plan{userActiveInvestments.length > 1 ? 's' : ''}
+                                            </span>
+                                            <div className="flex flex-wrap gap-1 justify-center max-w-[200px] mt-1">
+                                              {userActiveInvestments.map((inv: any) => (
+                                                <span key={inv.id} className="text-[8px] font-bold uppercase bg-white/5 px-2 py-0.5 rounded text-[#a855f7] border border-white/5">
+                                                  {inv.plan_name}: ${inv.amount.toLocaleString()} ({inv.status})
+                                                </span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <span className="text-[8px] font-black text-gray-500 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/5">
+                                            No Active Nodes
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="px-6 py-4">
+                                        {u.banned ? (
+                                          <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-red-500/10 text-red-500 rounded-full flex items-center gap-1 w-fit"><Ban size={10} /> Banned</span>
+                                        ) : u.suspended ? (
+                                          <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-yellow-500/10 text-yellow-500 rounded-full flex items-center gap-1 w-fit"><Pause size={10} /> Suspended</span>
+                                        ) : (
+                                          <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-0.5 bg-aura-lime/10 text-aura-lime rounded-full flex items-center gap-1 w-fit"><ShieldCheck size={10} /> Verified</span>
+                                        )}
+                                      </td>
+                                      <td className="px-6 py-4 text-right text-aura-muted group-hover:text-aura-lime transition-all">
+                                        <ChevronRight size={14} className="inline" />
+                                      </td>
+                                    </tr>
+                                  );
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </section>
+                  </div>
+                )}
+
+                {/* 3. USER ACTIVITIES ENGINE PAGE */}
+                {usersSubTab === 'activities_engine' && (
+                  <div className="space-y-6 animate-fade-in pb-10">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-white/5">
+                      <div>
+                        <h2 className="text-lg font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
+                          <Activity size={20} className="text-aura-lime animate-pulse" /> Users Activities Engine
+                        </h2>
+                        <p className="text-[9px] text-aura-muted uppercase tracking-widest mt-1">Real-time chronicle of interactive user operations & handshakes</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Live Activities Matrix</span>
+                    </div>
+
+                    {focusedActivityUserId ? (
+                      // FOCUSED USER DETAILED TIMELINE
+                      <div className="p-6 sm:p-8 bg-[#090b10] border border-white/5 rounded-3xl space-y-6">
+                        {(() => {
+                          const item = activeUsersWithActivities.find(x => x.user.id === focusedActivityUserId);
+                          if (!item) {
+                            return (
+                              <div className="space-y-4">
+                                <button 
+                                  onClick={() => setFocusedActivityUserId(null)}
+                                  className="text-[10px] font-black uppercase text-aura-lime hover:underline tracking-widest flex items-center gap-1 cursor-pointer"
+                                >
+                                  <ArrowLeft size={12} /> Back to User Feed
+                                </button>
+                                <p className="text-xs text-aura-muted">No activities recorded for this user.</p>
+                              </div>
                             );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </section>
+                          }
+                          
+                          return (
+                            <div className="space-y-6 animate-fade-in">
+                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 pb-4 font-bold">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-11 h-11 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-black text-xs text-aura-lime shrink-0">
+                                    {item.user.name?.[0]?.toUpperCase() || 'U'}
+                                  </div>
+                                  <div>
+                                    <h4 className="text-sm font-bold text-white">{item.user.name || 'Anonymous'}</h4>
+                                    <p className="text-[10px] text-aura-muted font-bold font-mono uppercase">{item.user.email}</p>
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => setFocusedActivityUserId(null)}
+                                  className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white transition-all flex items-center gap-1 cursor-pointer"
+                                >
+                                  <ArrowLeft size={12} /> View All Audits
+                                </button>
+                              </div>
 
-                {/* SECTION 3 — USER ACTIVITIES ENGINE */}
-                <section className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <Activity size={18} className="text-aura-lime" />
-                      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">User Activities Engine</h2>
-                    </div>
-                    <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Live Activities Matrix</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-1">
+                              <div className="space-y-4">
+                                <div className="text-[9px] font-black uppercase text-aura-muted tracking-widest">
+                                  Chronological Activities Sequence ({item.activities.length} signals)
+                                </div>
+                                <div className="relative pl-4 border-l border-white/10 space-y-6 ml-2 pt-2">
+                                  {item.activities.map((act: any) => {
+                                    const isSecLog = !act.amount;
+                                    return (
+                                      <div key={act.id} className="relative group">
+                                        <div className={cn(
+                                          "absolute -left-[22px] top-1.5 w-3 h-3 rounded-full ring-[4px] ring-[#090b10] transition-colors",
+                                          isSecLog ? "bg-purple-500 group-hover:bg-purple-400" : "bg-aura-lime group-hover:bg-[#bbfb60]"
+                                        )} />
+                                        <div className="p-4 bg-white/[0.01] border border-white/5 group-hover:bg-white/[0.02] group-hover:border-white/10 rounded-2xl space-y-1.5 transition-all">
+                                          <div className="flex items-center justify-between gap-4 font-bold">
+                                            <span className="text-[10px] font-black uppercase text-white tracking-wider">
+                                              {act.action?.replace(/_/g, ' ')}
+                                            </span>
+                                            {act.amount > 0 && (
+                                              <span className="text-[10px] font-black text-aura-lime px-2 py-0.5 rounded bg-aura-lime/10">
+                                                +{formatCurrency(act.amount)}
+                                              </span>
+                                            )}
+                                          </div>
+                                          <p className="text-xs text-aura-muted font-medium">{act.description}</p>
+                                          <p className="text-[8px] text-aura-muted/40 font-bold font-mono tracking-wider italic">
+                                            {new Date(act.timestamp).toLocaleString()}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      // CARDS FEED
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {activeUsersWithActivities.map((item: any) => {
                       const now = new Date().getTime();
                       const elapsedMin = (now - item.latestTime) / (1000 * 60);
@@ -2135,35 +2666,47 @@ export default function CipherAdmin() {
                         </div>
                       );
                     })}
-                  </div>
-                </section>
-
-                {/* SECTION 4 — USER ROI ENGINE */}
-                <section className="p-6 sm:p-8 bg-white/[0.02] border border-white/5 rounded-[32px] sm:rounded-[40px] space-y-6">
-                  <div className="flex items-center justify-between pb-4 border-b border-white/5">
-                    <div className="flex items-center gap-2">
-                      <Zap size={18} className="text-aura-lime animate-bounce" />
-                      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-white">User ROI Engine</h2>
                     </div>
-                    <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Accumulator Matrix</span>
+                    )}
                   </div>
+                )}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {users
-                      .filter(u => investments.some(inv => inv.user_id === u.id && inv.status === 'active'))
-                      .map((u: any) => {
-                        const userActiveInvestments = investments.filter(inv => inv.user_id === u.id && inv.status === 'active');
-                        return (
-                          <AdminROIEngineCard 
-                            key={u.id}
-                            userValue={u}
-                            userInvestments={userActiveInvestments}
-                            plans={plans}
-                          />
-                        );
-                      })}
+                {/* 4. USER ROI ENGINE PAGE */}
+                {usersSubTab === 'roi_engine' && (
+                  <div className="space-y-6 animate-fade-in pb-10">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-white/5">
+                      <div>
+                        <h2 className="text-lg font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
+                          <Zap size={20} className="text-aura-lime animate-bounce" /> Users ROI Engine
+                        </h2>
+                        <p className="text-[9px] text-aura-muted uppercase tracking-widest mt-1">Real-time compilation of system active yield node accumulators</p>
+                      </div>
+                      <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Accumulator Matrix</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {users.filter(u => investments.some(inv => inv.user_id === u.id && inv.status === 'active')).length === 0 ? (
+                        <div className="col-span-full p-12 text-center text-xs font-bold uppercase text-aura-muted tracking-widest bg-white/[0.01] border border-white/5 rounded-3xl">
+                          No active ROI investments currently running
+                        </div>
+                      ) : (
+                        users
+                          .filter(u => investments.some(inv => inv.user_id === u.id && inv.status === 'active'))
+                          .map((u: any) => {
+                            const userActiveInvestments = investments.filter(inv => inv.user_id === u.id && inv.status === 'active');
+                            return (
+                              <AdminROIEngineCard 
+                                key={u.id}
+                                userValue={u}
+                                userInvestments={userActiveInvestments}
+                                plans={plans}
+                              />
+                            );
+                          })
+                      )}
+                    </div>
                   </div>
-                </section>
+                )}
 
               </div>
             ) : (
@@ -2500,6 +3043,83 @@ export default function CipherAdmin() {
             </div>
 
             <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
+                  <Settings size={16} className="text-purple-400 animate-spin [animation-duration:10s]" /> System Maintenance mode
+                </h3>
+                <div className="space-y-6">
+                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
+                      <div>
+                         <h4 className="text-sm font-black uppercase">Maintenance Protocol</h4>
+                         <p className="text-[10px] text-aura-muted font-bold uppercase tracking-widest">
+                            {maintenanceMode ? "ONLINE USERS BLOCKED SECURELY" : "APP ONLINE WITH GENERAL ACCESS ENFORCED"}
+                         </p>
+                      </div>
+                      <button
+                         type="button"
+                         onClick={() => {
+                            const nextMode = !maintenanceMode;
+                            setMaintenanceMode(nextMode);
+                            updateMaintenanceSettings(nextMode, maintenanceTitle, maintenanceMessage, maintenanceEta);
+                         }}
+                         className={cn(
+                            "px-6 py-2.5 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all cursor-pointer select-none",
+                            maintenanceMode 
+                               ? "bg-purple-500 text-white shadow-[0_4px_12px_rgba(168,85,247,0.3)] hover:bg-purple-600" 
+                               : "bg-white/5 text-purple-400 border border-purple-500/20 hover:bg-purple-500/10"
+                         )}
+                      >
+                         {maintenanceMode ? "Deactivate Mode" : "Activate Mode"}
+                      </button>
+                   </div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Maintenance Title</label>
+                         <input 
+                            type="text" 
+                            value={maintenanceTitle}
+                            onChange={(e) => setMaintenanceTitle(e.target.value)}
+                            className="w-full bg-aura-black border border-white/10 rounded-2xl py-3 px-4 text-xs font-bold outline-none focus:border-purple-500/50 transition-all text-white"
+                            placeholder="System Upgrading"
+                         />
+                      </div>
+
+                      <div className="space-y-2">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Estimated Return Time (optional)</label>
+                         <input 
+                            type="text" 
+                            value={maintenanceEta}
+                            onChange={(e) => setMaintenanceEta(e.target.value)}
+                            className="w-full bg-aura-black border border-white/10 rounded-2xl py-3 px-4 text-xs font-bold font-mono outline-none focus:border-purple-500/50 transition-all text-white"
+                            placeholder="e.g. 2 Hours, May 27th, 14:00 UTC"
+                         />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-2">
+                         <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Maintenance Message / Body</label>
+                         <textarea 
+                            value={maintenanceMessage}
+                            onChange={(e) => setMaintenanceMessage(e.target.value)}
+                            rows={3}
+                            className="w-full bg-aura-black border border-white/10 rounded-2xl py-3 px-4 text-xs font-medium outline-none focus:border-purple-500/50 transition-all text-white leading-relaxed resize-none"
+                            placeholder="Provide details about the maintenance operation..."
+                         />
+                      </div>
+                   </div>
+
+                   <div className="flex justify-end pt-2 border-t border-white/5">
+                      <button 
+                         type="button"
+                         onClick={() => updateMaintenanceSettings(maintenanceMode, maintenanceTitle, maintenanceMessage, maintenanceEta)}
+                         className="px-8 py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl shadow-xl hover:scale-[1.01] transition-all cursor-pointer"
+                      >
+                         Save Maintenance Parameters
+                      </button>
+                   </div>
+                </div>
+             </div>
+
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
                <h3 className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
                  <Activity size={16} className="text-aura-lime" /> Terminal Integrity
                </h3>
@@ -2516,6 +3136,547 @@ export default function CipherAdmin() {
                     </div>
                   ))}
                </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'cadverts' && (
+          <div className="space-y-12">
+            {/* Header / Intro */}
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1 bg-aura-lime/10 text-aura-lime rounded-full border border-aura-lime/20">
+                  Adverts Protocol v1.4
+                </span>
+                <h2 className="text-3xl font-black font-serif italic mt-2">Marketing & Bulletin Dispatcher</h2>
+                <p className="text-xs text-aura-muted font-bold uppercase tracking-wider mt-1">Configure and target high-yield premium pop-ups throughout user feeds globally</p>
+              </div>
+              <button
+                onClick={handleResetAdvertForm}
+                className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs uppercase font-black tracking-widest border border-white/5 transition-all inline-flex items-center gap-2 active:scale-95"
+              >
+                <Plus size={14} />
+                Create New Advert
+              </button>
+            </div>
+
+            {/* Core Section: Split Form + Live Preview */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+              {/* Creator Form */}
+              <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-8">
+                <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                  <Megaphone className="text-aura-lime" size={20} />
+                  <h3 className="text-base font-black uppercase tracking-wider text-white">
+                    {editingAdvertId ? `Edit Advert (ID: ${editingAdvertId})` : "Create New Campaign"}
+                  </h3>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Title & Message */}
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Advert Title</label>
+                      <input
+                        type="text"
+                        value={advTitle}
+                        onChange={(e) => setAdvTitle(e.target.value)}
+                        placeholder="e.g. Exclusive High-Yield Event"
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-sm font-bold outline-none focus:border-aura-lime transition-all text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Message / Content Body</label>
+                      <textarea
+                        value={advMessage}
+                        onChange={(e) => setAdvMessage(e.target.value)}
+                        placeholder="Detail the event advantages, requirements, and timing limits here..."
+                        rows={4}
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-semibold outline-none focus:border-aura-lime transition-all text-white leading-relaxed resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Image & CTA Link */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Advert Image URL</label>
+                      <input
+                        type="text"
+                        value={advImageUrl}
+                        onChange={(e) => setAdvImageUrl(e.target.value)}
+                        placeholder="https://i.imgur.com/example.png"
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-semibold outline-none focus:border-aura-lime transition-all text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Redirect Link / Destination URL</label>
+                      <input
+                        type="text"
+                        value={advRedirectLink}
+                        onChange={(e) => setAdvRedirectLink(e.target.value)}
+                        placeholder="/invest?plan=gold"
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-semibold outline-none focus:border-aura-lime transition-all text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Button CTA text & Style Template */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">CTA Button Text</label>
+                      <input
+                        type="text"
+                        value={advCtaText}
+                        onChange={(e) => setAdvCtaText(e.target.value)}
+                        placeholder="Claim Bonus Now"
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Advert Style Template</label>
+                      <select
+                        value={advStyleTemplate}
+                        onChange={(e) => setAdvStyleTemplate(e.target.value)}
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white cursor-pointer"
+                      >
+                        <option value="glass">Glassmorphism Default</option>
+                        <option value="neon">Neon Cyber (High Contrast)</option>
+                        <option value="minimal">Minimal Stark Slate</option>
+                        <option value="brutalist">Mono Brutalist Craft</option>
+                        <option value="warm">Amber Aurora Gold</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* DISPLAY TYPE & SIZE */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Popup / Display Type</label>
+                      <select
+                        value={advPopupType}
+                        onChange={(e) => setAdvPopupType(e.target.value)}
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white cursor-pointer"
+                      >
+                        <option value="center">Center Pop-up</option>
+                        <option value="floating-corner">Floating Corner Card</option>
+                        <option value="bottom-slide">Bottom Slide Toast</option>
+                        <option value="top-banner">Top Header Banner</option>
+                        <option value="side-floating">Side Floating Badge</option>
+                        <option value="mini-notification">Mini Notification toast</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Scale / Size Category</label>
+                      <select
+                        value={advSize}
+                        onChange={(e) => setAdvSize(e.target.value)}
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white cursor-pointer"
+                      >
+                        <option value="small">Small Compact (Max 360px)</option>
+                        <option value="medium">Medium Standard (Max 480px)</option>
+                        <option value="large">Large Premium (Max 600px)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Position & Height/Width Limits */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">UI Screen Position</label>
+                      <select
+                        value={advPosition}
+                        onChange={(e) => setAdvPosition(e.target.value)}
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white cursor-pointer"
+                      >
+                        <option value="center">Center</option>
+                        <option value="top-left">Top Left</option>
+                        <option value="top-right">Top Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="top-center">Top Center</option>
+                        <option value="bottom-center">Bottom Center</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Custom Width (e.g. 400px)</label>
+                      <input
+                        type="text"
+                        value={advWidth}
+                        onChange={(e) => setAdvWidth(e.target.value)}
+                        placeholder="Leave blank for auto"
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-semibold outline-none focus:border-aura-lime transition-all text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted ml-2">Custom Height (e.g. 320px)</label>
+                      <input
+                        type="text"
+                        value={advHeight}
+                        onChange={(e) => setAdvHeight(e.target.value)}
+                        placeholder="Leave blank for auto"
+                        className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 px-6 text-xs font-semibold outline-none focus:border-aura-lime transition-all text-white"
+                      />
+                    </div>
+                  </div>
+
+                  {/* SCHEDULING OPTIONS */}
+                  <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white/75 italic">Time Scheduling Rules</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-aura-muted ml-1">Trigger Frequency</label>
+                        <select
+                          value={advSchedulingType}
+                          onChange={(e) => setAdvSchedulingType(e.target.value)}
+                          className="w-full bg-aura-black border border-white/10 rounded-xl py-3 px-4 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white"
+                        >
+                          <option value="every-refresh">Show Every Refresh</option>
+                          <option value="once-daily">Show Once Daily</option>
+                          <option value="every-login">Show Every Session Login</option>
+                          <option value="custom-interval">Show Recurring Interval</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-aura-muted ml-1">Interval Minutes (if recurring)</label>
+                        <input
+                          type="number"
+                          disabled={advSchedulingType !== 'custom-interval'}
+                          value={advIntervalMinutes}
+                          onChange={(e) => setAdvIntervalMinutes(parseInt(e.target.value) || 30)}
+                          className="w-full bg-aura-black disabled:opacity-40 border border-white/10 rounded-xl py-3 px-4 text-xs font-mono outline-none focus:border-aura-lime transition-all text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-aura-muted ml-1">Campaign Start Date</label>
+                        <input
+                          type="datetime-local"
+                          value={advStartDate}
+                          onChange={(e) => setAdvStartDate(e.target.value)}
+                          className="w-full bg-aura-black border border-white/10 rounded-xl py-3 px-4 text-xs font-mono outline-none text-white focus:border-aura-lime"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-aura-muted ml-1">Campaign End Date</label>
+                        <input
+                          type="datetime-local"
+                          value={advEndDate}
+                          onChange={(e) => setAdvEndDate(e.target.value)}
+                          className="w-full bg-aura-black border border-white/10 rounded-xl py-3 px-4 text-xs font-mono outline-none text-white focus:border-aura-lime"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* TARGET PAGE CODES */}
+                  <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white/75 italic">Location Node Target</h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-aura-muted ml-1">Active Page Destination</label>
+                        <select
+                          value={advPageTargetingType}
+                          onChange={(e) => setAdvPageTargetingType(e.target.value)}
+                          className="w-full bg-aura-black border border-white/10 rounded-xl py-3 px-4 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white"
+                        >
+                          <option value="all">Entire Application (All Feeds)</option>
+                          <option value="dashboard">Dashboard / Home Panel</option>
+                          <option value="rewards">Rewards & Quests Page</option>
+                          <option value="invest">Investment Terminal</option>
+                          <option value="profile">Profile & Security Panel</option>
+                          <option value="fund">Fund & Withdrawal Gateway</option>
+                          <option value="custom">Custom Specified Router Path</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[8px] font-black uppercase tracking-widest text-aura-muted ml-1">Custom Specified Path (if chosen)</label>
+                        <input
+                          type="text"
+                          disabled={advPageTargetingType !== 'custom'}
+                          value={advCustomPath}
+                          onChange={(e) => setAdvCustomPath(e.target.value)}
+                          placeholder="e.g. /token"
+                          className="w-full bg-aura-black disabled:opacity-40 border border-white/10 rounded-xl py-3 px-4 text-xs font-bold outline-none focus:border-aura-lime transition-all text-white"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Active Toggle & Submission Controls */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setAdvIsActive(!advIsActive)}
+                        className={cn(
+                          "w-12 h-6 rounded-full p-1 transition-colors duration-300 focus:outline-none",
+                          advIsActive ? "bg-aura-lime" : "bg-white/10"
+                        )}
+                      >
+                        <div
+                          className={cn(
+                            "w-4 h-4 rounded-full bg-aura-black transition-transform duration-300",
+                            advIsActive ? "translate-x-6" : "translate-x-0"
+                          )}
+                        />
+                      </button>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                        {advIsActive ? "Publish Campaign Active" : "Publish Campaign Paused"}
+                      </span>
+                    </div>
+
+                    <div className="flex gap-4 w-full sm:w-auto justify-end">
+                      {editingAdvertId && (
+                        <button
+                          onClick={handleResetAdvertForm}
+                          className="px-6 py-4 bg-white/5 border border-white/10 text-white font-black uppercase tracking-widest text-[9px] rounded-2xl hover:bg-white/10 transition-all cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                      <button
+                        onClick={handleSaveAdvert}
+                        className="px-8 py-4 bg-aura-lime text-aura-black font-black uppercase tracking-widest text-[9px] rounded-2xl hover:scale-[1.02] shadow-lg active:scale-95 transition-all cursor-pointer"
+                      >
+                        {editingAdvertId ? "Update Campaign" : "Publish Campaign"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Real-time Live Preview Panel */}
+              <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] flex flex-col justify-between space-y-8 min-h-[500px]">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                  <div className="flex items-center gap-3">
+                    <Eye className="text-purple-400" size={18} />
+                    <h3 className="text-base font-black uppercase tracking-wider text-white">Real-time Visual Sandbox</h3>
+                  </div>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-aura-muted px-2 py-1 bg-white/5 rounded">Iframe Emulation</span>
+                </div>
+
+                <div className="flex-1 flex items-center justify-center p-6 bg-[#030406] border border-white/5 rounded-3xl relative overflow-hidden min-h-[350px]">
+                  {/* Background grids */}
+                  <div className="absolute inset-0 bg-[radial-gradient(#ffffff03_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
+
+                  {/* Render simulated pop-up based on style template and positioning preview */}
+                  <div 
+                    style={{ 
+                      width: advWidth || (advSize === 'small' ? '280px' : advSize === 'large' ? '460px' : '380px'),
+                      height: advHeight || 'auto'
+                    }}
+                    className={cn(
+                      "relative rounded-[24px] p-6 text-center overflow-hidden border transition-all duration-300 font-sans shadow-2xl",
+                      // styles
+                      advStyleTemplate === 'glass' && "bg-white/[0.03] backdrop-blur-xl border-white/10 text-white shadow-[0_30px_60px_rgba(0,0,0,0.8)]",
+                      advStyleTemplate === 'neon' && "bg-[#0b031c] border-purple-500 text-purple-100 shadow-[0_0_30px_rgba(168,85,247,0.30)]",
+                      advStyleTemplate === 'minimal' && "bg-[#111215] border-white/15 text-gray-200",
+                      advStyleTemplate === 'brutalist' && "bg-black border-4 border-white text-white font-mono rounded-none",
+                      advStyleTemplate === 'warm' && "bg-gradient-to-tr from-[#130d07] to-[#1a100a] border-amber-600/30 text-amber-50 shadow-[0_30px_50px_rgba(245,158,11,0.05)]",
+                    )}
+                  >
+                    {/* Style Decorator Overlay elements */}
+                    {advStyleTemplate === 'neon' && (
+                      <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+                    )}
+                    {advStyleTemplate === 'warm' && (
+                      <div className="absolute top-[-30%] left-[-30%] w-[60%] h-[60%] bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                    )}
+
+                    {/* Badge popup styling helper notification */}
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5 pointer-events-none">
+                      <span className={cn(
+                        "text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded",
+                        advStyleTemplate === 'brutalist' ? "bg-white text-black font-mono" : "bg-white/10 text-white/40"
+                      )}>
+                        {advPopupType.replace('-', ' ')}
+                      </span>
+                    </div>
+
+                    <div className="space-y-5 mt-4">
+                      {/* Optional Image */}
+                      {advImageUrl && (
+                        <div className={cn("overflow-hidden mx-auto", advStyleTemplate === 'brutalist' ? "border-2 border-white rounded-none w-full h-32" : "rounded-2xl w-full h-32 bg-white/5 border border-white/5")}>
+                          <img 
+                            referrerPolicy="no-referrer"
+                            src={advImageUrl} 
+                            alt="Advert Banner Preview" 
+                            className="w-full h-full object-cover" 
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <h4 className={cn(
+                          "font-serif tracking-tight font-black uppercase italic leading-tight",
+                          advSize === 'small' ? "text-base" : advSize === 'large' ? "text-xl-plus text-xl" : "text-lg",
+                          advStyleTemplate === 'neon' && "text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 not-italic font-sans font-extrabold tracking-wide",
+                          advStyleTemplate === 'brutalist' && "font-mono not-italic tracking-normal text-left"
+                        )}>
+                          {advTitle || "EVENT TITLE PLACEHOLDER"}
+                        </h4>
+                        
+                        {advStyleTemplate === 'brutalist' ? (
+                          <div className="w-full h-0.5 bg-white" />
+                        ) : (
+                          <div className="w-12 h-0.5 bg-gradient-to-r from-transparent via-aura-lime/30 to-transparent mx-auto" />
+                        )}
+
+                        <p className={cn(
+                          "text-xs leading-relaxed opacity-70 px-1",
+                          advStyleTemplate === 'brutalist' && "font-mono text-left opacity-100 text-xs"
+                        )}>
+                          {advMessage || "Provide high-end message text inside the dispatcher form. This emulates standard terminal layouts precisely."}
+                        </p>
+                      </div>
+
+                      <button
+                        className={cn(
+                          "w-full py-3.5 text-[10px] uppercase font-black tracking-widest transition-all",
+                          advStyleTemplate === 'glass' && "bg-white/5 border border-white/10 text-white rounded-xl hover:bg-white/10",
+                          advStyleTemplate === 'neon' && "bg-gradient-to-r from-purple-600 to-cyan-500 text-white rounded-md shadow-lg hover:brightness-110",
+                          advStyleTemplate === 'minimal' && "bg-white/10 text-white rounded-lg hover:bg-white/15",
+                          advStyleTemplate === 'brutalist' && "bg-white text-black border-2 border-white rounded-none hover:bg-black hover:text-white",
+                          advStyleTemplate === 'warm' && "bg-amber-600 text-white rounded-xl hover:bg-amber-500",
+                        )}
+                      >
+                        {advCtaText || "Continue"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Simulated Positioning Indicator */}
+                <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between text-[10px] uppercase font-black tracking-wider text-aura-muted">
+                  <div className="flex gap-2">
+                    <span>Positioning:</span>
+                    <span className="text-white font-mono">{advPosition}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <span>Active Target:</span>
+                    <span className="text-aura-lime">{advPageTargetingType}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Active & Paused Campaigns */}
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
+              <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                <div className="flex items-center gap-3">
+                  <Megaphone className="text-aura-lime" size={18} />
+                  <h3 className="text-base font-black uppercase tracking-wider text-white">Adverts Campaigns Directory</h3>
+                </div>
+                <div className="text-[8px] font-black uppercase tracking-widest text-aura-muted px-2 py-1 bg-white/5 rounded">
+                  {adverts.length} Active Node(s)
+                </div>
+              </div>
+
+              {isAdvertsLoading ? (
+                <div className="py-12 text-center text-xs font-mono text-aura-muted animate-pulse">
+                  DOWNLOADING DISPATCH NODES...
+                </div>
+              ) : adverts.length === 0 ? (
+                <div className="py-12 text-center text-xs font-bold uppercase tracking-wider text-aura-muted">
+                  No campaigns published. Click "Create New Advert" above to initiate.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-white/5 text-[8px] font-black uppercase tracking-[0.2em] text-aura-muted">
+                        <th className="pb-4">Preview</th>
+                        <th className="pb-4">Campaign Core</th>
+                        <th className="pb-4">Rendering UI</th>
+                        <th className="pb-4">Schedule Rule</th>
+                        <th className="pb-4">Page Target</th>
+                        <th className="pb-4 text-center">Active Status</th>
+                        <th className="pb-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/[0.02] text-xs">
+                      {adverts.map((v) => (
+                        <tr key={v.id} className="group hover:bg-white/[0.01]">
+                          <td className="py-4">
+                            {v.imageUrl ? (
+                              <img 
+                                referrerPolicy="no-referrer"
+                                src={v.imageUrl} 
+                                alt="" 
+                                className="w-10 h-10 object-cover rounded-lg bg-white/5 border border-white/10" 
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-white/5 rounded-lg border border-white/5 flex items-center justify-center">
+                                <ImageIcon size={14} className="opacity-30" />
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 pr-4">
+                            <p className="font-bold text-white uppercase">{v.title}</p>
+                            <p className="text-[10px] text-aura-muted line-clamp-1 max-w-[200px]" title={v.message}>{v.message}</p>
+                          </td>
+                          <td className="py-4 font-mono text-[10px]">
+                            <span className="text-purple-400 capitalize">{v.popupType}</span>
+                            <span className="text-neutral-500 mx-1">•</span>
+                            <span className="text-sky-400 capitalize">{v.styleTemplate}</span>
+                          </td>
+                          <td className="py-4 font-mono text-[10px] text-white/80">
+                            <p className="capitalize text-indigo-400">{v.scheduling?.type?.replace('-', ' ')}</p>
+                            {v.scheduling?.type === 'custom-interval' && (
+                              <p className="text-[8px] text-aura-muted">Frequency: {v.scheduling?.intervalMinutes} mins</p>
+                            )}
+                          </td>
+                          <td className="py-4 text-[10px]">
+                            <span className="px-2 py-0.5 bg-white/5 border border-white/5 text-neutral-300 font-mono tracking-wider rounded uppercase">
+                              {v.pageTargeting?.type === 'custom' ? v.pageTargeting?.customPath : v.pageTargeting?.type}
+                            </span>
+                          </td>
+                          <td className="py-4 text-center">
+                            <button
+                              onClick={() => handleToggleAdvertStatus(v.id, v.active !== false)}
+                              className={cn(
+                                "text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md transition-all border",
+                                v.active !== false 
+                                  ? "bg-aura-lime/10 text-aura-lime border-aura-lime/20" 
+                                  : "bg-white/5 text-neutral-400 border-white/10"
+                              )}
+                            >
+                              {v.active !== false ? "Active" : "Paused"}
+                            </button>
+                          </td>
+                          <td className="py-4 text-right space-x-2">
+                            <button
+                              onClick={() => handleEditAdvert(v)}
+                              className="p-1 px-2.5 bg-white/5 border border-white/10 rounded-md text-[9px] font-black uppercase tracking-widest text-neutral-300 hover:text-white hover:bg-white/10 transition-all inline-flex items-center gap-1 active:scale-95"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAdvert(v.id)}
+                              className="p-1.5 bg-red-400/10 border border-red-500/10 rounded md text-red-400 hover:bg-red-400/20 transition-all inline-flex items-center active:scale-95"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2697,12 +3858,8 @@ export default function CipherAdmin() {
                       {[
                         { id: 'all', label: 'Send to All', desc: 'Deliver broadcast instantly to every user.', count: users.length },
                         { id: 'selected', label: `Send to Selected`, desc: 'Target specifically ticked accounts.', count: selectedUserIds.length },
-                        { id: 'inactive', label: 'Send to Inactive', desc: 'Target clients without active nodes.', count: users.filter(u => !investments.some(i => i.user_id === u.id && i.status === 'active')).length },
-                        { id: 'inactive_investors', label: 'Inactive Investors', desc: 'Exclude users with running nodes.', count: users.filter(u => {
-                          const hasActiveNodes = investments.some(i => i.user_id === u.id && i.status === 'active');
-                          const hasAnyNodes = investments.some(i => i.user_id === u.id);
-                          return !hasActiveNodes && hasAnyNodes;
-                        }).length }
+                        { id: 'active_users', label: 'Active Users', desc: 'Target clients with running nodes.', count: users.filter(u => investments.some(i => i.user_id === u.id && i.status === 'active')).length },
+                        { id: 'inactive_users', label: 'Inactive Users', desc: 'Target clients without active investments.', count: users.filter(u => !investments.some(i => i.user_id === u.id && i.status === 'active')).length }
                       ].map((scope) => (
                         <button
                           key={scope.id}
@@ -2764,13 +3921,12 @@ export default function CipherAdmin() {
                       // Get all currently visible matching users
                       const visibleUsers = users.filter(u => {
                         const matchesSearch = u.name?.toLowerCase().includes(notifSearchTerm.toLowerCase()) || u.email?.toLowerCase().includes(notifSearchTerm.toLowerCase()) || u.id?.toLowerCase().includes(notifSearchTerm.toLowerCase());
-                        const activeNodesCount = investments.filter(i => i.user_id === u.id && i.status === 'active').length;
-                        const totalNodesCount = investments.filter(i => i.user_id === u.id).length;
+                        const hasActiveNode = investments.some(i => i.user_id === u.id && i.status === 'active');
                         
-                        if (notifUserFilter === 'inactive') {
-                          if (activeNodesCount > 0) return false;
-                        } else if (notifUserFilter === 'inactive_investors') {
-                          if (activeNodesCount > 0 || totalNodesCount === 0) return false;
+                        if (notifUserFilter === 'active_users') {
+                          if (!hasActiveNode) return false;
+                        } else if (notifUserFilter === 'inactive_users') {
+                          if (hasActiveNode) return false;
                         }
                         return matchesSearch;
                       });
@@ -2796,8 +3952,8 @@ export default function CipherAdmin() {
                   <div className="flex bg-white/5 p-1 rounded-xl">
                     {[
                       { id: 'all', label: 'All Users' },
-                      { id: 'inactive', label: 'Inactive Users' },
-                      { id: 'inactive_investors', label: 'Inactive Investors' }
+                      { id: 'active_users', label: 'Active Users' },
+                      { id: 'inactive_users', label: 'Inactive Users' }
                     ].map((tab) => (
                       <button
                         key={tab.id}
@@ -2830,13 +3986,12 @@ export default function CipherAdmin() {
                   {users
                     .filter(u => {
                       const matchesSearch = u.name?.toLowerCase().includes(notifSearchTerm.toLowerCase()) || u.email?.toLowerCase().includes(notifSearchTerm.toLowerCase()) || u.id?.toLowerCase().includes(notifSearchTerm.toLowerCase());
-                      const activeNodesCount = investments.filter(i => i.user_id === u.id && i.status === 'active').length;
-                      const totalNodesCount = investments.filter(i => i.user_id === u.id).length;
+                      const hasActiveNode = investments.some(i => i.user_id === u.id && i.status === 'active');
                       
-                      if (notifUserFilter === 'inactive') {
-                        if (activeNodesCount > 0) return false;
-                      } else if (notifUserFilter === 'inactive_investors') {
-                        if (activeNodesCount > 0 || totalNodesCount === 0) return false;
+                      if (notifUserFilter === 'active_users') {
+                        if (!hasActiveNode) return false;
+                      } else if (notifUserFilter === 'inactive_users') {
+                        if (hasActiveNode) return false;
                       }
                       return matchesSearch;
                     })

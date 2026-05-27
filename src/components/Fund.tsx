@@ -1155,7 +1155,8 @@ export default function Fund() {
         isOpen={showWithdrawSuccess}
         onClose={handleWithdrawReset}
         title="Withdrawal Submitted"
-        message="Your withdrawal request is pending institutional review. Completion typically occurs within 24 hours."
+        message="Your withdrawal request has been submitted successfully. Withdrawals are typically completed within 15 to 45 minutes. If processing takes longer, please contact support."
+        autoClose={false}
       />
 
       <PinProtocolModal 

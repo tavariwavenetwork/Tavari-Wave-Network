@@ -11,6 +11,7 @@ import {
   X,
   Bell,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   CreditCard,
   History,
@@ -24,15 +25,18 @@ import {
   Search,
   ArrowLeft,
   Users,
-  Copy
+  Copy,
+  HelpCircle,
+  Cpu,
+  Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, isWithdrawalAllowed, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
+import { useUI } from '../contexts/UIContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
-import rewardHeaderImage from '../assets/images/reward_header_1779476104728.png';
 import { 
   collection, 
   doc, 
@@ -44,11 +48,22 @@ import {
   arrayUnion, 
   addDoc, 
   onSnapshot,
-  runTransaction
+  runTransaction,
+  getDocs
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import PinProtocolModal from './PinProtocolModal';
 import { TransactionTicket } from './TransactionTicket';
+
+// Nigerian banks list for the withdrawal selector
+const NIGERIAN_BANKS = [
+  "Opay", "Kuda Bank", "Moniepoint MFB", "PalmPay", "Carbon", "FairMoney Microfinance Bank", 
+  "VFD Microfinance Bank (VBank)", "Sparkle Microfinance Bank", "Eyowo", "Access Bank", 
+  "Zenith Bank", "Guaranty Trust Bank (GTBank)", "First Bank of Nigeria", 
+  "United Bank for Africa (UBA)", "Fidelity Bank", "Wema Bank", "Ecobank Nigeria", 
+  "First City Monument Bank (FCMB)", "Sterling Bank", "Polaris Bank", "Union Bank of Nigeria", 
+  "Keystone Bank", "Unity Bank", "Stanbic IBTC Bank", "Standard Chartered Bank Nigeria"
+];
 
 interface Investment {
   id: string;
@@ -59,88 +74,48 @@ interface Investment {
   created_at?: string;
 }
 
+interface ReferralPartner {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  created_at: string;
+  country?: string;
+  status: 'active' | 'inactive';
+  last_rebook?: string;
+  active_investment_amount?: number;
+  planName?: string;
+}
+
+// Compact Guide Cards
 const GUIDE_CARDS = [
   {
     id: 'daily',
     title: 'Daily Check-in Reward',
-    shortDesc: 'Earn exactly 1 Point (PTS) every 24 hours simply by recording your daily attendance on the calendar.',
-    fullDesc: `Our daily check-in system operates with highly secure 24-hour verification loops. By checking in, you claim Loyalty Points (PTS) that accumulate directly into your activity ledger.
-
-Key Protocols:
-• Reward Frequency: 1 Claim per 24 hours. The countdown activates immediately upon confirmation.
-• Points Payout: Exactly +1 PTS is credited per claim. No dollar values are minted in this phase.
-• Consecutive Streaks: Logging in on consecutive days increments your attendance streak, boosting platform status.
-• Auto-tracking Clocks: Attestation logging automatically synchronizes with central network UTC clocks.`,
-    iconColor: '#a855f7',
-    glowColor: 'rgba(124,58,237,0.3)',
+    shortDesc: 'Earn 1 PTS daily by checking in on your reward calendar.',
+    fullDesc: 'Logging in every 24 hours logs your attendance, feeding into your activity ledger and incrementing streaks.'
   },
   {
     id: 'investment',
     title: 'Investment Bonus',
-    shortDesc: 'Activate any validator node and claim a calculated 2.00% instant bonus on your active capital tier.',
-    fullDesc: `Unleash the performance yield of our advanced validator nodes. Launching any computing tier instantly triggers an eligible 2.00% capital cash back bonus.
-
-Key Protocols:
-• Node Eligibility: Applicable to all active Regular, Premium, or Elite container configurations.
-• Principal Formula: The cashback value is calculated as 2% of the initial node principal (e.g., a $5,000 node generates a $100.00 cash back reward).
-• Claim Cycle: Unlocked immediately upon successful node activation. Valid for 1 claim per lifecycle.
-• Independent Yield: Claims occur completely outside of your daily compound ROI calculations to ensure asset safety.`,
-    iconColor: '#10b981',
-    glowColor: 'rgba(16,185,129,0.3)',
+    shortDesc: 'Instantly claim 2.00% cashback bonus upon node activation.',
+    fullDesc: 'Get an instant 2.00% cashback multiplier of your node principal credited directly to your reward wallet.'
   },
   {
     id: 'exchange',
     title: 'Exchange Mechanism',
-    shortDesc: 'Convert earned PTS directly into spendable Reward Dollar Balance USD instantly with a zero-fee calculator.',
-    fullDesc: `Convert loyalty activity points into spendable currencies automatically with our native zero-fee PTS → USD exchange channel.
-
-Key Protocols:
-• Conversion Formula: 10 PTS converts to exactly $1.00 USD. 100 PTS converts to $10.00 USD.
-• Transaction Fees: 100% free with 0% swap fees added.
-• Immediate Settlement: Swapping PTS outputs instantly to your Reward Dollar Balance. Converted reward dollars are fully eligible for platform withdrawal.
-• Permanent Records: Every point conversion creates a secure, timestamped transaction entry in your Ledger.`,
-    iconColor: '#f59e0b',
-    glowColor: 'rgba(245,158,11,0.3)',
+    shortDesc: 'Convert earned PTS directly into USD cash balance at $0.10/point.',
+    fullDesc: 'Use our real-time conversion converter to swap PTS into USD reward balance with 0 protocol swap fees.'
   },
   {
     id: 'protocols',
-    title: 'Reward Protocols',
-    shortDesc: 'Settle reward payouts directly starting at $10.00 USD under strict security transfer PIN guidelines.',
-    fullDesc: `Platform rewards withdrawals are guided by robust safety parameters and verification codes to preserve ecosystem stability.
-
-Key Protocols:
-• Settlement Threshold: Active withdrawals can be initiated starting from a minimum of $10.00 USD.
-• Supported Routes: Eligible assets are settled to external crypto wallet addresses (USDT TRC-20) or verified bank accounts.
-• Transfer PIN Guard: Security approvals require typing your custom security transfer PIN. The bank holder name must match your registration name perfectly.
-• Network Fee fraction: Settle withdrawals under a standard 20% protocol fee used to fund container operational activities.`,
-    iconColor: '#ef4444',
-    glowColor: 'rgba(239,68,68,0.3)',
+    title: 'Settlement Guides',
+    shortDesc: 'Withdraw rewards starting at $10.00 USD with security transfer PIN.',
+    fullDesc: 'Withdrawal protocol settlements feature secure processing to TRC-20 USDT wallets or direct local bank accounts.'
   }
 ];
 
-const NIGERIAN_BANKS = [
-  "Opay", "Kuda Bank", "Moniepoint MFB", "PalmPay", "Carbon", "FairMoney Microfinance Bank", 
-  "VFD Microfinance Bank (VBank)", "Sparkle Microfinance Bank", "Eyowo", "Access Bank", 
-  "Zenith Bank", "Guaranty Trust Bank (GTBank)", "First Bank of Nigeria", 
-  "United Bank for Africa (UBA)", "Fidelity Bank", "Wema Bank", "Ecobank Nigeria", 
-  "First City Monument Bank (FCMB)", "Sterling Bank", "Polaris Bank", "Union Bank of Nigeria", 
-  "Keystone Bank", "Unity Bank", "Stanbic IBTC Bank", "Standard Chartered Bank Nigeria", 
-  "Citibank Nigeria", "Titan Trust Bank", "Providus Bank", "Parallex Bank", "Globus Bank", 
-  "Premium Trust Bank", "Optimus Bank", "SunTrust Bank Nigeria", "Signature Bank", 
-  "Nova Commercial Bank", "Jaiz Bank", "Taj Bank", "Lotus Bank", "Rand Merchant Bank Nigeria", 
-  "FSDH Merchant Bank", "Coronation Merchant Bank", "Greenwich Merchant Bank", 
-  "Nova Merchant Bank", "LAPO Microfinance Bank", "AB Microfinance Bank Nigeria", 
-  "Accion Microfinance Bank", "Addosser Microfinance Bank", "Bosak Microfinance Bank", 
-  "CEMCS Microfinance Bank", "Daylight Microfinance Bank", "Ekondo Microfinance Bank", 
-  "Fina Trust Microfinance Bank", "Fortis Microfinance Bank", "Grooming Microfinance Bank", 
-  "Hasal Microfinance Bank", "Infinity Microfinance Bank", "Mainstreet Microfinance Bank", 
-  "Mutual Trust Microfinance Bank", "NPF Microfinance Bank", "Peace Microfinance Bank", 
-  "Pennywise Microfinance Bank", "Rephidim Microfinance Bank", "Royal Exchange Microfinance Bank", 
-  "Safe Haven Microfinance Bank", "Shepherd Trust Microfinance Bank", "Solid Rock Microfinance Bank", 
-  "Trustbond Microfinance Bank", "Unical Microfinance Bank", "Verite Microfinance Bank", 
-  "Visa Microfinance Bank", "Xpress Microfinance Bank"
-];
-
+// Bank Selector Modal component
 function BankSelectorModal({ 
   isOpen, 
   onClose, 
@@ -153,30 +128,27 @@ function BankSelectorModal({
   selectedBank: string 
 }) {
   const [search, setSearch] = useState('');
-  
   const filteredBanks = NIGERIAN_BANKS.filter(bank => 
     bank.toLowerCase().includes(search.toLowerCase())
   );
-
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md" onClick={onClose}>
       <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 12 }}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
         className="relative w-full max-w-[400px] bg-[#0d1016] border border-white/10 rounded-[28px] overflow-hidden flex flex-col max-h-[80vh] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-6 border-b border-white/5 space-y-4">
+        <div className="p-6 border-b border-white/5 space-y-4 shrink-0">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-black text-white uppercase tracking-widest italic">Select Institution</h3>
-            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-white/40 hover:text-white">
+            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white">
               <X size={20} />
             </button>
           </div>
-          
           <div className="relative">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" />
             <input 
@@ -185,74 +157,422 @@ function BankSelectorModal({
               placeholder="Search banks..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm text-white outline-none focus:border-emerald-500/30 focus:bg-white/10 transition-all font-medium"
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-12 pr-4 text-sm text-white outline-none focus:border-emerald-500/30 font-medium"
             />
           </div>
         </div>
-
         <div className="flex-1 overflow-y-auto p-2 scrollbar-none">
-          <div className="grid grid-cols-1 gap-1">
-            {filteredBanks.map((bank, idx) => (
-              <button
-                key={`${bank}-${idx}`}
-                onClick={() => {
-                  onSelect(bank);
-                  onClose();
-                }}
-                className={cn(
-                  "w-full px-6 py-4 text-left rounded-2xl transition-all group relative flex items-center justify-between",
-                  selectedBank === bank ? "bg-emerald-500/10 text-emerald-400 font-bold" : "hover:bg-white/5 text-white/70 hover:text-white"
-                )}
-              >
-                <div className="flex flex-col">
-                  <span className={cn(
-                    "text-xs font-bold uppercase tracking-wide transition-colors",
-                    selectedBank === bank ? "text-emerald-400" : "text-white/70 group-hover:text-white"
-                  )}>
-                    {bank}
-                  </span>
-                </div>
-              </button>
-            ))}
-          </div>
+          {filteredBanks.map((bank, idx) => (
+            <button
+              key={`${bank}-${idx}`}
+              onClick={() => {
+                onSelect(bank);
+                onClose();
+              }}
+              className={cn(
+                "w-full px-6 py-4 text-left rounded-2xl transition-all flex items-center justify-between",
+                selectedBank === bank ? "bg-emerald-500/10 text-emerald-400 font-bold" : "hover:bg-white/5 text-white/70 hover:text-white"
+              )}
+            >
+              <span className="text-xs font-bold uppercase tracking-wide">{bank}</span>
+            </button>
+          ))}
         </div>
       </motion.div>
     </div>
   );
 }
 
+// PREMIUM 3D VECTOR SVG ICONS UNDER LIGHTWEIGHT PROTOCOL
+const Icon3DDailyPoints = () => (
+  <motion.div 
+    className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_8px_20px_rgba(16,185,129,0.35)]"
+    whileHover={{ scale: 1.1, rotateY: 10, rotateX: -5 }}
+    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+  >
+    <svg className="w-16 h-16" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gradCoin_dp" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FDE047" />
+          <stop offset="50%" stopColor="#EAB308" />
+          <stop offset="100%" stopColor="#854D0E" />
+        </linearGradient>
+        <linearGradient id="gradCheck_dp" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#34D399" />
+          <stop offset="100%" stopColor="#059669" />
+        </linearGradient>
+        <linearGradient id="gradCal_dp" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#374151" />
+          <stop offset="100%" stopColor="#111827" />
+        </linearGradient>
+        <radialGradient id="glow_dp" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#10B981" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Ambient background glow */}
+      <circle cx="32" cy="32" r="28" fill="url(#glow_dp)" />
+
+      {/* 3D Calendar Sheet in Background */}
+      <rect x="14" y="10" width="36" height="38" rx="6" fill="url(#gradCal_dp)" stroke="#4B5563" strokeWidth="1.5" />
+      <path d="M14 18H50" stroke="#4B5563" strokeWidth="1.5" />
+      <circle cx="22" cy="14" r="2" fill="#EF4444" />
+      <circle cx="42" cy="14" r="2" fill="#EF4444" />
+
+      {/* 3D Stack of Glowing Coins on the bottom right */}
+      {/* Coin 3 (Bottom) */}
+      <ellipse cx="28" cy="46" rx="14" ry="5" fill="#713F12" />
+      <ellipse cx="28" cy="44" rx="14" ry="5" fill="url(#gradCoin_dp)" stroke="#A16207" strokeWidth="1" />
+      
+      {/* Coin 2 (Middle) */}
+      <ellipse cx="26" cy="41" rx="14" ry="5" fill="#713F12" />
+      <ellipse cx="26" cy="39" rx="14" ry="5" fill="url(#gradCoin_dp)" stroke="#A16207" strokeWidth="1" />
+
+      {/* Coin 1 (Top) */}
+      <ellipse cx="25" cy="35" rx="14" ry="5" fill="#713F12" />
+      <ellipse cx="25" cy="33" rx="14" ry="5" fill="url(#gradCoin_dp)" stroke="#CA8A04" strokeWidth="1" />
+      <circle cx="25" cy="33" r="5" fill="#FEF08A" opacity="0.6" />
+
+      {/* Floating Sparkles & Small Coins */}
+      <ellipse cx="46" cy="24" rx="6" ry="2.5" fill="url(#gradCoin_dp)" stroke="#CA8A04" strokeWidth="0.75" />
+      <circle cx="48" cy="14" r="1.5" fill="#FDE047" />
+      <circle cx="12" cy="36" r="2.5" fill="#FDE047" />
+
+      {/* Giant 3D glowing checkmark overlay */}
+      <path d="M30 32L38 40L54 20" stroke="#064E3B" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M30 32L38 40L54 20" stroke="url(#gradCheck_dp)" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M32 32L38 38L52 21" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity="0.7" />
+    </svg>
+  </motion.div>
+);
+
+const Icon3DReferFriends = () => (
+  <motion.div 
+    className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_8px_20px_rgba(168,85,247,0.35)]"
+    whileHover={{ scale: 1.1, rotateY: -10, rotateX: 5 }}
+    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+  >
+    <svg className="w-16 h-16" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="metalSilver_rf" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#9CA3AF" />
+          <stop offset="100%" stopColor="#374151" />
+        </linearGradient>
+        <linearGradient id="neonPurple_rf" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#C084FC" />
+          <stop offset="50%" stopColor="#8B5CF6" />
+          <stop offset="100%" stopColor="#5B21B6" />
+        </linearGradient>
+        <linearGradient id="glowPurple_rf" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#A855F7" />
+          <stop offset="100%" stopColor="#D946EF" />
+        </linearGradient>
+      </defs>
+
+      {/* Subtle background network connection lines */}
+      <path d="M16 38L32 24M32 24L48 38M16 38H48" stroke="url(#glowPurple_rf)" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.6" />
+      <circle cx="16" cy="38" r="3" fill="#A855F7" className="animate-pulse" />
+      <circle cx="48" cy="38" r="3" fill="#D946EF" className="animate-pulse" />
+      <circle cx="32" cy="24" r="3" fill="#22D3EE" />
+
+      {/* Avatar Left (Smaller, Partner 1) */}
+      <g transform="translate(4, 18)">
+        <circle cx="12" cy="20" r="8" fill="url(#metalSilver_rf)" stroke="#111827" strokeWidth="1.5" />
+        <path d="M4 34C4 28 8 26 12 26C16 26 20 28 20 34V36H4V34Z" fill="url(#metalSilver_rf)" stroke="#111827" strokeWidth="1.5" />
+      </g>
+
+      {/* Avatar Right (Smaller, Partner 2) */}
+      <g transform="translate(36, 18)">
+        <circle cx="12" cy="20" r="8" fill="url(#metalSilver_rf)" stroke="#111827" strokeWidth="1.5" />
+        <path d="M4 34C4 28 8 26 12 26C16 26 20 28 20 34V36H4V34Z" fill="url(#metalSilver_rf)" stroke="#111827" strokeWidth="1.5" />
+      </g>
+
+      {/* Avatar Center (Larger, Primary Referrer) */}
+      <g transform="translate(18, 6)">
+        <circle cx="14" cy="20" r="11" fill="url(#neonPurple_rf)" stroke="#111827" strokeWidth="2" />
+        <circle cx="14" cy="20" r="9" fill="white" opacity="0.08" />
+        <path d="M3 38C3 30 8 27 14 27C20 27 25 30 25 38V41H3V38Z" fill="url(#neonPurple_rf)" stroke="#111827" strokeWidth="2" />
+      </g>
+
+      {/* Floating Invite Plus Badge on top */}
+      <circle cx="44" cy="46" r="8" fill="#22D3EE" stroke="#111827" strokeWidth="1.5" />
+      <path d="M44 42V50M40 46H48" stroke="#111827" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  </motion.div>
+);
+
+const Icon3DNodeRewards = () => (
+  <motion.div 
+    className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_8px_20px_rgba(249,115,22,0.35)]"
+    whileHover={{ scale: 1.1, rotate: 5 }}
+    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+  >
+    <svg className="w-16 h-16" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="vaultPlate" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#4B5563" />
+          <stop offset="50%" stopColor="#1F2937" />
+          <stop offset="100%" stopColor="#111827" />
+        </linearGradient>
+        <linearGradient id="neonAmber" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FBBF24" />
+          <stop offset="50%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#D97706" />
+        </linearGradient>
+        <radialGradient id="portalGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#F59E0B" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Tech background glow ring */}
+      <circle cx="32" cy="32" r="28" fill="url(#portalGlow)" />
+      <circle cx="32" cy="32" r="27" stroke="#EA580C" strokeWidth="1" strokeDasharray="4 2" opacity="0.6" />
+
+      {/* Armored Hexagonal / Rectangular Vault Body */}
+      <rect x="12" y="12" width="40" height="40" rx="8" fill="url(#vaultPlate)" stroke="#374151" strokeWidth="2" />
+      
+      {/* Corner Bolts */}
+      <circle cx="17" cy="17" r="1.5" fill="#9CA3AF" />
+      <circle cx="47" cy="17" r="1.5" fill="#9CA3AF" />
+      <circle cx="17" cy="47" r="1.5" fill="#9CA3AF" />
+      <circle cx="47" cy="47" r="1.5" fill="#9CA3AF" />
+
+      {/* Main Inner Glowing Chamber */}
+      <circle cx="32" cy="32" r="14" fill="#0F172A" stroke="url(#neonAmber)" strokeWidth="2.5" />
+      
+      {/* 3D Shiny Gold Coin emerging from Vault Chamber */}
+      <ellipse cx="32" cy="31" rx="9" ry="5.5" fill="#78350F" />
+      <ellipse cx="32" cy="29" rx="9" ry="5.5" fill="url(#neonAmber)" stroke="#FEF08A" strokeWidth="1" />
+      
+      {/* Tech grid lines overlaying vault core */}
+      <path d="M22 32H12M42 32H52M32 22V12M32 42V52" stroke="#EA580C" strokeWidth="1" opacity="0.4" />
+      <circle cx="32" cy="29" r="2.5" fill="#FFFBEB" opacity="0.8" />
+
+      {/* Floating Sparkles & Digital Claim Particles */}
+      <path d="M19 24L21 26M45 24L43 26" stroke="#FDE047" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="28" cy="19" r="1" fill="#FBBF24" />
+      <circle cx="38" cy="43" r="1" fill="#FEF08A" />
+    </svg>
+  </motion.div>
+);
+
+const Icon3DRanking = () => (
+  <motion.div 
+    className="relative w-20 h-20 flex items-center justify-center filter drop-shadow-[0_8px_20px_rgba(6,182,212,0.35)]"
+    whileHover={{ scale: 1.1, rotate: -5 }}
+    transition={{ type: "spring", stiffness: 300, damping: 15 }}
+  >
+    <svg className="w-16 h-16" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="goldTrophy" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FDE047" />
+          <stop offset="50%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#B45309" />
+        </linearGradient>
+        <linearGradient id="podiumGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#1E293B" />
+          <stop offset="100%" stopColor="#0F172A" />
+        </linearGradient>
+        <linearGradient id="neonCyan_rn" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#22D3EE" />
+          <stop offset="100%" stopColor="#0891B2" />
+        </linearGradient>
+      </defs>
+
+      {/* 3D Podium Pedestal Blocks (1-2-3 Layout) */}
+      {/* 2nd Place (Left) */}
+      <rect x="12" y="38" width="12" height="16" rx="3" fill="url(#podiumGrad)" stroke="#334155" strokeWidth="1" />
+      <rect x="12" y="38" width="12" height="3" fill="#3B82F6" />
+      <text x="18" y="49" fill="#94A3B8" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">2</text>
+
+      {/* 3rd Place (Right) */}
+      <rect x="40" y="42" width="12" height="12" rx="3" fill="url(#podiumGrad)" stroke="#334155" strokeWidth="1" />
+      <rect x="40" y="42" width="12" height="3" fill="#64748B" />
+      <text x="46" y="51" fill="#94A3B8" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">3</text>
+
+      {/* 1st Place (Center - Higher Block) */}
+      <rect x="24" y="30" width="16" height="24" rx="4" fill="url(#podiumGrad)" stroke="#475569" strokeWidth="1.5" />
+      <rect x="24" y="30" width="16" height="3" fill="url(#neonCyan_rn)" />
+      <text x="32" y="45" fill="#F8FAFC" fontSize="11" fontWeight="extrabold" textAnchor="middle" fontFamily="sans-serif">1</text>
+
+      {/* Outstanding 3D Golden Crown / Trophy symbolism floating on center block */}
+      <g transform="translate(16, 6)">
+        {/* Crown Body with 3 points */}
+        <path d="M22 10L25 15L32 8L39 15L42 10L40 20H24L22 10Z" fill="url(#goldTrophy)" stroke="#78350F" strokeWidth="1.2" />
+        {/* Glowing crown headband line & jewel */}
+        <rect x="25" y="18" width="14" height="2" fill="#EF4444" rx="0.5" />
+        <circle cx="32" cy="8" r="1.5" fill="white" />
+        <circle cx="22" cy="10" r="1.2" fill="#22D3EE" />
+        <circle cx="42" cy="10" r="1.2" fill="#22D3EE" />
+      </g>
+    </svg>
+  </motion.div>
+);
+
+const Icon3DRankingMini = () => (
+  <div className="w-5 h-5 inline-flex items-center justify-center relative flex-shrink-0 bg-cyan-400/15 rounded-md p-0.5 border border-cyan-400/25 shadow-md shadow-cyan-500/5 hover:scale-105 transition-all">
+    <svg className="w-full h-full" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="goldTrophy_mini" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FDE047" />
+          <stop offset="50%" stopColor="#F59E0B" />
+          <stop offset="100%" stopColor="#B45309" />
+        </linearGradient>
+        <linearGradient id="podiumGrad_mini" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#1E293B" />
+          <stop offset="100%" stopColor="#0F172A" />
+        </linearGradient>
+        <linearGradient id="neonCyan_rn_mini" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#22D3EE" />
+          <stop offset="100%" stopColor="#0891B2" />
+        </linearGradient>
+      </defs>
+      {/* 2nd Place (Left) */}
+      <rect x="12" y="38" width="12" height="16" rx="3" fill="url(#podiumGrad_mini)" stroke="#334155" strokeWidth="1" />
+      <rect x="12" y="38" width="12" height="3" fill="#3B82F6" />
+      <text x="18" y="49" fill="#94A3B8" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">2</text>
+      {/* 3rd Place (Right) */}
+      <rect x="40" y="42" width="12" height="12" rx="3" fill="url(#podiumGrad_mini)" stroke="#334155" strokeWidth="1" />
+      <rect x="40" y="42" width="12" height="3" fill="#64748B" />
+      <text x="46" y="51" fill="#94A3B8" fontSize="8" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">3</text>
+      {/* 1st Place (Center) */}
+      <rect x="24" y="30" width="16" height="24" rx="4" fill="url(#podiumGrad_mini)" stroke="#475569" strokeWidth="1.5" />
+      <rect x="24" y="30" width="16" height="3" fill="url(#neonCyan_rn_mini)" />
+      <text x="32" y="45" fill="#F8FAFC" fontSize="11" fontWeight="extrabold" textAnchor="middle" fontFamily="sans-serif">1</text>
+      <g transform="translate(16, 6)">
+        <path d="M22 10L25 15L32 8L39 15L42 10L40 20H24L22 10Z" fill="url(#goldTrophy_mini)" stroke="#78350F" strokeWidth="1.2" />
+        <rect x="25" y="18" width="14" height="2" fill="#EF4444" rx="0.5" />
+        <circle cx="32" cy="8" r="1.5" fill="white" />
+        <circle cx="22" cy="10" r="1.2" fill="#22D3EE" />
+        <circle cx="42" cy="10" r="1.2" fill="#22D3EE" />
+      </g>
+    </svg>
+  </div>
+);
+
+const Icon3DEliteCard = () => (
+  <motion.div 
+    className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 w-24 h-24 flex items-center justify-center filter drop-shadow-[0_12px_24px_rgba(245,158,11,0.4)]"
+    animate={{ y: [0, -6, 0] }}
+    transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+  >
+    {/* Soft inner radial glow underneath */}
+    <div className="absolute inset-4 bg-amber-500/20 rounded-full blur-xl animate-pulse" />
+    <svg className="w-20 h-20" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="diamondGrad_ec" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FFE082" />
+          <stop offset="30%" stopColor="#F59E0B" />
+          <stop offset="70%" stopColor="#D97706" />
+          <stop offset="100%" stopColor="#78350F" />
+        </linearGradient>
+        <radialGradient id="glosss_ec" cx="30%" cy="30%" r="40%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      {/* Glowing luxury 3D diamond/crown mesh */}
+      <path d="M40 10L62 26L52 65L28 65L18 26L40 10Z" fill="url(#diamondGrad_ec)" stroke="#92400E" strokeWidth="2.5" />
+      
+      {/* Inner facet lines for realistic gem feel */}
+      <path d="M40 10L35 34L18 26" stroke="#FEF3C7" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M40 10L45 34L62 26" stroke="#FEF3C7" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M35 34L45 34L40 65L35 34Z" fill="#FBBF24" stroke="#92400E" strokeWidth="1.5" />
+      <path d="M18 26L35 34L28 65" stroke="#92400E" strokeWidth="1.5" />
+      <path d="M62 26L45 34L52 65" stroke="#92400E" strokeWidth="1.5" />
+      
+      {/* Golden crown teeth overlay on top of gem */}
+      <path d="M30 42L35 48L40 38L45 48L50 42L47 52H33L30 42Z" fill="#511c00" stroke="#FEE2E2" strokeWidth="1" />
+      <circle cx="40" cy="38" r="1.5" fill="white" />
+      <circle cx="30" cy="42" r="1" fill="#38BDF8" />
+      <circle cx="50" cy="42" r="1" fill="#38BDF8" />
+      
+      {/* Specular gloss highlight */}
+      <path d="M40 10L62 26L52 65L28 65L18 26L40 10Z" fill="url(#glosss_ec)" pointerEvents="none" />
+    </svg>
+  </motion.div>
+);
+
+const Icon3DPremiumCard = () => (
+  <motion.div 
+    className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 w-24 h-24 flex items-center justify-center filter drop-shadow-[0_12px_24px_rgba(168,85,247,0.4)]"
+    animate={{ y: [0, -6, 0] }}
+    transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut', delay: 0.5 }}
+  >
+    <div className="absolute inset-4 bg-purple-500/20 rounded-full blur-xl animate-pulse" />
+    <svg className="w-20 h-20" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="shieldGrad_pc" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#C084FC" />
+          <stop offset="50%" stopColor="#7C3AED" />
+          <stop offset="100%" stopColor="#4C1D95" />
+        </linearGradient>
+        <linearGradient id="goldRim_pc" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#FBBF24" />
+          <stop offset="100%" stopColor="#D97706" />
+        </linearGradient>
+      </defs>
+      {/* Beautiful 3D Shield */}
+      <path d="M40 12C40 12 58 16 58 32C58 48 40 68 40 68C40 68 22 48 22 32C22 16 40 12 40 12Z" fill="url(#shieldGrad_pc)" stroke="url(#goldRim_pc)" strokeWidth="3" />
+      
+      {/* Inner glowing core details */}
+      <path d="M40 18C40 18 52 21 52 33C52 45 40 59 40 59C40 59 28 45 28 33C28 21 40 18 40 18Z" fill="#120624" opacity="0.4" />
+      
+      {/* Giant high-gloss letter or medal star in center */}
+      <path d="M40 24L43 31L50 32L45 37L46 44L40 40L34 44L35 37L30 32L37 31L40 24Z" fill="url(#goldRim_pc)" stroke="white" strokeWidth="0.5" />
+      
+      {/* Gloss reflection overlay */}
+      <path d="M40 12C40 12 55 15 57 28C40 20 28 36 22 32C22 16 40 12 40 12Z" fill="white" fillOpacity="0.15" />
+    </svg>
+  </motion.div>
+);
+
+const Icon3DRegularCard = () => (
+  <motion.div 
+    className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 w-24 h-24 flex items-center justify-center filter drop-shadow-[0_12px_24px_rgba(16,185,129,0.4)]"
+    animate={{ y: [0, -6, 0] }}
+    transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut', delay: 1 }}
+  >
+    <div className="absolute inset-4 bg-emerald-500/20 rounded-full blur-xl animate-pulse" />
+    <svg className="w-20 h-20" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="verifiedGrad_rc" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#34D399" />
+          <stop offset="50%" stopColor="#059669" />
+          <stop offset="100%" stopColor="#064E3B" />
+        </linearGradient>
+      </defs>
+      {/* Futuristic verified user rank badge: 12-point glossy star */}
+      <path d="M40 10L48 16L58 14L60 24L69 28L65 38L70 48L60 52L58 62L48 60L40 66L32 60L22 62L20 52L10 48L15 38L11 28L20 24L22 14L32 16L40 10Z" fill="url(#verifiedGrad_rc)" stroke="#047857" strokeWidth="2.5" />
+      
+      {/* Inner checkmark with glassmorphism glow */}
+      <circle cx="40" cy="38" r="18" fill="#022c22" fillOpacity="0.5" stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+      <path d="M30 38L37 45L51 29" stroke="#10B981" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M30 38L37 45L51 29" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.6" />
+      
+      {/* Gloss sheen */}
+      <path d="M40 10L48 16L58 14L60 24L40 28L22 14L32 16L40 10Z" stroke="white" strokeWidth="1" strokeOpacity="0.3" fill="none" />
+    </svg>
+  </motion.div>
+);
+
 export default function Rewards() {
   const { user, profile } = useAuth();
   const { config: uiConfig } = useUIConfig();
+  const { openTransferModal } = useUI();
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    if (location.hash) {
-      const elementId = location.hash.substring(1);
-      const checkAndScroll = () => {
-        const element = document.getElementById(elementId);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('ring-2', 'ring-purple-500', 'ring-offset-2', 'ring-offset-black', 'transition-all', 'duration-500');
-          setTimeout(() => {
-            element.classList.remove('ring-2', 'ring-purple-500', 'ring-offset-2', 'ring-offset-black');
-          }, 3000);
-          return true;
-        }
-        return false;
-      };
+  const [rewardView, setRewardView] = useState<'dashboard' | 'daily' | 'refer' | 'nodes' | 'ranking' | 'conversion' | 'about'>('dashboard');
 
-      if (!checkAndScroll()) {
-        let attempts = 0;
-        const interval = setInterval(() => {
-          attempts++;
-          if (checkAndScroll() || attempts > 10) {
-            clearInterval(interval);
-          }
-        }, 150);
-        return () => clearInterval(interval);
-      }
+  // Deep-linking / Hash Routing
+  useEffect(() => {
+    if (location.hash === '#referral-rewards') {
+      setRewardView('refer');
+    } else if (location.hash === '#active-node-multipliers') {
+      setRewardView('nodes');
     }
   }, [location.hash]);
 
@@ -264,117 +584,16 @@ export default function Rewards() {
   const [countdownStr, setCountdownStr] = useState('');
   const [isMobile, setIsMobile] = useState(false);
 
-  // Referral System States & Listener
+  // Referral System States
+  const [partners, setPartners] = useState<ReferralPartner[]>([]);
+  const [partnersLoading, setPartnersLoading] = useState(true);
   const [referralClaims, setReferralClaims] = useState<any[]>([]);
   const [isClaimingId, setIsClaimingId] = useState<string | null>(null);
+  const [pokedUsers, setPokedUsers] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (!user) return;
-    const q = query(
-      collection(db, 'referral_claims'),
-      where('user_id', '==', user.uid)
-    );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const claims: any[] = [];
-      snapshot.forEach(docSnap => {
-        claims.push({ id: docSnap.id, ...docSnap.data() });
-      });
-      // Sort by created_at desc
-      claims.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-      setReferralClaims(claims);
-    }, (err) => {
-      console.error("Error fetching referral claims in rewards page:", err);
-    });
-    return () => unsubscribe();
-  }, [user]);
-
-  const handleClaimReward = async (claim: any) => {
-    if (!user || !profile) return;
-    if (profile.suspended || profile.banned) {
-      toast.error("Account access restricted by System Protocol.");
-      return;
-    }
-
-    setIsClaimingId(claim.id);
-    try {
-      await runTransaction(db, async (transaction) => {
-        const claimRef = doc(db, 'referral_claims', claim.id);
-        const claimSnap = await transaction.get(claimRef);
-        if (!claimSnap.exists()) throw new Error("Reward claim record not found.");
-        
-        const claimData = claimSnap.data();
-        if (claimData.status !== 'pending') throw new Error("Reward has already been claimed.");
-
-        const userRef = doc(db, 'users', user.uid);
-        
-        // Update user balances (referral_earnings and available_balance)
-        transaction.update(userRef, {
-          available_balance: increment(claim.amount),
-          referral_earnings: increment(claim.amount)
-        });
-
-        // Mark claim as claimed
-        transaction.update(claimRef, {
-          status: 'claimed',
-          claimed_at: new Date().toISOString()
-        });
-
-        // Add history transaction
-        const txRef = doc(collection(db, 'transactions'));
-        transaction.set(txRef, {
-          user_id: user.uid,
-          type: 'referral_reward',
-          amount: claim.amount,
-          status: 'approved',
-          created_at: new Date().toISOString(),
-          description: claim.type === 'referrer'
-            ? `Referral commission - partner ${claim.partner_name}`
-            : `Welcome referral bonus unlocked`
-        });
-
-        // Add user notification
-        const notificationRef = doc(collection(db, 'notifications'));
-        transaction.set(notificationRef, {
-          user_id: user.uid,
-          title: 'Referral Reward Disbursed',
-          message: `Successfully claimed ${claim.amount} USD to your Referral & Available balances.`,
-          type: 'success',
-          read: false,
-          created_at: new Date().toISOString()
-        });
-      });
-
-      toast.success("Bonus Disbursed! Balance Successfully Updated.");
-    } catch (err: any) {
-      toast.error(err.message || "Claim failed.");
-    } finally {
-      setIsClaimingId(null);
-    }
-  };
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Smooth-scroll helper for the dashboard redirect path
-  useEffect(() => {
-    if (window.location.hash === '#referral-rewards') {
-      const timer = setTimeout(() => {
-        const el = document.getElementById('referral-rewards-section');
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }, 600);
-      return () => clearTimeout(timer);
-    }
-  }, []);
-  
   // Points Conversion State
   const [pointsInput, setPointsInput] = useState('');
-  
+
   // Withdrawal States
   const [showWithdrawForm, setShowWithdrawForm] = useState(false);
   const [withdrawMethod, setWithdrawMethod] = useState<'crypto' | 'bank'>('crypto');
@@ -388,16 +607,17 @@ export default function Rewards() {
   const [selectedMobileMethod, setSelectedMobileMethod] = useState<'crypto' | 'bank' | null>(null);
   const [showBankSelector, setShowBankSelector] = useState(false);
 
-  // Time metrics
+  // Time & streak setup
   const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonthNum = now.getMonth(); // 0-11
-  const daysInMonth = new Date(currentYear, currentMonthNum + 1, 0).getDate();
+  const currentMonthNum = now.getMonth();
   const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const todayDayNum = now.getDate();
-  const todayStr = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-'); // LOCAL YYYY-MM-DD
+  const todayStr = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
 
-  // Active user parameters with fallbacks
+  // Premium Universal Calendar States
+  const [calTab, setCalTab] = useState<'daily' | 'monthly' | 'yearly'>('daily');
+  const [calYear, setCalYear] = useState<number>(now.getFullYear());
+  const [calMonth, setCalMonth] = useState<number>(now.getMonth()); // 0-indexed (0 is Jan)
+
   const points_balance = profile?.withdraw_methods?.points_balance ?? profile?.points_balance ?? 0;
   const reward_dollar_balance = profile?.withdraw_methods?.reward_dollar_balance ?? profile?.reward_dollar_balance ?? 0;
   const total_claimed_days = profile?.withdraw_methods?.total_claimed_days ?? profile?.total_claimed_days ?? 0;
@@ -406,6 +626,8 @@ export default function Rewards() {
   const claimed_dates = profile?.withdraw_methods?.claimed_dates ?? profile?.claimed_dates ?? [];
   const claimedDatesSet = new Set(claimed_dates);
   const claimed_investment_ids = profile?.withdraw_methods?.claimed_investment_ids || [];
+  const claimed_milestones = profile?.withdraw_methods?.claimed_milestones || [];
+  const activeRefs = partners.filter(p => p.status === 'active').length;
 
   // 1. Fetch user's active node investments
   useEffect(() => {
@@ -427,7 +649,85 @@ export default function Rewards() {
     return () => unsubscribe();
   }, [user]);
 
-  // Fetch only reward activities real-time: points_gain, investment_reward, rewards_conversion, reward withdrawals
+  // 2. Fetch referral claims
+  useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'referral_claims'),
+      where('user_id', '==', user.uid)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const claims: any[] = [];
+      snapshot.forEach(docSnap => {
+        claims.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      claims.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setReferralClaims(claims);
+    }, (err) => {
+      console.error("Error fetching claims:", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  // 3. Fetch partners (live referral network list)
+  useEffect(() => {
+    if (!user || rewardView !== 'refer') return;
+    setPartnersLoading(true);
+    const q = query(collection(db, 'users'), where('referred_by', '==', user.uid));
+    const unsubscribe = onSnapshot(q, async (snap) => {
+      const partnerData: ReferralPartner[] = [];
+      snap.forEach(docSnap => {
+        const u = docSnap.data();
+        partnerData.push({
+          id: docSnap.id,
+          name: u.name || 'Anonymous User',
+          username: u.username || 'user',
+          email: u.email || '',
+          created_at: u.created_at || '',
+          country: u.country || 'Global',
+          status: 'inactive',
+          last_rebook: u.last_rebook || ''
+        });
+      });
+
+      try {
+        const results = await Promise.all(partnerData.map(async (p) => {
+          const invQ = query(
+            collection(db, 'investments'),
+            where('user_id', '==', p.id),
+            where('status', '==', 'active')
+          );
+          const invSnap = await getDocs(invQ);
+          const isActive = !invSnap.empty;
+          let activeAmt = 0;
+          let plans: string[] = [];
+          invSnap.forEach(d => {
+            const data = d.data();
+            activeAmt += data.amount || 0;
+            if (data.plan_name && !plans.includes(data.plan_name)) {
+              plans.push(data.plan_name);
+            }
+          });
+          return {
+            ...p,
+            status: isActive ? 'active' : ('inactive' as const),
+            active_investment_amount: activeAmt,
+            planName: plans.join(', ') || 'No Active Nodes'
+          };
+        }));
+        setPartners(results);
+      } catch (err) {
+        setPartners(partnerData);
+      }
+      setPartnersLoading(false);
+    }, (err) => {
+      console.error("Failed listing partners:", err);
+      setPartnersLoading(false);
+    });
+    return () => unsubscribe();
+  }, [user, rewardView]);
+
+  // 4. Fetch reward transaction history
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -455,17 +755,17 @@ export default function Rewards() {
 
       setRewardHistory(filtered);
     }, (err) => {
-      console.error("Failed to load reward history:", err);
+      console.error("Failed logging history:", err);
     });
     return () => unsubscribe();
   }, [user]);
 
-  // 2. Countdown handler for daily check-in (counts down to next global 12:00 AM midnight)
+  // 5. Daily Countdown
   useEffect(() => {
     const timer = setInterval(() => {
       const nowTime = new Date();
       const nextMidnight = new Date();
-      nextMidnight.setHours(24, 0, 0, 0); // Next 12:00 AM midnight
+      nextMidnight.setHours(24, 0, 0, 0);
       const remains = nextMidnight.getTime() - nowTime.getTime();
 
       if (remains <= 0) {
@@ -477,18 +777,15 @@ export default function Rewards() {
         setCountdownStr(`${hrs}h ${mins}m ${secs}s`);
       }
     }, 1000);
-
     return () => clearInterval(timer);
   }, []);
 
-  // Reference for sliding calendar timeline container
-  const calendarContainerRef = useRef<HTMLDivElement>(null);
-
-  // Check if can claim daily check-in (resets immediately at 12:00 AM midnight)
+  // Check handles
   const hasClaimedToday = claimedDatesSet.has(todayStr);
   const isDailyClaimable = !hasClaimedToday;
 
-  // Generate the sliding timeline of check-in days in chronological order
+  // Calendar horizontal sliding visible items calculation
+  const calendarContainerRef = useRef<HTMLDivElement>(null);
   const daysList = useMemo(() => {
     const list = [];
     const signupDateStr = profile?.created_at || profile?.createdAt;
@@ -496,29 +793,18 @@ export default function Rewards() {
     if (isNaN(startDate.getTime())) {
       startDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
     }
-    // Set to local start of day to avoid timezone mismatches
     startDate.setHours(0, 0, 0, 0);
 
-    // End date is today + 14 days so we can reveal upcoming future days
     const endDate = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
     endDate.setHours(23, 59, 59, 999);
 
     const currentIter = new Date(startDate);
     while (currentIter <= endDate) {
       const iterStr = currentIter.toISOString().split('T')[0];
-      const dayNum = currentIter.getDate();
-      const monthNum = currentIter.getMonth();
-      const yearNum = currentIter.getFullYear();
-      const dayName = currentIter.toLocaleDateString('en-US', { weekday: 'short' });
-      const monthLabel = currentIter.toLocaleDateString('en-US', { month: 'short' });
-      
       list.push({
         dateStr: iterStr,
-        dayNum,
-        monthNum,
-        yearNum,
-        dayName,
-        monthLabel,
+        dayNum: currentIter.getDate(),
+        dayName: currentIter.toLocaleDateString('en-US', { weekday: 'short' }),
         isToday: iterStr === todayStr,
         isPast: iterStr < todayStr,
         isFuture: iterStr > todayStr,
@@ -529,63 +815,37 @@ export default function Rewards() {
     return list;
   }, [profile?.created_at, profile?.createdAt, claimed_dates, todayStr]);
 
-  // Compute the exact subset of days to display based on mobile/desktop rolling rules
   const visibleDays = useMemo(() => {
-    const K = isMobile ? 3 : 5;
-    // Find index of the first date that is NOT checked-in
+    const K = window.innerWidth < 1024 ? 3 : 5;
     const firstUnclaimedIdx = daysList.findIndex(d => !d.isClaimed);
     const startIdx = firstUnclaimedIdx === -1 
       ? Math.max(0, daysList.length - K - 1) 
       : (firstUnclaimedIdx >= K ? firstUnclaimedIdx - K : 0);
     return daysList.slice(startIdx, startIdx + K + 1);
-  }, [daysList, isMobile]);
+  }, [daysList]);
 
-  // Calculate dynamic missed days starting ONLY from registration date up to yesterday
-  const missedDaysCount = useMemo(() => {
-    let count = 0;
-    const signupDateStr = profile?.created_at || profile?.createdAt;
-    let startDate = signupDateStr ? new Date(signupDateStr) : new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-    if (isNaN(startDate.getTime())) {
-      startDate = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-    }
-    startDate.setHours(0, 0, 0, 0);
+  // Dynamic ranking updates
+  const getDynamicUserCount = (baseCount: number, dailyGrowthRate: number) => {
+    const baseTime = new Date('2026-05-20T00:00:00Z').getTime();
+    const elapsedDays = Math.max(0, (Date.now() - baseTime) / (1000 * 60 * 60 * 24));
+    return Math.floor(baseCount * (1 + elapsedDays * dailyGrowthRate));
+  };
 
-    const checkDate = new Date(startDate);
-    const todayMidnight = new Date();
-    todayMidnight.setHours(0, 0, 0, 0);
+  const eliteCount = getDynamicUserCount(20803, 0.0000375);
+  const premiumCount = getDynamicUserCount(32144, 0.00005);
+  const regularCount = getDynamicUserCount(107200, 0.000928);
 
-    while (checkDate < todayMidnight) {
-      const dStr = checkDate.toISOString().split('T')[0];
-      if (!claimedDatesSet.has(dStr)) {
-        count++;
-      }
-      checkDate.setDate(checkDate.getDate() + 1);
-    }
-    return count;
-  }, [profile?.created_at, profile?.createdAt, claimed_dates, todayStr]);
+  // User rank matching
+  const userHighestPlan = useMemo(() => {
+    if (activeInvestments.length === 0) return null;
+    const plans = activeInvestments.map(inv => inv.plan_name?.toLowerCase());
+    if (plans.includes('elite')) return 'elite';
+    if (plans.includes('premium')) return 'premium';
+    if (plans.includes('regular')) return 'regular';
+    return null;
+  }, [activeInvestments]);
 
-  // Automatically shift the calendar left smoothly pointing to Today element
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const container = calendarContainerRef.current;
-      const todayElement = document.getElementById(`cal-day-${todayStr}`);
-      if (container && todayElement) {
-        const containerLeft = container.getBoundingClientRect().left;
-        const elementLeft = todayElement.getBoundingClientRect().left;
-        const currentScrollLeft = container.scrollLeft;
-        
-        // Align Today at the beginning/front of the container with slight left offset
-        const targetScrollLeft = currentScrollLeft + (elementLeft - containerLeft) - 12;
-        container.scrollTo({
-          left: Math.max(0, targetScrollLeft),
-          behavior: 'smooth'
-        });
-      }
-    }, 450); // slight buffer to let layout stabilize
-    return () => clearTimeout(timer);
-  }, [visibleDays, hasClaimedToday, todayStr]);
-
-  // Daily Check-In function
+  // DAILY CHECK IN TRIGGER
   const handleDailyCheckIn = async () => {
     const authUser = auth.currentUser;
     if (!authUser || isSubmitting) return;
@@ -607,26 +867,20 @@ export default function Rewards() {
 
         const userData = userSnap.data();
         const existingWithdrawMethods = userData.withdraw_methods || {};
-        
-        // Retrieve current reward tracking state nested under withdraw_methods
         const currentStreak = existingWithdrawMethods.current_streak || 0;
         const lastCheckIn = existingWithdrawMethods.last_check_in || '';
         const claimedDatesList = existingWithdrawMethods.claimed_dates || [];
         const claimedDatesSet = new Set(claimedDatesList);
 
-        // Check if already claimed today
         if (claimedDatesSet.has(todayStr)) {
-          throw new Error("Safety protocol triggered: Attestation already signed for this cycle.");
+          throw new Error("Safety protocol triggered: Attestation already signed for today.");
         }
 
-        // Compute yesterday's date string in user's local timezone style
         const yesterdayDate = new Date();
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
         const yStr = [yesterdayDate.getFullYear(), String(yesterdayDate.getMonth() + 1).padStart(2, '0'), String(yesterdayDate.getDate()).padStart(2, '0')].join('-');
-
         const lastCheckInDateOnly = lastCheckIn ? lastCheckIn.split('T')[0] : '';
 
-        // Calculate new streak
         let newStreak = 1;
         if (lastCheckIn) {
           if (lastCheckInDateOnly === yStr) {
@@ -642,7 +896,6 @@ export default function Rewards() {
         const newPointsBalance = (existingWithdrawMethods.points_balance || 0) + 1;
         const newTotalClaimedDays = (existingWithdrawMethods.total_claimed_days || 0) + 1;
 
-        // Perform transaction write update
         transaction.update(userRef, {
           withdraw_methods: {
             ...existingWithdrawMethods,
@@ -654,7 +907,6 @@ export default function Rewards() {
           }
         });
 
-        // Write Transaction Log
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: authUser.uid,
@@ -665,13 +917,12 @@ export default function Rewards() {
           description: 'Daily Check-In Incentive'
         });
 
-        // Write Notification Log
         const notifRef = doc(collection(db, 'notifications'));
         transaction.set(notifRef, {
           user_id: authUser.uid,
           type: 'success',
           title: 'Daily Check-In Successful',
-          message: 'Successfully checked in today! 1 Point has been credited to your balance.',
+          message: 'Successfully checked in! +1 Point (PTS) has been credited.',
           read: false,
           created_at: nowIso
         });
@@ -685,7 +936,7 @@ export default function Rewards() {
     }
   };
 
-  // Convert points to USD
+  // POINTS CONVERSION TRIGGER
   const handlePointsConversion = async () => {
     const authUser = auth.currentUser;
     if (!authUser || isSubmitting) return;
@@ -696,30 +947,28 @@ export default function Rewards() {
       return;
     }
 
+    if (ptsToConvert > points_balance) {
+      toast.error("Your balance contains insufficient points.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const nowIso = new Date().toISOString();
-      const dollarReward = ptsToConvert * 0.10; // 10 pts = $1
+      const dollarReward = ptsToConvert * 0.10; // 1 point = $0.10
       const userRef = doc(db, 'users', authUser.uid);
 
       await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
         if (!userSnap.exists()) {
-          throw new Error("Core profile record does not exist on Tavari Wave protocol.");
+          throw new Error("User record not found.");
         }
 
         const userData = userSnap.data();
         const existingWithdrawMethods = userData.withdraw_methods || {};
-        const pointsBalance = existingWithdrawMethods.points_balance || 0;
-
-        if (ptsToConvert > pointsBalance) {
-          throw new Error("Your balance contains insufficient points.");
-        }
-
-        const newPointsBalance = pointsBalance - ptsToConvert;
+        const newPointsBalance = (existingWithdrawMethods.points_balance || 0) - ptsToConvert;
         const newRewardDollarBalance = (existingWithdrawMethods.reward_dollar_balance || 0) + dollarReward;
 
-        // Perform transaction write update
         transaction.update(userRef, {
           withdraw_methods: {
             ...existingWithdrawMethods,
@@ -728,7 +977,6 @@ export default function Rewards() {
           }
         });
 
-        // Log transaction
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: authUser.uid,
@@ -739,20 +987,20 @@ export default function Rewards() {
           description: `Exchanged ${ptsToConvert} Points for Reward Dollars`
         });
 
-        // Log notification
         const notifRef = doc(collection(db, 'notifications'));
         transaction.set(notifRef, {
           user_id: authUser.uid,
           type: 'success',
-          title: 'Points Converted',
-          message: `Exchanged ${ptsToConvert} PTS to $${dollarReward.toFixed(2)} Reward Dollars.`,
+          title: 'Points Swapped',
+          message: `Exchanged ${ptsToConvert} PTS into $${dollarReward.toFixed(2)} USD.`,
           read: false,
           created_at: nowIso
         });
       });
 
-      toast.success(`Exchanged ${ptsToConvert} PTS to $${dollarReward.toFixed(2)} Reward Dollars!`);
+      toast.success(`Exchanged ${ptsToConvert} PTS into $${dollarReward.toFixed(2)} reward balance!`);
       setPointsInput('');
+      setRewardView('dashboard');
     } catch (err: any) {
       toast.error(err.message || "Failed to convert points.");
     } finally {
@@ -760,22 +1008,158 @@ export default function Rewards() {
     }
   };
 
-  // Identify eligible active unclaimed investments
-  const unclaimedInvestmentRewards = activeInvestments.filter(inv => !inv.reward_claimed && !claimed_investment_ids.includes(inv.id));
-  
-  // Find which plan cards to highlight
-  const regularUnclaimed = unclaimedInvestmentRewards.find(inv => inv.plan_name.toLowerCase() === 'regular');
-  const premiumUnclaimed = unclaimedInvestmentRewards.find(inv => inv.plan_name.toLowerCase() === 'premium');
-  const eliteUnclaimed = unclaimedInvestmentRewards.find(inv => inv.plan_name.toLowerCase() === 'elite');
+  // POKE USER FOR INACTIVE REFERRALS
+  const handlePokeUser = async (partner: ReferralPartner) => {
+    if (!user || !profile) return;
+    try {
+      const nowIso = new Date().toISOString();
+      await updateDoc(doc(db, 'users', partner.id), {
+        last_rebook: nowIso
+      });
 
-  // Claim 2% Node Reward
+      await addDoc(collection(db, 'notifications'), {
+        user_id: partner.id,
+        title: 'Partner Incentive Poke',
+        message: `Your partner ${profile.username || 'Tavari Wave member'} poked you! Activate a validator node to unlock rewards and start earning.`,
+        type: 'info',
+        read: false,
+        created_at: nowIso
+      });
+
+      setPokedUsers(prev => ({ ...prev, [partner.id]: true }));
+      toast.success(`System notification poke sent to ${partner.username}`);
+    } catch (err) {
+      toast.error("Failed to transmit poke action.");
+    }
+  };
+
+  // REFERRAL BONUS CLAIM
+  const handleClaimReferralReward = async (claim: any) => {
+    if (!user || !profile) return;
+    if (profile.suspended || profile.banned) {
+      toast.error("Access restricted by System Protocol.");
+      return;
+    }
+
+    setIsClaimingId(claim.id);
+    try {
+      await runTransaction(db, async (transaction) => {
+        const claimRef = doc(db, 'referral_claims', claim.id);
+        const claimSnap = await transaction.get(claimRef);
+        if (!claimSnap.exists()) throw new Error("Reward verification error.");
+
+        const claimData = claimSnap.data();
+        if (claimData.status !== 'pending') throw new Error("Already claimed.");
+
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await transaction.get(userRef);
+        const existingWithdrawMethods = userSnap.data()?.withdraw_methods || {};
+        const oldRewardDollar = existingWithdrawMethods.reward_dollar_balance || 0;
+
+        transaction.update(userRef, {
+          referral_earnings: increment(claim.amount),
+          withdraw_methods: {
+            ...existingWithdrawMethods,
+            reward_dollar_balance: oldRewardDollar + claim.amount
+          }
+        });
+
+        transaction.update(claimRef, {
+          status: 'claimed',
+          claimed_at: new Date().toISOString()
+        });
+
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: user.uid,
+          type: 'referral_reward',
+          amount: claim.amount,
+          status: 'approved',
+          created_at: new Date().toISOString(),
+          description: claim.type === 'referrer'
+            ? `Referral commission - partner ${claim.partner_name}`
+            : `Welcome referral bonus unlocked`
+        });
+      });
+
+      toast.success("Bonus successfully claimed to your balance!");
+    } catch (err: any) {
+      toast.error(err.message || "Claim failed.");
+    } finally {
+      setIsClaimingId(null);
+    }
+  };
+
+  // CLAIM 2% NODE REWARD
   const handleClaimInvestmentReward = async (inv: Investment) => {
     const authUser = auth.currentUser;
     if (!authUser || isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      const rewardAmt = inv.amount * 0.02; // 2% 
+      const rewardAmt = inv.amount * 0.02;
+      const nowIso = new Date().toISOString();
+      const userRef = doc(db, 'users', authUser.uid);
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error("Core profile record does not exist.");
+
+        const userData = userSnap.data();
+        const existingWithdrawMethods = userData.withdraw_methods || {};
+        const claimedInvestmentIds = existingWithdrawMethods.claimed_investment_ids || [];
+
+        if (claimedInvestmentIds.includes(inv.id)) {
+          throw new Error("Reward already claimed for this active node.");
+        }
+
+        const newRewardDollarBalance = (existingWithdrawMethods.reward_dollar_balance || 0) + rewardAmt;
+        const newClaimedInvestmentIds = [...claimedInvestmentIds, inv.id];
+
+        transaction.update(userRef, {
+          withdraw_methods: {
+            ...existingWithdrawMethods,
+            reward_dollar_balance: newRewardDollarBalance,
+            claimed_investment_ids: newClaimedInvestmentIds
+          }
+        });
+
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: authUser.uid,
+          type: 'investment_reward',
+          amount: rewardAmt,
+          status: 'approved',
+          created_at: nowIso,
+          description: `2% Cashback reward on active ${inv.plan_name} node`
+        });
+      });
+
+      toast.success(`Claimed $${rewardAmt.toFixed(2)} Cashback Reward successfully!`);
+    } catch (err: any) {
+      toast.error(err.message || "Claim failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // REFERRAL MILESTONES REAL INTEGRATION
+  const handleClaimMilestone = async (milestoneId: string, amount: number, requiredRefs: number) => {
+    const authUser = auth.currentUser;
+    if (!authUser || isSubmitting) return;
+
+    if (activeRefs < requiredRefs) {
+      toast.error(`You need at least ${requiredRefs} active referrals to claim this milestone.`);
+      return;
+    }
+
+    if (claimed_milestones.includes(milestoneId)) {
+      toast.error("This milestone reward has already been claimed.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
       const nowIso = new Date().toISOString();
       const userRef = doc(db, 'users', authUser.uid);
 
@@ -787,60 +1171,57 @@ export default function Rewards() {
 
         const userData = userSnap.data();
         const existingWithdrawMethods = userData.withdraw_methods || {};
-        const claimedInvestmentIds = existingWithdrawMethods.claimed_investment_ids || [];
+        const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance || 0;
+        const currentClaimed = existingWithdrawMethods.claimed_milestones || [];
 
-        // Check if already claimed
-        if (claimedInvestmentIds.includes(inv.id)) {
-          throw new Error("Reward has already been processed for this active node.");
+        if (currentClaimed.includes(milestoneId)) {
+          throw new Error("Security check fail: Milestone already claimed.");
         }
 
-        const newRewardDollarBalance = (existingWithdrawMethods.reward_dollar_balance || 0) + rewardAmt;
-        const newClaimedInvestmentIds = [...claimedInvestmentIds, inv.id];
-
-        // 1. Update balances & claims inside withdraw_methods on user document
+        // Update user state
         transaction.update(userRef, {
           withdraw_methods: {
             ...existingWithdrawMethods,
-            reward_dollar_balance: newRewardDollarBalance,
-            claimed_investment_ids: newClaimedInvestmentIds
+            reward_dollar_balance: oldRewardDollarBalance + amount,
+            claimed_milestones: [...currentClaimed, milestoneId]
           }
         });
 
-        // 2. Log transaction
+        // Add transaction ledger entry
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: authUser.uid,
-          type: 'investment_reward',
-          amount: rewardAmt,
+          type: 'milestone_reward',
+          amount: amount,
           status: 'approved',
           created_at: nowIso,
-          description: `2% Automated reward on active node (${inv.plan_name})`
+          description: `Referral Milestone reward claimed - ${requiredRefs} active users`
         });
 
-        // 3. Log notification
+        // Add notify alert
         const notifRef = doc(collection(db, 'notifications'));
         transaction.set(notifRef, {
           user_id: authUser.uid,
           type: 'success',
-          title: 'Investment Reward Claimed',
-          message: `You claimed $${rewardAmt.toFixed(2)} (2% reward) on your active ${inv.plan_name} node investment.`,
+          title: 'Milestone Reward Claimed',
+          message: `Successfully claimed $${amount.toFixed(2)} USD for reaching ${requiredRefs} active referrals!`,
           read: false,
           created_at: nowIso
         });
       });
 
-      toast.success(`Claimed $${rewardAmt.toFixed(2)} investment reward successfully!`);
+      toast.success(`Successfully claimed $${amount.toFixed(2)} USD milestone reward!`);
     } catch (err: any) {
-      toast.error(err.message || "Claim failed.");
+      toast.error(err.message || "Failed to claim milestone.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Open Withdrawal authentication modal
+  // SUBMIT WITHDRAW REQUEST
   const handleWithdrawalRequest = () => {
     if (profile?.withdrawals_frozen) {
-      toast.error("Withdrawal services are currently restricted for this account.");
+      toast.error("Withdrawal services are currently restricted.");
       return;
     }
 
@@ -851,7 +1232,7 @@ export default function Rewards() {
     }
 
     if (amt > reward_dollar_balance) {
-      toast.error("Your Reward Dollar Balance contains insufficient funds.");
+      toast.error("Insufficient Reward Dollar Balance.");
       return;
     }
 
@@ -875,7 +1256,6 @@ export default function Rewards() {
     setShowPinModal(true);
   };
 
-  // On correct transfer PIN callback
   const handleWithdrawSubmit = async (pin: string) => {
     const authUser = auth.currentUser;
     if (!authUser || !profile) return;
@@ -889,39 +1269,30 @@ export default function Rewards() {
     setIsSubmitting(true);
     
     try {
-      const amountRaw = parseFloat(withdrawAmount);
-      const amount = Math.floor(amountRaw * 100) / 100;
-      const fee = Math.floor((amount * 0.20) * 100) / 100; // 20% flat fee
-      const finalAmount = Math.floor((amount - fee) * 100) / 100;
+      const amount = parseFloat(withdrawAmount);
+      const fee = Math.floor((amount * 0.20) * 100) / 100;
+      const finalAmount = amount - fee;
       const nowIso = new Date().toISOString();
-
       const userRef = doc(db, 'users', authUser.uid);
 
       await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
-        if (!userSnap.exists()) {
-          throw new Error("Core profile record does not exist on Tavari Wave protocol.");
+        if (!userSnap.exists()) throw new Error("User record not found.");
+
+        const existingWithdrawMethods = userSnap.data()?.withdraw_methods || {};
+        const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance || 0;
+
+        if (amount > oldRewardDollarBalance) {
+          throw new Error("Insufficient rewards balance.");
         }
 
-        const userData = userSnap.data();
-        const existingWithdrawMethods = userData.withdraw_methods || {};
-        const rewardDollarBalance = existingWithdrawMethods.reward_dollar_balance || 0;
-
-        if (amount > rewardDollarBalance) {
-          throw new Error("Your Reward Dollar Balance contains insufficient funds.");
-        }
-
-        const newRewardDollarBalance = rewardDollarBalance - amount;
-
-        // Update reward_dollar_balance inside withdraw_methods
         transaction.update(userRef, {
           withdraw_methods: {
             ...existingWithdrawMethods,
-            reward_dollar_balance: newRewardDollarBalance
+            reward_dollar_balance: oldRewardDollarBalance - amount
           }
         });
 
-        // Submit request into withdrawals collection
         const witRef = doc(collection(db, 'withdrawals'));
         transaction.set(witRef, {
           user_id: authUser.uid,
@@ -942,7 +1313,6 @@ export default function Rewards() {
           created_at: nowIso
         });
 
-        // Submit into transactions log
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: authUser.uid,
@@ -955,17 +1325,6 @@ export default function Rewards() {
           created_at: nowIso,
           description: `Reward balance settlement request (${withdrawMethod.toUpperCase()})`
         });
-
-        // Submit notification info
-        const notifRef = doc(collection(db, 'notifications'));
-        transaction.set(notifRef, {
-          user_id: authUser.uid,
-          type: 'info',
-          title: 'Settlement Under Verification',
-          message: `Your reward withdrawal request for $${amount.toFixed(2)} with a 20% protocol fee has been submitted.`,
-          read: false,
-          created_at: nowIso
-        });
       });
 
       toast.success(`Success! Withdrawal request of $${amount.toFixed(2)} logged for review.`);
@@ -976,914 +1335,1535 @@ export default function Rewards() {
       setBankAccName('');
       setShowWithdrawForm(false);
     } catch (err: any) {
-      toast.error(err.message || "Failed to process transaction.");
+      toast.error(err.message || "Failed to process withdrawal.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <div className="w-full text-[#9CA3AF] relative font-sans">
-      
-      {/* Background Neon Orbs */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[600px] h-[600px] bg-purple-600/10 blur-[150px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-blue-600/5 blur-[150px] rounded-full" />
-      </div>
+  const unclaimedInvestmentRewards = activeInvestments.filter(inv => !inv.reward_claimed && !claimed_investment_ids.includes(inv.id));
+  const regularUnclaimed = unclaimedInvestmentRewards.find(inv => inv.plan_name?.toLowerCase() === 'regular');
+  const premiumUnclaimed = unclaimedInvestmentRewards.find(inv => inv.plan_name?.toLowerCase() === 'premium');
+  const eliteUnclaimed = unclaimedInvestmentRewards.find(inv => inv.plan_name?.toLowerCase() === 'elite');
 
+  return (
+    <div className="w-full text-[#9CA3AF] relative font-sans p-4">
       {/* Edge-to-Edge Premium Header Banner with Image Background */}
-      <div className="w-full mb-8 relative overflow-hidden bg-[#050608]">
+      <div className="w-full mb-6 relative overflow-hidden bg-[#050608] rounded-3xl">
         <img 
           src="https://i.imgur.com/9tUwvoe.png" 
           alt="Ecosystem Rewards Header" 
-          className="w-full h-auto block select-none"
+          className="w-full h-auto block select-none rounded-3xl"
           referrerPolicy="no-referrer"
         />
       </div>
 
-      {/* Relocated Premium Portal Info Panel below the header image */}
-      <div className="max-w-5xl mx-auto w-full px-4 mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#7C3AED]/25 to-[#A855F7]/15 flex items-center justify-center border border-[#7C3AED]/30 shadow-[0_4px_12px_rgba(124,58,237,0.15)] backdrop-blur-md">
-            <Gift className="text-[#C084FC]" size={22} />
-          </div>
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight italic">Ecosystem Reward</h1>
-            <p className="text-[10px] md:text-xs text-aura-muted font-bold leading-snug mt-1.5">Claim, convert, and withdraw your rewards seamlessly.</p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="bg-[#11131f]/80 border border-[#7C3AED]/35 px-4 py-2 rounded-full flex items-center gap-2 backdrop-blur-md shadow-lg">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-[#C084FC]">verified portal</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-5xl mx-auto w-full relative z-10">
-
-        {/* 6. TOP SECTION: REWARD BALANCES & TRACKING STATS */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          
-          {/* Card: Points Balance */}
-          <div className="col-span-1 md:col-span-1 p-6 bg-[#0a0c10]/80 backdrop-blur-xl border border-white/5 rounded-[28px] relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#7C3AED]/5 blur-3xl rounded-full" />
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-[#7C3AED]/10 flex items-center justify-center text-[#A855F7]">
-                <Sparkles size={16} />
+      <AnimatePresence mode="wait">
+        {rewardView === 'dashboard' && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="max-w-5xl mx-auto space-y-6"
+          >
+            {/* Header Title Section */}
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between px-2">
+              <div>
+                <h1 className="text-3xl font-black text-white italic tracking-tight">Ecosystem Rewards</h1>
+                <p className="text-xs text-gray-500 font-bold mt-1">Slick multi-tier incentives dashboard.</p>
               </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-aura-muted">Points Balance</span>
-            </div>
-            <div className="mb-6">
-              <span className="text-3xl font-black text-white italic tracking-tight">{points_balance.toLocaleString()}</span>
-              <span className="text-xs font-bold text-[#A855F7] ml-2">PTS</span>
-            </div>
-            
-            {/* Converting interface */}
-            <div className="space-y-3 pt-3 border-t border-white/5">
-              <p className="text-[10px] uppercase font-bold text-aura-muted">Convert points to dollar rewards (10 PTS = $1.00):</p>
-              <div className="flex gap-2">
-                <input 
-                  type="number" 
-                  placeholder="PointsAmt" 
-                  value={pointsInput}
-                  onChange={(e) => setPointsInput(e.target.value)}
-                  className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white outline-none focus:border-[#7C3AED]/40 placeholder:text-gray-600 font-mono"
-                />
-                <button 
-                  onClick={handlePointsConversion}
-                  disabled={isSubmitting || !pointsInput}
-                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#7C3AED] to-[#A855F7] text-white text-[10px] font-black uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all disabled:opacity-40"
-                >
-                  Convert
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Card: Reward Dollar Balance */}
-          <div className="col-span-1 md:col-span-1 p-6 bg-[#0a0c10]/80 backdrop-blur-xl border border-white/5 rounded-[28px] relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-[#A855F7]/5 blur-3xl rounded-full" />
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                <Coins size={16} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-aura-muted">Balance</span>
-            </div>
-            <div className="mb-6">
-              <span className="text-3xl font-black text-white italic tracking-tight">${reward_dollar_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span className="text-[10px] text-emerald-400 font-black ml-1 uppercase">USD</span>
-            </div>
-
-            {/* Withdrawal Trigger */}
-            <div className="pt-3 border-t border-white/5">
-              <button 
-                onClick={() => {
-                  setShowMethodSelector(true);
-                  setSelectedMobileMethod(null);
-                }}
-                disabled={reward_dollar_balance < 10}
-                className={cn(
-                  "w-full py-2.5 rounded-xl text-center text-[10px] font-black uppercase tracking-widest transition-all shadow-md",
-                  reward_dollar_balance >= 10 
-                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white hover:brightness-110 active:scale-[0.98]" 
-                    : "bg-white/5 text-gray-600 cursor-not-allowed border border-white/5"
-                )}
+              <button
+                onClick={() => setRewardView('about')}
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-black uppercase tracking-wider transition-all duration-300 shadow-lg shadow-purple-500/10 cursor-pointer self-start md:self-auto hover:brightness-110 active:scale-95 border border-purple-500/20"
               >
-                {reward_dollar_balance >= 10 ? 'Withdraw' : 'Min Settlement $10.00'}
+                <Info size={14} className="animate-pulse" />
+                About Rewards
               </button>
             </div>
-          </div>
 
-          {/* Card: Streak & Total Stats */}
-          <div className="col-span-1 md:col-span-1 p-6 bg-[#0a0c10]/80 backdrop-blur-xl border border-white/5 rounded-[28px] relative overflow-hidden">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
-                <Timer size={16} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-aura-muted">Claimed Streak</span>
-            </div>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-white italic tracking-tight">{current_streak}</span>
-              <span className="text-xs font-bold uppercase text-orange-400">Days Active</span>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-4 leading-relaxed">Regular daily check-ins boost your passive ecosystem multiplier.</p>
-          </div>
-
-          {/* Card: Missed Days & Total Claimed */}
-          <div className="col-span-1 md:col-span-1 p-6 bg-[#0a0c10]/80 backdrop-blur-xl border border-white/5 rounded-[28px] relative overflow-hidden">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400">
-                <Trophy size={16} />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-aura-muted">Ecosystem Activity</span>
-            </div>
-            <div className="grid grid-cols-2 gap-4 divide-x divide-white/5">
-              <div>
-                <p className="text-[9px] uppercase font-bold text-gray-500">Missed days</p>
-                <p className="text-xl font-black text-rose-500 italic mt-0.5">{missedDaysCount}</p>
-              </div>
-              <div className="pl-4">
-                <p className="text-[9px] uppercase font-bold text-gray-500">Total claimed</p>
-                <p className="text-xl font-black text-emerald-400 italic mt-0.5">{total_claimed_days}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-gray-500 mt-3 leading-relaxed">Tracking automatically syncs to local timezone clocks.</p>
-          </div>
-
-        </div>
-
-        {/* Dynamic Rewards Settlement Drawer */}
-        <AnimatePresence>
-          {showWithdrawForm && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="bg-[#11131f] border border-emerald-500/20 rounded-3xl p-6 mb-10 overflow-hidden relative"
-            >
-              <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 blur-[80px] rounded-full pointer-events-none" />
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                  <Coins size={18} className="text-emerald-400" />
-                  <h3 className="text-base font-black italic text-white uppercase tracking-tight">Ecosystem Reward Settlement</h3>
-                </div>
-                <button 
-                  onClick={() => setShowWithdrawForm(false)}
-                  className="p-1 rounded-full bg-white/5 text-gray-400 hover:text-white transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Options panel */}
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1.5">Withdrawal Protocol</label>
-                    <div className="grid grid-cols-2 gap-2">
-                       <button 
-                        onClick={() => setWithdrawMethod('bank')}
-                        className={cn(
-                          "py-3 rounded-xl text-xs font-black uppercase tracking-widest border transition-all text-center",
-                          withdrawMethod === 'bank' 
-                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" 
-                            : "bg-white/5 border-white/5 text-gray-500 hover:bg-white/10"
-                        )}
-                      >
-                        Bank Transfer
-                      </button>
-                      <button 
-                        onClick={() => setWithdrawMethod('crypto')}
-                        className={cn(
-                          "py-3 rounded-xl text-xs font-black uppercase tracking-widest border transition-all text-center",
-                          withdrawMethod === 'crypto' 
-                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400" 
-                            : "bg-white/5 border-white/5 text-gray-500 hover:bg-white/10"
-                        )}
-                      >
-                        Crypto Wallet
-                      </button>
+            {/* Premium Dual Balance & Points Section */}
+            <div className="p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] bg-gradient-to-br from-[#121c22]/90 to-[#070a0e]/95 border border-white/5 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[120px] rounded-full" />
+              <div className="grid grid-cols-2 gap-4 md:gap-8 divide-x divide-white/10">
+                {/* Balance Area (Left) */}
+                <div className="space-y-2.5 sm:space-y-3 pr-2 sm:pr-4 flex flex-col justify-between">
+                  <div 
+                    onClick={() => {
+                      setShowMethodSelector(true);
+                      setSelectedMobileMethod(null);
+                    }}
+                    className="space-y-2 cursor-pointer select-none group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">Balance</span>
+                      <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-white/5 flex items-center justify-center text-[8px] sm:text-[10px] text-gray-500 hover:text-white transition-colors">?</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-lg xs:text-xl sm:text-3xl md:text-4xl font-black text-white italic leading-none tracking-tight">
+                        ${reward_dollar_balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                      <ChevronRight size={16} className="text-gray-500 group-hover:text-white transition-colors group-hover:translate-x-1 sm:hidden md:block" />
                     </div>
                   </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1.5">Withdraw Amount (USD)</label>
-                    <div className="relative">
-                      <input 
-                        type="number" 
-                        placeholder="$0.00" 
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className="w-full bg-[#0a0c10] border border-white/10 rounded-xl py-4 px-4 text-base font-bold text-white outline-none focus:border-emerald-500/50 pr-16"
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => setWithdrawAmount(reward_dollar_balance.toString())}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-all"
-                      >
-                        Max
-                      </button>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-gray-500 mt-1.5 px-0.5">
-                      <span>Available: ${reward_dollar_balance.toFixed(2)}</span>
-                      <span>Min: $10.00</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Details input panel */}
-                <div className="space-y-4 flex flex-col justify-between">
-                  {withdrawMethod === 'crypto' ? (
-                    <div>
-                      <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1.5">USDT (TRC20) Wallet Destination</label>
-                      <input 
-                        type="text" 
-                        placeholder="TR7NHqdj61L314G1135Y68t9..."
-                        value={cryptoAddress}
-                        onChange={(e) => setCryptoAddress(e.target.value)}
-                        className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-mono placeholder:text-gray-700 outline-none focus:border-emerald-500/40"
-                      />
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1">Financial Institution (Bank Name)</label>
-                        <button 
-                          type="button"
-                          onClick={() => setShowBankSelector(true)}
-                          className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none hover:border-emerald-500/40 transition-all text-left flex items-center justify-between"
-                        >
-                          <span className={bankName ? "text-white font-bold" : "text-gray-500 font-medium"}>
-                            {bankName || "Select Bank"}
-                          </span>
-                          <ChevronDown size={16} className="text-gray-400" />
-                        </button>
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1">Account Number</label>
-                        <input 
-                          type="text" 
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="e.g. 1093129482103"
-                          value={bankAccNumber}
-                          onChange={(e) => setBankAccNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                          className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white font-mono outline-none focus:border-emerald-500/40"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1">Holder Name (Must perfectly match profile name)</label>
-                        <input 
-                          type="text" 
-                          placeholder={profile?.name || "Holder Name"}
-                          value={bankAccName}
-                          onChange={(e) => setBankAccName(e.target.value)}
-                          className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-emerald-500/40"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Calculations & verification triggered button */}
-                  <div className="bg-[#0a0c10] border border-white/5 p-4 rounded-2xl space-y-2 mt-4">
-                    <div className="flex justify-between text-xs">
-                      <span>Fee Fraction (20% Protocol Fee):</span>
-                      <span className="text-rose-400 font-mono">-${((parseFloat(withdrawAmount) || 0) * 0.20).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-black text-white pt-2 border-t border-white/5">
-                      <span>Net Settlement Payout:</span>
-                      <span className="text-emerald-400 font-mono">${((parseFloat(withdrawAmount) || 0) * 0.80).toFixed(2)}</span>
-                    </div>
-                    
-                    <button 
-                      onClick={handleWithdrawalRequest}
-                      disabled={isSubmitting || !withdrawAmount || parseFloat(withdrawAmount) < 10}
-                      className="w-full mt-3 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:brightness-110 active:scale-[0.98] transition-all rounded-xl text-xs font-black uppercase text-white tracking-widest disabled:opacity-40"
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    <button
+                      onClick={() => {
+                        setShowMethodSelector(true);
+                        setSelectedMobileMethod(null);
+                      }}
+                      className="px-2 py-1 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-[#00E5FF]/10 hover:bg-[#00E5FF]/20 border border-[#00E5FF]/20 text-[#00E5FF] text-[8px] xs:text-[99px] sm:text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
                     >
-                      Verify PIN & Log Withdrawal
+                      Withdraw
+                    </button>
+                    <button
+                      onClick={openTransferModal}
+                      className="px-2 py-1 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-purple-400 text-[8px] xs:text-[99px] sm:text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                    >
+                      Transfer
                     </button>
                   </div>
-
+                  <p className="text-[8px] sm:text-[10px] text-gray-500 font-bold uppercase tracking-wider mt-1 sm:mt-2">Supported Instantly</p>
                 </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
-        {/* MIDDLE SECTION: CALENDAR SYSTEM & DAILY CLAIM & INVESTMENTS REWARDS */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-          
-          {/* Horizontal Calendar Check-In Card (8 columns) */}
-          <div className="lg:col-span-8 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/5 blur-[80px] rounded-full pointer-events-none" />
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <div className="flex items-center gap-3">
-                <Calendar className="text-[#A855F7]" size={20} />
-                <div>
-                  <h3 className="text-base font-black italic text-white uppercase tracking-tight">Ecosystem Check-In</h3>
-                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Passive rewards tracking for {monthName}</p>
+                {/* Points Area (Right) */}
+                <div className="space-y-2.5 sm:space-y-3 pl-2 sm:pl-8 flex flex-col justify-between">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">Points</span>
+                    <div className="px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-cyan-400/10 border border-cyan-400/20 text-[#00E5FF] text-[8px] sm:text-[10px] font-black tracking-widest animate-none">
+                      ${(points_balance * 0.10).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </div>
+                  </div>
+                  <div 
+                    onClick={() => setRewardView('conversion')}
+                    className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group select-none self-start"
+                  >
+                    <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+                      <span className="text-black text-xs sm:text-base font-bold">★</span>
+                    </div>
+                    <span className="text-lg xs:text-xl sm:text-3xl md:text-4xl font-black text-white italic leading-none tracking-tight">
+                      {points_balance.toLocaleString()}
+                    </span>
+                    <ChevronRight size={16} className="text-gray-500 group-hover:text-white transition-colors group-hover:translate-x-1 sm:hidden md:block" />
+                  </div>
+                  <p className="text-[8px] sm:text-[10px] text-gray-500 font-bold uppercase tracking-wider">Tap to convert</p>
                 </div>
-              </div>
-
-              {/* Status Indicator */}
-              <div className="flex items-center gap-2">
-                {hasClaimedToday ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider">
-                    <CheckCircle2 size={12} /> Checked In Today
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#7C3AED]/10 border border-[#7C3AED]/25 text-[#C084FC] text-[10px] font-black uppercase tracking-wider animate-pulse">
-                    <AlertCircle size={12} /> Action Needed
-                  </div>
-                )}
               </div>
             </div>
 
-            {/* Monthly Dates swiper strip container */}
-            <div className="relative mb-6">
+            {/* Grid of 4 Premium Navigation Cards */}
+            <div className="grid grid-cols-4 gap-1.5 xs:gap-2 sm:gap-4 md:gap-6">
+              {/* Card 1: Daily Point */}
               <div 
-                ref={calendarContainerRef}
-                className="flex overflow-x-auto gap-3.5 pb-4 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory"
+                onClick={() => setRewardView('daily')}
+                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-emerald-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
               >
-                {visibleDays.map((item) => {
-                  if (item.isClaimed) {
-                    return (
-                      <div 
-                        key={item.dateStr} 
-                        id={`cal-day-${item.dateStr}`}
-                        className="flex-shrink-0 w-20 h-24 rounded-2xl bg-gradient-to-b from-[#0e1e16] to-[#0a0f0c] border border-emerald-500/50 flex flex-col items-center justify-center snap-start text-emerald-400 relative shadow-[0_4px_15px_rgba(16,185,129,0.15)] hover:border-emerald-500 transition-all duration-300"
-                      >
-                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-500/80 mb-1">{item.dayName}</span>
-                        <span className="text-base font-black text-white">{item.dayNum}</span>
-                        <span className="text-[8px] font-black text-emerald-400 mt-1.5 uppercase tracking-tighter bg-emerald-500/10 px-1.5 py-0.5 rounded">+1 PTS</span>
-                        <span className="absolute -top-1 -right-1 bg-emerald-500 text-black rounded-full p-0.5 shadow-md border border-[#0a0f0c] w-4.5 h-4.5 flex items-center justify-center">
-                          <Check size={11} strokeWidth={4} className="text-[#0a0f0c]" />
-                        </span>
-                      </div>
-                    );
-                  } else if (item.isToday) {
-                    return (
-                      <div 
-                        key={item.dateStr} 
-                        id={`cal-day-${item.dateStr}`}
-                        className={cn(
-                          "flex-shrink-0 w-20 h-24 rounded-2xl flex flex-col items-center justify-center snap-start relative transition-all duration-300",
-                          hasClaimedToday 
-                            ? "bg-gradient-to-b from-[#0f111a] to-[#090a10] border border-white/5 text-gray-500"
-                            : "bg-gradient-to-b from-[#7C3AED]/20 to-[#1d1433] border-2 border-[#7C3AED] text-white animate-pulse shadow-[0_0_20px_rgba(124,58,237,0.4)]"
-                        )}
-                      >
-                        <span className={cn("text-[9px] font-black uppercase tracking-wider mb-1", hasClaimedToday ? "text-gray-500" : "text-purple-300")}>
-                          TODAY
-                        </span>
-                        <span className="text-base font-black text-white">{item.dayNum}</span>
-                        <span className={cn(
-                          "text-[8px] font-black mt-1.5 uppercase tracking-tighter px-1.5 py-0.5 rounded",
-                          hasClaimedToday ? "bg-white/5 text-gray-500" : "bg-[#7C3AED]/20 text-purple-300"
-                        )}>
-                          +1 PTS
-                        </span>
-                        {!hasClaimedToday && (
-                          <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-[#7C3AED] animate-pulse" />
-                        )}
-                      </div>
-                    );
-                  } else if (item.isPast) {
-                    return (
-                      <div 
-                        key={item.dateStr} 
-                        id={`cal-day-${item.dateStr}`}
-                        className="flex-shrink-0 w-20 h-24 rounded-2xl bg-[#08090f]/40 border border-white/[0.02] flex flex-col items-center justify-center snap-start text-gray-700/50"
-                      >
-                        <span className="text-[8px] font-bold uppercase tracking-tight text-gray-600 mb-1">Missed</span>
-                        <span className="text-sm font-normal line-through text-gray-600">{item.dayNum}</span>
-                      </div>
-                    );
-                  } else {
-                    return (
-                      <div 
-                        key={item.dateStr} 
-                        id={`cal-day-${item.dateStr}`}
-                        className="flex-shrink-0 w-20 h-24 rounded-2xl bg-gradient-to-b from-[#11131f] to-[#0a0b12] border border-white/5 flex flex-col items-center justify-center snap-start text-gray-400 hover:border-white/10 transition-all duration-300"
-                      >
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mb-1">{item.dayName}</span>
-                        <span className="text-base font-semibold text-gray-300">{item.dayNum}</span>
-                        <span className="text-[8px] font-bold text-gray-600 mt-1.5 uppercase tracking-tighter bg-white/5 px-1.5 py-0.5 rounded">+1 PTS</span>
-                      </div>
-                    );
-                  }
-                })}
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                  <Icon3DDailyPoints />
+                </div>
+                <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-emerald-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Daily Point</span>
               </div>
-            </div>
 
-            {/* Daily claim section */}
-            <div className="mt-auto bg-[#0a0c10] border border-white/5 p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-center sm:text-left">
-                <p className="text-xs font-bold text-white uppercase tracking-wider">Obtain Daily Attendance Loyalty Token</p>
-                <p className="text-[10px] text-gray-500 mt-1">Claim 1 Loyalty Point (PTS) absolutely free every 24 hours.</p>
-              </div>
-              
-              <button 
-                onClick={handleDailyCheckIn}
-                disabled={isSubmitting || !isDailyClaimable}
-                className={cn(
-                  "w-full sm:w-auto px-8 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all italic",
-                  isDailyClaimable 
-                    ? "bg-gradient-to-r from-[#7C3AED] to-[#A855F7] hover:brightness-110 active:scale-95 text-white shadow-[0_4px_15px_rgba(124,58,237,0.3)]" 
-                    : "bg-[#11131f] text-gray-600 border border-white/5 cursor-not-allowed"
-                )}
+              {/* Card 2: Refer Friends */}
+              <div 
+                onClick={() => setRewardView('refer')}
+                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-purple-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
               >
-                {hasClaimedToday 
-                  ? "Checked-in Completed" 
-                  : countdownStr 
-                    ? `Next in ${countdownStr}` 
-                    : "Check-in & Claim +1 PTS"}
-              </button>
-            </div>
-          </div>
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                  <Icon3DReferFriends />
+                </div>
+                <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-purple-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Refer Friends</span>
+              </div>
 
-          {/* Correct highlightable investment node rewards cards (4 columns) */}
-          <div id="active-node-multipliers" className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-48 h-48 bg-purple-500/5 blur-[80px] rounded-full pointer-events-none" />
-            
-            <div className="flex items-center gap-2.5 mb-6">
-              <PiggyBank className="text-[#A855F7]" size={20} />
-              <div>
-                <h3 className="text-base font-black italic text-white uppercase tracking-tight">Active Node Multipliers</h3>
-                <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Unlocks 2.00% instant incentives</p>
+              {/* Card 3: Node Rewards */}
+              <div 
+                onClick={() => setRewardView('nodes')}
+                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-yellow-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
+              >
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                  <Icon3DNodeRewards />
+                </div>
+                <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-yellow-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Node Rewards</span>
+              </div>
+
+              {/* Card 4: Ranking */}
+              <div 
+                onClick={() => setRewardView('ranking')}
+                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-cyan-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
+              >
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                  <Icon3DRanking />
+                </div>
+                <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-cyan-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Ranking</span>
               </div>
             </div>
 
-            <div className="space-y-4 flex-1 flex flex-col justify-around">
-              
-              {/* Regular investment tier */}
-              <div className={cn(
-                "p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden",
-                regularUnclaimed 
-                  ? "bg-[#7C3AED]/5 border-[#7C3AED] shadow-[0_0_15px_rgba(124,58,237,0.15)]" 
-                  : "bg-black/30 border-white/5 opacity-60"
-              )}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-[#A855F7] tracking-widest bg-[#7C3AED]/10 px-2 py-0.5 rounded">Regular Plan</span>
-                    <p className="text-xs text-gray-500 mt-1 max-w-[150px] leading-tight flex items-center gap-1">
-                      {regularUnclaimed ? 'Active investment node' : 'No unclaimed regular rewards'}
-                    </p>
-                  </div>
-                  {regularUnclaimed && (
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-gray-400">Available Reward:</p>
-                      <p className="text-sm font-black text-white italic">${(regularUnclaimed.amount * 0.02).toFixed(2)}</p>
-                    </div>
-                  )}
-                </div>
-                {regularUnclaimed && (
-                  <button 
-                    onClick={() => handleClaimInvestmentReward(regularUnclaimed)}
-                    disabled={isSubmitting}
-                    className="w-full mt-3 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
-                  >
-                    Claim 2% Reward
-                  </button>
-                )}
-              </div>
-
-              {/* Premium investment tier */}
-              <div className={cn(
-                "p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden",
-                premiumUnclaimed 
-                  ? "bg-emerald-500/5 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.15)]" 
-                  : "bg-black/30 border-white/5 opacity-60"
-              )}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-emerald-400 tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded">Premium Plan</span>
-                    <p className="text-xs text-gray-500 mt-1 max-w-[150px] leading-tight flex items-center gap-1">
-                      {premiumUnclaimed ? 'Active investment node' : 'No unclaimed premium rewards'}
-                    </p>
-                  </div>
-                  {premiumUnclaimed && (
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-gray-400">Available Reward:</p>
-                      <p className="text-sm font-black text-white italic">${(premiumUnclaimed.amount * 0.02).toFixed(2)}</p>
-                    </div>
-                  )}
-                </div>
-                {premiumUnclaimed && (
-                  <button 
-                    onClick={() => handleClaimInvestmentReward(premiumUnclaimed)}
-                    disabled={isSubmitting}
-                    className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
-                  >
-                    Claim 2% Reward
-                  </button>
-                )}
-              </div>
-
-              {/* Elite investment tier */}
-              <div className={cn(
-                "p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden",
-                eliteUnclaimed 
-                  ? "bg-amber-500/5 border-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.15)]" 
-                  : "bg-black/30 border-white/5 opacity-60"
-              )}>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[9px] uppercase font-black text-amber-500 tracking-widest bg-amber-500/10 px-2 py-0.5 rounded">Elite Plan</span>
-                    <p className="text-xs text-gray-500 mt-1 max-w-[150px] leading-tight flex items-center gap-1">
-                      {eliteUnclaimed ? 'Active investment node' : 'No unclaimed elite rewards'}
-                    </p>
-                  </div>
-                  {eliteUnclaimed && (
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-gray-400">Available Reward:</p>
-                      <p className="text-sm font-black text-white italic">${(eliteUnclaimed.amount * 0.02).toFixed(2)}</p>
-                    </div>
-                  )}
-                </div>
-                {eliteUnclaimed && (
-                  <button 
-                    onClick={() => handleClaimInvestmentReward(eliteUnclaimed)}
-                    disabled={isSubmitting}
-                    className="w-full mt-3 py-2 bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-white text-[10px] font-black uppercase tracking-widest rounded-xl transition-all"
-                  >
-                    Claim 2% Reward
-                  </button>
-                )}
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-
-        {/* --- DUAL-COLUMN ELITE REFERRAL MODULE GRID (8 + 4 cols) --- */}
-        <div id="referral-rewards-section" className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-12">
-          
-          {/* Card 1: Redesigned Referral Metrics Card (8 columns) */}
-          <div className="lg:col-span-8 relative overflow-visible rounded-[32px] border-2 border-purple-500/25 bg-gradient-to-br from-[#121524]/95 via-purple-950/20 to-[#0e111a]/95 p-6 md:p-8 shadow-[0_20px_50px_rgba(168,85,247,0.12)] select-none">
-            {/* Background glowing gradients */}
-            <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/10 blur-[90px] rounded-full pointer-events-none" />
-            <div className="absolute -bottom-10 right-10 w-48 h-48 bg-pink-500/10 blur-[90px] rounded-full pointer-events-none" />
-            
-            {/* Extremely Premium overlapping 3D gift/wave visual graphic extending OUTSIDE boundaries */}
-            <div className="absolute -right-6 -bottom-6 w-56 h-56 pointer-events-none opacity-85 hidden sm:block overflow-visible select-none">
-               <svg viewBox="0 0 100 100" className="w-full h-full filter drop-shadow-[0_12px_24px_rgba(168,85,247,0.4)]">
-                 <defs>
-                   <linearGradient id="glowG" x1="0" y1="0" x2="1" y2="1">
-                     <stop offset="0%" stopColor="#ec4899" />
-                     <stop offset="100%" stopColor="#8b5cf6" />
-                   </linearGradient>
-                 </defs>
-                 {/* Floating floating sparks outside the box */}
-                 <polygon points="12,18 18,12 24,18 18,24" fill="#fbbf24" opacity="0.8" />
-                 <polygon points="80,50 84,46 88,50 84,54" fill="#67e8f9" opacity="0.6" />
-                 
-                 {/* Overlay circles for lighting */}
-                 <circle cx="50" cy="50" r="32" fill="none" stroke="url(#glowG)" strokeWidth="0.5" strokeDasharray="3 3" />
-                 
-                 {/* Overlapping box elements */}
-                 <path d="M 30,55 L 70,30 L 50,15 L 10,40 Z" fill="url(#glowG)" opacity="0.15" />
-                 <path d="M 50,55 L 90,30 L 70,15 L 30,40 Z" fill="url(#glowG)" opacity="0.2" />
-                 {/* Premium 3D Box lid and ribbon */}
-                 <path d="M 40,58 L 80,38 L 50,22 L 10,42 Z" fill="url(#glowG)" />
-                 <path d="M 10,42 L 50,62 L 50,95 L 10,75 Z" fill="#6d28d9" />
-                 <path d="M 80,38 L 50,62 L 50,95 L 80,71 Z" fill="#4c1d95" />
-                 <path d="M 50,62 L 50,95" stroke="#f472b6" strokeWidth="2.5" />
-                 <path d="M 30,48 Q 50,25 50,15 Q 50,25 70,48 Q 50,58 30,48 Z" fill="#f43f5e" opacity="0.9" />
-               </svg>
-            </div>
-
-            <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center text-[#A855F7] shadow-[0_4px_20px_rgba(168,85,247,0.2)]">
-                  <Users size={24} />
-                </div>
+            {/* Core Ledger Logs Section */}
+            <div className="p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] relative overflow-hidden">
+              <div className="flex items-center gap-2.5 mb-6">
+                <History className="text-purple-400" size={18} />
                 <div>
-                  <h3 className="text-lg font-black italic text-white uppercase tracking-tight">Referral Matrix</h3>
-                  <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Earn spendable payouts of 5.00% under Elite Commission Tier</p>
+                  <h3 className="text-base font-black italic text-white uppercase">Reward Activity Ledger</h3>
+                  <p className="text-[10px] text-gray-500 uppercase font-black">Timestamped ledger of claim audits</p>
                 </div>
               </div>
-            </div>
-
-            {/* Metrics Panel */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6">
-              <div className="p-5 bg-black/40 border border-white/5 rounded-2xl text-center backdrop-blur-sm">
-                <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Total Network</span>
-                <span className="text-2xl sm:text-3xl font-black text-white italic font-serif leading-none">{profile?.referrals_count || 0}</span>
-                <span className="text-[8px] font-bold text-purple-400 uppercase tracking-widest block mt-1">Partners</span>
-              </div>
-              
-              <div className="p-5 bg-black/40 border border-white/5 rounded-2xl text-center backdrop-blur-sm">
-                <span className="text-[10px] sm:text-[11px] font-bold text-gray-500 uppercase tracking-widest block mb-1">Active Nodes</span>
-                <span className="text-2xl sm:text-3xl font-black text-emerald-400 italic font-serif leading-none">{profile?.active_referrals || 0}</span>
-                <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-widest block mt-1">First-Invested</span>
-              </div>
-
-              <div className="col-span-2 sm:col-span-1 p-5 bg-gradient-to-br from-purple-500/15 to-pink-500/10 border border-purple-500/20 rounded-2xl text-center backdrop-blur-sm">
-                <span className="text-[10px] sm:text-[11px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Referral Wallet</span>
-                <span className="text-2xl sm:text-3xl font-black text-white italic font-serif leading-none">
-                  {formatCurrency(profile?.referral_earnings || 0)}
-                </span>
-                <span className="text-[8px] font-bold text-pink-400 uppercase tracking-widest block mt-1">Unclaimed Payouts Available</span>
-              </div>
-            </div>
-
-            {/* Connection / Share Area */}
-            <div className="mt-6 p-4 bg-white/[0.03] border border-white/5 rounded-2xl space-y-4 max-w-lg">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div>
-                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Unique Invite Code</span>
-                  <span className="text-xs font-black text-white tracking-[0.2em]">{profile?.referral_code || '---'}</span>
-                </div>
-                <div className="h-px sm:h-8 w-full sm:w-px bg-white/5" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block">Network Referral Link</span>
-                  <span className="text-[10px] font-bold text-white/50 truncate block mt-0.5 font-mono">
-                    {profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => {
-                    const link = profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`;
-                    navigator.clipboard.writeText(link);
-                    toast.success("Referral invitation link copied to clipboard!");
-                  }}
-                  className="px-4 py-2.5 bg-[#4c1d95] hover:bg-purple-600 active:scale-95 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all self-stretch sm:self-center flex items-center justify-center gap-1.5 border border-purple-500/20 shadow-md cursor-pointer"
-                >
-                  <Copy size={12} /> Copy Share Link
-                </button>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Card 2: Referral Reward Claim Card (4 columns) */}
-          <div id="referral-rewards" className="lg:col-span-4 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] flex flex-col relative overflow-hidden shadow-2xl">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[50px] rounded-full pointer-events-none" />
-            
-            <div className="flex items-center gap-2.5 mb-4">
-              <Trophy className="text-purple-400" size={20} />
-              <div>
-                <h3 className="text-sm font-black italic text-white uppercase tracking-tight">Referral Rewards</h3>
-                <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Claim 5.00% pending payouts</p>
-              </div>
-            </div>
-
-            {/* List claims */}
-            <div className="flex-1 mt-2 overflow-y-auto space-y-3.5 pr-1 max-h-[280px] scrollbar-thin scrollbar-thumb-white/5">
-              {referralClaims.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-black/20 border border-white/5 rounded-2xl">
-                  <Gift size={24} className="text-gray-600 mb-2 animate-pulse" />
-                  <span className="text-[9px] font-bold uppercase text-gray-500 tracking-widest leading-normal">
-                    No Payouts Available
-                  </span>
-                  <span className="text-[8px] text-gray-600 leading-normal mt-1 block">
-                    Your referral ledger is pristine. Payouts materialize here when direct partners activate nodes.
-                  </span>
+              {rewardHistory.length === 0 ? (
+                <div className="bg-black/20 border border-white/5 rounded-2xl p-8 text-center text-xs text-gray-500 font-bold uppercase tracking-widest">
+                  No payout entries detected.
                 </div>
               ) : (
-                referralClaims.map((claim) => (
-                  <div 
-                    key={claim.id} 
-                    className="p-3.5 bg-black/30 border border-white/5 rounded-2xl flex items-center justify-between gap-3.5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[8px] font-bold text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                          {claim.type === 'referrer' ? 'Commission' : 'Welcome'}
-                        </span>
-                        <span className="text-[9px] text-gray-400 capitalize truncate max-w-[100px]">
-                          Partner: {claim.partner_name}
-                        </span>
-                      </div>
-                      <div className="text-xs font-black text-white mt-1">
-                        Amount: {formatCurrency(claim.amount)}
-                      </div>
-                      <div className="text-[8px] text-gray-600 mt-0.5">
-                        {new Date(claim.created_at || '').toLocaleDateString()}
-                      </div>
-                    </div>
-                    
-                    <div className="flex-shrink-0">
-                      {claim.status === 'pending' ? (
-                        <button 
-                          onClick={() => handleClaimReward(claim)}
-                          disabled={isClaimingId === claim.id}
-                          className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:brightness-110 active:scale-95 disabled:opacity-40 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all shadow-md shadow-pink-500/10 cursor-pointer"
-                        >
-                          {isClaimingId === claim.id ? 'Claiming' : 'Claim'}
-                        </button>
-                      ) : (
-                        <span className="px-2.5 py-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[8px] font-black uppercase tracking-widest rounded-xl">
-                          Claimed
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))
+                <div className="grid gap-3 max-h-[300px] overflow-y-auto pr-2 scrollbar-thin">
+                  {rewardHistory.map((tx, idx) => (
+                    <TransactionTicket 
+                      key={`${tx.id}-${idx}`}
+                      tx={tx}
+                      currentUserId={user?.uid ?? undefined}
+                      variant="fund"
+                    />
+                  ))}
+                </div>
               )}
             </div>
 
-          </div>
-
-        </div>
-
-        {/* REWARD TRANSACTION HISTORY SECTION */}
-        <div id="reward-history-section" className="mb-10 p-6 md:p-8 bg-[#11131f] border border-white/5 rounded-[32px] relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-64 h-64 bg-purple-500/5 blur-[80px] rounded-full pointer-events-none" />
-          
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-[#A855F7]">
-              <History size={16} />
-            </div>
-            <div>
-              <h3 className="text-base font-black italic text-white uppercase tracking-tight">Reward Activity Ledger</h3>
-              <p className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Historical records of claimed points, conversion swaps, and settlements</p>
-            </div>
-          </div>
-
-          {rewardHistory.length === 0 ? (
-            <div id="no-reward-tx-msg" className="bg-[#0a0c10] border border-white/5 rounded-2xl p-8 text-center text-xs text-aura-muted font-bold uppercase tracking-widest">
-              No reward records detected.
-            </div>
-          ) : (
-            <div id="reward-tx-grid" className="grid gap-3 max-h-[480px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-white/5">
-              {rewardHistory.map((tx, idx) => (
-                <TransactionTicket 
-                  key={`${tx.id}-${idx}`}
-                  tx={tx}
-                  currentUserId={user?.uid ?? undefined}
-                  variant="fund"
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 6. BOTTOM SECTION: COMPREHENSIVE INSTRUCTIONS / EXPLANATION CARD */}
-        <div className="p-8 md:p-12 rounded-[32px] border border-[#7C3AED]/20 bg-gradient-to-br from-[#11131f]/90 via-[#7C3AED]/10 to-[#11131f]/90 backdrop-blur-3xl relative overflow-hidden shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.12),transparent_60%)] pointer-events-none" />
-          
-          <div className="relative z-10 grid lg:grid-cols-12 gap-10 items-center">
-            
-            <div className="lg:col-span-4 space-y-4 text-center lg:text-left">
-              <div className="inline-block px-3 py-1 bg-[#7C3AED]/10 border border-[#7C3AED]/30 rounded-full text-[10px] font-black text-[#A855F7] uppercase tracking-widest mb-2">Platform Protocol</div>
-              <h3 className="text-2xl font-black text-white italic tracking-tight uppercase">Loyalty Reward Guide</h3>
-              <p className="text-xs text-aura-muted leading-relaxed">
-                Discover the mechanics governing our automated checking systems, instant points conversion and secure settlement policies designed for elite network nodes.
-              </p>
-            </div>
-
-            <div className="lg:col-span-8 grid md:grid-cols-2 gap-6">
-              {GUIDE_CARDS.map((card) => (
+            {/* Bottom guide cards explanation */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
+              {GUIDE_CARDS.map(card => (
                 <div 
                   key={card.id}
-                  id={`guide-card-${card.id}`}
                   onClick={() => setSelectedGuide(card)}
-                  style={{ '--glow-color': card.glowColor } as React.CSSProperties}
-                  className={cn(
-                    "p-6 rounded-[24px] bg-[#0a0c14] border border-white/5 space-y-3 cursor-pointer select-none",
-                    "transition-all duration-300 hover:scale-[1.02]",
-                    "hover:shadow-[0_4px_25px_var(--glow-color)] hover:border-[#7C3AED]/40 active:scale-[0.99] group/card"
-                  )}
+                  className="p-5 bg-[#0a0c10] border border-white/5 rounded-2xl cursor-pointer hover:border-[#00E5FF]/30 transition-all select-none group"
                 >
-                  <h4 className="text-sm font-black text-white flex items-center gap-2.5 transition-all">
-                    <span 
-                      className="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]"
-                      style={{ backgroundColor: card.iconColor, color: card.iconColor }}
-                    /> 
-                    {card.title}
-                  </h4>
-                  <p className="text-xs text-[#9CA3AF] leading-relaxed line-clamp-2">
-                    {card.shortDesc}
-                  </p>
-                  <div className="pt-2 flex items-center gap-1 text-[9px] uppercase font-black text-[#A855F7] tracking-widest opacity-60 group-hover/card:opacity-100 transition-opacity">
-                    See protocol detail →
-                  </div>
+                  <h4 className="text-xs font-black text-white group-hover:text-[#00E5FF] transition-colors uppercase tracking-wider mb-2">{card.title}</h4>
+                  <p className="text-[11px] text-gray-500 leading-relaxed">{card.shortDesc}</p>
                 </div>
               ))}
             </div>
+          </motion.div>
+        )}
 
-          </div>
-        </div>
-
-      </div>
-
-      {/* Enlarged Premium Popup/Modal for clicked guide card */}
-      <AnimatePresence>
-        {selectedGuide && (
-          <div id="guide-modal-backdrop" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 30 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
-              className="bg-[#0f111a] border border-[#7C3AED]/30 rounded-[32px] max-w-lg w-full p-6 md:p-8 relative overflow-hidden shadow-[0_10px_50px_rgba(124,58,237,0.2)]"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-[#7C3AED]/10 blur-3xl rounded-full" />
-              
-              {/* Close button */}
+        {/* --- DEDICATED PAGE: DAILY POINT --- */}
+        {rewardView === 'daily' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.99 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.99 }}
+            className="max-w-xl mx-auto space-y-5"
+          >
+            {/* Header bar designed to match reference image header */}
+            <div className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-[24px] px-4 py-5 flex items-center relative shadow-sm">
               <button 
-                onClick={() => setSelectedGuide(null)}
-                className="absolute top-5 right-5 p-2 rounded-full bg-white/5 text-gray-400 hover:text-white hover:bg-white/10 transition-all border border-white/5"
+                onClick={() => setRewardView('dashboard')}
+                className="absolute left-4 p-1 rounded-full hover:bg-white/10 text-white transition-all cursor-pointer flex items-center justify-center animate-none"
+                id="back_to_rewards_db_details"
               >
-                <X size={16} />
+                <ChevronLeft size={24} strokeWidth={2.5} />
               </button>
+              <h1 className="w-full text-center text-sm sm:text-base font-bold tracking-tight uppercase">
+                Daily Check-In Details
+              </h1>
+            </div>
 
-              <div className="flex items-center gap-3 mb-5">
-                <span 
-                  className="w-2.5 h-2.5 rounded-full animate-pulse shadow-[0_0_10px_currentColor]"
-                  style={{ backgroundColor: selectedGuide.iconColor }}
-                />
-                <h3 className="text-lg md:text-xl font-black text-white italic tracking-tight uppercase">
-                  {selectedGuide.title}
-                </h3>
+            {/* OVERVIEW CARD SECTION */}
+            <div className="bg-white border border-slate-100 rounded-[24px] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-slate-100/60">
+                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Points Overview</h3>
               </div>
+              <div className="grid grid-cols-3 gap-1 xs:gap-2 sm:gap-4 items-center">
+                <div className="text-left">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-bold text-slate-400 block uppercase mb-1 leading-tight truncate">Points Credited Today</span>
+                  <span className="text-emerald-500 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono">
+                    +{hasClaimedToday ? 1 : 0} Point{hasClaimedToday ? '' : 's'}
+                  </span>
+                </div>
+                <div className="text-center border-x border-slate-100 px-1 sm:px-2">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-bold text-slate-400 block uppercase mb-1 leading-tight truncate">Total Points</span>
+                  <span className="text-slate-800 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono truncate">
+                    {points_balance.toLocaleString()} PTS
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-bold text-slate-400 block uppercase mb-1 leading-tight truncate">Total Balance</span>
+                  <span className="text-slate-800 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono truncate">
+                    ${(points_balance * 0.10).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
 
-              <div className="space-y-4 max-h-[360px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/10 text-left">
-                <p className="text-xs md:text-sm font-bold text-purple-300 leading-relaxed">
-                  {selectedGuide.shortDesc}
-                </p>
-                <div className="text-[11px] text-aura-muted leading-relaxed whitespace-pre-wrap font-sans bg-white/[0.01] border border-white/5 p-4 rounded-2xl">
-                  {selectedGuide.fullDesc}
+            {/* DAILY CHECK-IN CALENDAR SECTION */}
+            <div className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
+              <div className="flex justify-between items-center border-b border-slate-50 pb-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Daily Check-In Calendar</h3>
+                <div className="flex gap-1.5 bg-slate-50 border border-slate-100 p-1.5 rounded-full text-center">
+                  <span className="text-[9px] uppercase font-bold text-emerald-700 px-2.5 py-0.5 bg-emerald-50 rounded-md">Streak: {current_streak} days</span>
                 </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <button 
-                  onClick={() => setSelectedGuide(null)}
-                  className="px-6 py-2.5 bg-gradient-to-r from-[#7C3AED] to-[#A855F7] text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-lg"
+              {/* Day, Month, Year Tabs selector */}
+              <div className="bg-slate-100/60 border border-slate-200/40 p-1 rounded-full flex gap-1 w-full max-w-[280px] mx-auto shadow-inner">
+                <button
+                  onClick={() => setCalTab('daily')}
+                  className={cn(
+                    "flex-1 text-[11px] font-bold py-1.5 rounded-full transition-all cursor-pointer",
+                    calTab === 'daily' 
+                      ? "bg-[#e8f5e9] text-emerald-700 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-800 bg-transparent"
+                  )}
                 >
-                  Close Guide
+                  Daily
+                </button>
+                <button
+                  onClick={() => setCalTab('monthly')}
+                  className={cn(
+                    "flex-1 text-[11px] font-bold py-1.5 rounded-full transition-all cursor-pointer",
+                    calTab === 'monthly' 
+                      ? "bg-[#e8f5e9] text-emerald-700 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-800 bg-transparent"
+                  )}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setCalTab('yearly')}
+                  className={cn(
+                    "flex-1 text-[11px] font-bold py-1.5 rounded-full transition-all cursor-pointer",
+                    calTab === 'yearly' 
+                      ? "bg-[#e8f5e9] text-emerald-700 shadow-sm" 
+                      : "text-slate-500 hover:text-slate-800 bg-transparent"
+                  )}
+                >
+                  Yearly
                 </button>
               </div>
+
+              {/* Sub-Header: Year selector & Sum Points */}
+              <div className="flex items-center justify-between text-xs px-1">
+                {/* Left side: Points sum */}
+                <div>
+                  {calTab === 'daily' && (
+                    <span className="text-emerald-600 font-bold block text-sm">
+                      Sum +{(() => {
+                        const monthPrefix = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
+                        return claimed_dates.filter((dStr: string) => dStr.startsWith(monthPrefix)).length;
+                      })()} Points
+                    </span>
+                  )}
+                  {calTab === 'monthly' && (
+                    <span className="text-emerald-600 font-bold block text-sm">
+                      Sum +{(() => {
+                        const yearPrefix = `${calYear}-`;
+                        return claimed_dates.filter((dStr: string) => dStr.startsWith(yearPrefix)).length;
+                      })()} Points
+                    </span>
+                  )}
+                  {calTab === 'yearly' && (
+                    <span className="text-emerald-600 font-bold block text-sm">
+                      Sum +{claimed_dates.length} Points
+                    </span>
+                  )}
+                </div>
+
+                {/* Right side: Navigating chevrons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (calTab === 'daily') {
+                        if (calMonth === 0) {
+                          if (calYear > 1980) {
+                            setCalYear(prev => prev - 1);
+                            setCalMonth(11);
+                          }
+                        } else {
+                          setCalMonth(prev => prev - 1);
+                        }
+                      } else {
+                        if (calYear > 1980) {
+                          setCalYear(prev => prev - 1);
+                        }
+                      }
+                    }}
+                    disabled={calYear <= 1980}
+                    className="p-1 rounded-full hover:bg-slate-100 text-slate-600 active:scale-90 transition-all cursor-pointer disabled:opacity-20"
+                  >
+                    <ChevronLeft size={16} strokeWidth={2.5} />
+                  </button>
+
+                  <span className="font-bold text-slate-800 tracking-wide font-mono text-xs sm:text-sm">
+                    {calTab === 'daily' 
+                      ? `${calYear}.${String(calMonth + 1).padStart(2, '0')}`
+                      : `${calYear}`
+                    }
+                  </span>
+
+                  <button
+                    onClick={() => {
+                      if (calTab === 'daily') {
+                        if (calMonth === 11) {
+                          if (calYear < 2099) {
+                            setCalYear(prev => prev + 1);
+                            setCalMonth(0);
+                          }
+                        } else {
+                          setCalMonth(prev => prev + 1);
+                        }
+                      } else {
+                        if (calYear < 2099) {
+                          setCalYear(prev => prev + 1);
+                        }
+                      }
+                    }}
+                    disabled={calYear >= 2099}
+                    className="p-1 rounded-full hover:bg-slate-100 text-slate-600 active:scale-90 transition-all cursor-pointer disabled:opacity-20"
+                  >
+                    <ChevronRight size={16} strokeWidth={2.5} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Calendar Days / Months / Years Grid Content */}
+              <AnimatePresence mode="wait">
+                {calTab === 'daily' && (
+                  <motion.div
+                    key="daily-calendar"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.15 }}
+                    className="space-y-4"
+                  >
+                    {/* Weekday headers list */}
+                    <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 tracking-wider">
+                      {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(lbl => (
+                        <div key={lbl} className="py-1">{lbl}</div>
+                      ))}
+                    </div>
+
+                    {/* Numeric Days grid */}
+                    <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                      {(() => {
+                        const list = [];
+                        const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+                        let firstDayIdx = new Date(calYear, calMonth, 1).getDay();
+                        // Adjust default Sun=0 to Mon-start Mon=0, Sun=6
+                        firstDayIdx = (firstDayIdx + 6) % 7;
+
+                        // Blank items at month prefix
+                        for (let k = 0; k < firstDayIdx; k++) {
+                          list.push(
+                            <div key={`blank-${k}`} className="w-full aspect-square bg-transparent" />
+                          );
+                        }
+
+                        // Day entries
+                        for (let d = 1; d <= daysInMonth; d++) {
+                          const iterDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                          const isClaimed = claimedDatesSet.has(iterDateStr);
+                          const isToday = iterDateStr === todayStr;
+
+                          if (isClaimed) {
+                            if (isToday) {
+                              // TODAY successfully checked in is shown with bright solid green base matching 27 in image!
+                              list.push(
+                                <div 
+                                  key={`day-${d}`}
+                                  className="w-full aspect-square rounded-[14px] bg-emerald-500 shadow-[0_4px_12px_rgba(16,185,129,0.3)] border border-emerald-600 flex flex-col items-center justify-center cursor-default select-none relative"
+                                >
+                                  <span className="text-white text-xs sm:text-sm font-black">{d}</span>
+                                  <span className="text-[7px] sm:text-[9px] font-black text-emerald-100 mt-0.5 block">+1</span>
+                                </div>
+                              );
+                            } else {
+                              // Other claimed past or future dates show soft green background and light border
+                              list.push(
+                                <div 
+                                  key={`day-${d}`}
+                                  className="w-full aspect-square rounded-[14px] bg-[#e6f4ea] border border-[#a3e635]/15 flex flex-col items-center justify-center cursor-default select-none group"
+                                >
+                                  <span className="text-[#137333] text-xs sm:text-sm font-bold">{d}</span>
+                                  <span className="text-[7px] sm:text-[9px] font-black text-emerald-500 mt-0.5 block">+1</span>
+                                </div>
+                              );
+                            }
+                          } else if (isToday) {
+                            // TODAY: Not yet claimed, glows with light-pulsing active check-in prompt!
+                            list.push(
+                              <button 
+                                key={`day-${d}`}
+                                onClick={handleDailyCheckIn}
+                                className="w-full aspect-square rounded-[14px] border-2 border-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 font-bold flex flex-col items-center justify-center hover:scale-[1.03] transition-all cursor-pointer animate-pulse"
+                                title="Click to check-in now"
+                              >
+                                <span className="text-xs sm:text-sm font-black">{d}</span>
+                                <span className="text-[7px] sm:text-[9px] font-bold text-emerald-600 mt-0.5 block">CLAIM</span>
+                              </button>
+                            );
+                          } else {
+                            // Unclaimed normal date shown neutrally with clean spacing and absolutely no sub-labels
+                            list.push(
+                              <div 
+                                key={`day-${d}`}
+                                className="w-full aspect-square rounded-[14px] bg-slate-50/30 border border-slate-100 flex items-center justify-center text-slate-800 font-semibold text-xs sm:text-sm select-none"
+                              >
+                                {d}
+                              </div>
+                            );
+                          }
+                        }
+                        return list;
+                      })()}
+                    </div>
+                  </motion.div>
+                )}
+
+                {calTab === 'monthly' && (
+                  <motion.div
+                    key="monthly-calendar"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.15 }}
+                    className="grid grid-cols-3 gap-3"
+                  >
+                    {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((name, mIdx) => {
+                      const prefixStr = `${calYear}-${String(mIdx + 1).padStart(2, '0')}`;
+                      const claimCount = claimed_dates.filter((dStr: string) => dStr.startsWith(prefixStr)).length;
+                      const hasClaims = claimCount > 0;
+
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            setCalMonth(mIdx);
+                            setCalTab('daily');
+                          }}
+                          className={cn(
+                            "py-4 px-2 rounded-2xl flex flex-col items-center justify-center transition-all border cursor-pointer active:scale-95",
+                            hasClaims 
+                              ? "bg-[#e8f5e9] border-[#a3e635]/10 text-[#137333] hover:brightness-95"
+                              : "bg-slate-50/20 border-slate-100 text-slate-700 hover:bg-slate-50"
+                          )}
+                        >
+                          <span className="text-xs sm:text-sm font-black block uppercase">{name}</span>
+                          <span className="text-[9px] font-black text-slate-500 mt-1 block">
+                            {hasClaims ? `+${claimCount} Points` : '0 points'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+
+                {calTab === 'yearly' && (
+                  <motion.div
+                    key="yearly-calendar"
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    transition={{ duration: 0.15 }}
+                    className="grid grid-cols-3 gap-3"
+                  >
+                    {(() => {
+                      const list = [];
+                      const startY = calYear - 3; // Center range
+                      for (let y = startY; y < startY + 9; y++) {
+                        const prefixStr = `${y}-`;
+                        const claimCount = claimed_dates.filter((dStr: string) => dStr.startsWith(prefixStr)).length;
+                        const hasClaims = claimCount > 0;
+
+                        list.push(
+                          <button
+                            key={y}
+                            onClick={() => {
+                              setCalYear(y);
+                              setCalTab('monthly');
+                            }}
+                            className={cn(
+                              "py-4 px-2 rounded-2xl flex flex-col items-center justify-center transition-all border cursor-pointer active:scale-95",
+                              hasClaims 
+                                ? "bg-[#e8f5e9] border-[#a3e635]/10 text-[#137333] hover:brightness-95"
+                                : "bg-slate-50/20 border-slate-100 text-slate-700 hover:bg-slate-50"
+                            )}
+                          >
+                            <span className="text-xs sm:text-sm font-black block">{y}</span>
+                            <span className="text-[9px] font-black text-slate-500 mt-1 block">
+                              {hasClaims ? `+${claimCount} Points` : '0 points'}
+                            </span>
+                          </button>
+                        );
+                      }
+                      return list;
+                    })()}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* ATTEST / CLAIM ACTION BUTTON COMPONENT */}
+            <div className="bg-white border border-slate-100 rounded-[24px] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.015)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Claim attendance credit</p>
+                <p className="text-[10px] text-slate-400 font-medium">Must attest once every global 24-hour cycle.</p>
+              </div>
+
+              <button
+                onClick={handleDailyCheckIn}
+                disabled={isSubmitting || !isDailyClaimable}
+                className={cn(
+                  "w-full sm:w-auto px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer",
+                  isDailyClaimable 
+                    ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-105 text-white shadow-md shadow-emerald-500/10" 
+                    : "bg-slate-100 text-slate-400 border border-slate-100 cursor-not-allowed"
+                )}
+              >
+                {hasClaimedToday ? "Already Checked In Today" : countdownStr ? `Cycle rest in ${countdownStr}` : "Claim +1 Daily PTS"}
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* --- DEDICATED PAGE: REFER FRIENDS --- */}
+        {rewardView === 'refer' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="max-w-4xl mx-auto space-y-6"
+          >
+            <button 
+              onClick={() => setRewardView('dashboard')}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-gray-400 hover:text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all"
+            >
+              <ArrowLeft size={14} /> Back to Dashboard
+            </button>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Matrix general panel */}
+              <div className="lg:col-span-8 p-6 bg-[#11131f] border border-white/5 rounded-[32px] space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 blur-[60px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <Users className="text-purple-400" size={24} />
+                  <div>
+                    <h2 className="text-lg font-black text-white italic uppercase">Referral Matrix Control</h2>
+                    <p className="text-xs text-gray-500">Track invited partners, commissions, and codes.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5 xs:gap-2 sm:gap-3">
+                  <div className="p-2 sm:p-4 bg-black/30 border border-white/5 rounded-xl text-center">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-400 block mb-0.5 leading-tight truncate">Invited Users</span>
+                    <span className="text-xs xs:text-sm sm:text-lg font-black text-white italic">{partners.length}</span>
+                  </div>
+                  <div className="p-2 sm:p-4 bg-black/30 border border-white/5 rounded-xl text-center">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-400 block mb-0.5 leading-tight truncate">Active Tiers</span>
+                    <span className="text-xs xs:text-sm sm:text-lg font-black text-emerald-400 italic">
+                      {partners.filter(p => p.status === 'active').length}
+                    </span>
+                  </div>
+                  <div className="p-2 sm:p-4 bg-black/30 border border-white/5 rounded-xl text-center">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-400 block mb-0.5 leading-tight truncate">Inactive Tiers</span>
+                    <span className="text-xs xs:text-sm sm:text-lg font-black text-red-400 italic">
+                      {partners.filter(p => p.status === 'inactive').length}
+                    </span>
+                  </div>
+                  <div className="p-2 sm:p-4 bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/25 rounded-xl text-center">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-300 block mb-0.5 leading-tight truncate">Commission Wallet</span>
+                    <span className="text-xs xs:text-sm sm:text-lg font-black text-white italic">${(profile?.referral_earnings || 0).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Copies code & link area */}
+                <div className="p-3 sm:p-4 bg-white/[0.02] border border-white/5 rounded-2xl">
+                  <div className="flex flex-row items-center justify-between gap-2 sm:gap-4 text-left">
+                    <div className="shrink-0">
+                      <span className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider block">Invite Code</span>
+                      <span className="font-black text-white font-mono tracking-widest text-[10px] sm:text-sm uppercase leading-none">{profile?.referral_code || '---'}</span>
+                    </div>
+                    <div className="flex-1 min-w-0 px-1 sm:px-2">
+                       <span className="text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider block leading-tight">Ref Link URL</span>
+                       <span className="text-gray-400 truncate block font-mono text-[8px] sm:text-[9px] md:text-[10px] leading-tight">{profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const link = profile?.referral_code ? `${window.location.origin}/signup?ref=${profile.referral_code}` : `${window.location.origin}/signup`;
+                        navigator.clipboard.writeText(link);
+                        toast.success("Referral invitation link copied!");
+                      }}
+                      className="px-2.5 py-1.5 sm:px-4 sm:py-2 bg-purple-600 hover:bg-purple-500 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1 cursor-pointer shadow-md transition-all shrink-0 font-sans leading-none"
+                    >
+                      <Copy size={10} /> Copy Link
+                    </button>
+                  </div>
+                </div>
+
+                {/* Partners List */}
+                <div className="space-y-3">
+                  <h3 className="text-xs font-black uppercase text-white tracking-wider">Network Connections</h3>
+                  <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 scrollbar-thin">
+                    {partnersLoading ? (
+                      <div className="text-center py-6 text-xs text-gray-500 uppercase tracking-widest font-black animate-pulse">Loading directory entries...</div>
+                    ) : partners.length === 0 ? (
+                      <div className="text-center py-8 bg-black/10 rounded-xl text-[10px] text-gray-600 uppercase font-black">No partners invited. Share code to start.</div>
+                    ) : (
+                      partners.map(partner => (
+                        <div key={partner.id} className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between text-xs">
+                          <div>
+                            <p className="font-bold text-white uppercase tracking-wide">@{partner.username}</p>
+                            <p className="text-[10px] text-gray-500 block leading-normal">Plan: <span className="text-[#00E5FF] font-bold">{partner.planName}</span></p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest", partner.status === 'active' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400")}>
+                              {partner.status}
+                            </span>
+                            {partner.status === 'inactive' && (
+                              <button
+                                onClick={() => handlePokeUser(partner)}
+                                disabled={pokedUsers[partner.id]}
+                                className={cn(
+                                  "px-2.5 py-1.5 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all",
+                                  pokedUsers[partner.id] 
+                                    ? "bg-white/5 text-gray-600 cursor-not-allowed" 
+                                    : "bg-purple-600/20 text-purple-300 hover:bg-purple-600 hover:text-white"
+                                )}
+                              >
+                                {pokedUsers[partner.id] ? "Poked" : "Poke User"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Claims ledger panel */}
+              <div className="lg:col-span-4 p-6 bg-[#11131f] border border-white/5 rounded-[32px] space-y-4 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Trophy className="text-purple-400" size={18} />
+                    <span className="text-xs font-black uppercase tracking-wider text-white italic">Unclaimed Bonuses</span>
+                  </div>
+
+                  <div className="space-y-3.5 max-h-[290px] overflow-y-auto pr-1 scrollbar-thin flex-1">
+                    {referralClaims.length === 0 ? (
+                      <div className="text-center py-8 bg-black/20 rounded-2xl flex flex-col items-center justify-center p-4">
+                        <Gift size={20} className="text-gray-600 mb-2" />
+                        <span className="text-[9px] font-black uppercase text-gray-500 leading-normal block">Ledger Pristine</span>
+                      </div>
+                    ) : (
+                      referralClaims.map((claim) => (
+                        <div key={claim.id} className="p-3 bg-black/40 border border-white/5 rounded-xl flex items-center justify-between gap-3 text-xs">
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[8px] font-black text-indigo-400 bg-indigo-500/10 px-1 py-0.5 rounded uppercase block w-max mb-1">
+                              {claim.type === 'referrer' ? 'Commission' : 'Welcome'}
+                            </span>
+                            <p className="font-bold text-white truncate max-w-[120px]">Partner: @{claim.partner_name}</p>
+                            <p className="text-[10px] text-emerald-400 font-bold mt-1">${claim.amount.toFixed(2)}</p>
+                          </div>
+                          {claim.status === 'pending' ? (
+                            <button
+                              onClick={() => handleClaimReferralReward(claim)}
+                              disabled={isClaimingId === claim.id}
+                              className="px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:brightness-110 active:scale-95 text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all"
+                            >
+                              Claim
+                            </button>
+                          ) : (
+                            <span className="text-[8px] font-black text-gray-600 uppercase">Claimed</span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* --- DEDICATED PAGE: NODE REWARDS --- */}
+        {rewardView === 'nodes' && (() => {
+          const activeUnclaimedNodeRewards = unclaimedInvestmentRewards.reduce((sum, inv) => sum + (inv.amount * 0.02), 0);
+          const totalNodeRewardsClaimed = rewardHistory.filter(tx => tx.type === 'investment_reward').reduce((sum, tx) => sum + (tx.amount || 0), 0);
+          const activeInvestmentPlans = Array.from(new Set(activeInvestments.map(inv => inv.plan_name).filter(Boolean)));
+
+          return (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="max-w-2xl mx-auto space-y-6"
+            >
+              <button 
+                onClick={() => setRewardView('dashboard')}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-gray-400 hover:text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all"
+              >
+                <ArrowLeft size={14} /> Back to Dashboard
+              </button>
+
+              {/* PREMIUM DEDICATED OVERVIEW CARD */}
+              <div className="p-4 sm:p-6 rounded-[24px] bg-gradient-to-br from-[#121922]/95 to-[#070a10]/98 border border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-yellow-500/5 blur-[80px] rounded-full" />
+                <div className="grid grid-cols-4 gap-1 sm:gap-4 divide-x divide-white/5 md:divide-white/10">
+                  <div className="space-y-0.5 sm:space-y-1 text-center sm:text-left">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Node Reward Balance</span>
+                    <span className="text-xs xs:text-sm sm:text-xl font-black text-yellow-400 font-mono italic block">${activeUnclaimedNodeRewards.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-0.5 sm:space-y-1 pl-1 sm:pl-5 text-center sm:text-left">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Total Accumulated</span>
+                    <span className="text-xs xs:text-sm sm:text-xl font-black text-white font-mono italic block">${totalNodeRewardsClaimed.toFixed(2)}</span>
+                  </div>
+                  <div className="space-y-0.5 sm:space-y-1 pl-1 sm:pl-5 text-center sm:text-left">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Active Nodes</span>
+                    <span className="text-xs xs:text-sm sm:text-xl font-black text-white font-mono block">{activeInvestments.length}</span>
+                  </div>
+                  <div className="space-y-0.5 sm:space-y-1 pl-1 sm:pl-5 text-center sm:text-left flex flex-col justify-center">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[9px] font-black uppercase tracking-wider text-gray-400 block leading-tight mb-1 truncate">Active Plans</span>
+                    <div className="flex flex-wrap justify-center sm:justify-start gap-0.5 sm:gap-1">
+                      {activeInvestmentPlans.length === 0 ? (
+                        <span className="text-[7px] xs:text-[8px] text-gray-500 font-bold uppercase truncate">None</span>
+                      ) : (
+                        activeInvestmentPlans.slice(0, 2).map((nm) => (
+                          <span key={nm} className="px-1 py-0.2 sm:px-1.5 sm:py-0.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 text-[6px] sm:text-[8px] font-black uppercase tracking-wider">{nm}</span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-[#11131f] border border-white/5 rounded-[32px] space-y-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/5 blur-[80px] rounded-full animate-pulse" />
+                <div className="flex items-center gap-3 mb-2">
+                  <PiggyBank className="text-yellow-400" size={24} />
+                  <div>
+                    <h2 className="text-xl font-black text-white italic uppercase tracking-tight">Active Node Rewards</h2>
+                    <p className="text-xs text-gray-500">Claim instant 2.00% cashback multipliers on node containers.</p>
+                  </div>
+                </div>
+
+              {/* Tiers display */}
+              <div className="space-y-4">
+                {/* Regular */}
+                <div className={cn("p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden", regularUnclaimed ? "bg-purple-500/5 border-purple-500 shadow-md" : "bg-black/30 border-white/5 opacity-60")}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded tracking-widest">Regular Node Tier</span>
+                      <p className="text-xs text-gray-500 mt-1">{regularUnclaimed ? 'Active nodes hosting rewards' : 'No unclaimed regular rewards'}</p>
+                    </div>
+                    {regularUnclaimed && (
+                      <div className="text-right">
+                        <p className="text-[9px] text-gray-400 uppercase">Available:</p>
+                        <p className="text-sm font-black text-white italic">${(regularUnclaimed.amount * 0.02).toFixed(2)}</p>
+                      </div>
+                    )}
+                  </div>
+                  {regularUnclaimed && (
+                    <button onClick={() => handleClaimInvestmentReward(regularUnclaimed)} disabled={isSubmitting} className="w-full mt-3 py-2 bg-purple-600 hover:bg-purple-500 active:scale-[0.98] text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all">
+                      Claim 2% Incentive
+                    </button>
+                  )}
+                </div>
+
+                {/* Premium */}
+                <div className={cn("p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden", premiumUnclaimed ? "bg-emerald-500/5 border-emerald-500 shadow-md" : "bg-black/30 border-white/5 opacity-60")}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded tracking-widest">Premium Node Tier</span>
+                      <p className="text-xs text-gray-500 mt-1">{premiumUnclaimed ? 'Active nodes hosting rewards' : 'No unclaimed premium rewards'}</p>
+                    </div>
+                    {premiumUnclaimed && (
+                      <div className="text-right">
+                        <p className="text-[9px] text-gray-400 uppercase">Available:</p>
+                        <p className="text-sm font-black text-white italic">${(premiumUnclaimed.amount * 0.02).toFixed(2)}</p>
+                      </div>
+                    )}
+                  </div>
+                  {premiumUnclaimed && (
+                    <button onClick={() => handleClaimInvestmentReward(premiumUnclaimed)} disabled={isSubmitting} className="w-full mt-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all">
+                      Claim 2% Incentive
+                    </button>
+                  )}
+                </div>
+
+                {/* Elite */}
+                <div className={cn("p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden", eliteUnclaimed ? "bg-amber-500/5 border-amber-500 shadow-md" : "bg-black/30 border-white/5 opacity-60")}>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[8px] font-black uppercase text-amber-500 bg-amber-505/10 px-1.5 py-0.5 rounded tracking-widest">Elite Node Tier</span>
+                      <p className="text-xs text-gray-500 mt-1">{eliteUnclaimed ? 'Active nodes hosting rewards' : 'No unclaimed elite rewards'}</p>
+                    </div>
+                    {eliteUnclaimed && (
+                      <div className="text-right">
+                        <p className="text-[9px] text-gray-400 uppercase">Available:</p>
+                        <p className="text-sm font-black text-white italic">${(eliteUnclaimed.amount * 0.02).toFixed(2)}</p>
+                      </div>
+                    )}
+                  </div>
+                  {eliteUnclaimed && (
+                    <button onClick={() => handleClaimInvestmentReward(eliteUnclaimed)} disabled={isSubmitting} className="w-full mt-3 py-2 bg-amber-600 hover:bg-amber-500 active:scale-[0.98] text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all">
+                      Claim 2% Incentive
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ); })()}
+
+        {/* --- DEDICATED PAGE: RANKING --- */}
+        {rewardView === 'ranking' && (() => {
+          const totalRankingRewardsClaimed = claimed_milestones.reduce((sum, milestoneId) => {
+            const MILESTONES_LOCAL = [
+              { id: 'ref_milestone_5', amount: 20 },
+              { id: 'ref_milestone_10', amount: 45 },
+              { id: 'ref_milestone_20', amount: 90 },
+              { id: 'ref_milestone_50', amount: 240 },
+              { id: 'ref_milestone_100', amount: 500 },
+              { id: 'ref_milestone_200', amount: 1500 }
+            ];
+            const item = MILESTONES_LOCAL.find(m => m.id === milestoneId);
+            return sum + (item ? item.amount : 0);
+          }, 0);
+
+          return (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              className="max-w-4xl mx-auto space-y-6"
+            >
+              <button 
+                onClick={() => setRewardView('dashboard')}
+                className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-gray-400 hover:text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all"
+              >
+                <ArrowLeft size={14} /> Back to Dashboard
+              </button>
+
+              {/* PREMIUM RANKING OVERVIEW CARD */}
+              <div className="p-4 sm:p-6 rounded-[24px] bg-gradient-to-br from-[#101b22] to-[#05080c] border border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 blur-[80px] rounded-full animate-pulse" />
+                <div className="grid grid-cols-4 gap-1 sm:gap-4 divide-x divide-white/5 md:divide-white/10">
+                  <div className="space-y-0.5 sm:space-y-1 text-center sm:text-left">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[90px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Ranking Balance</span>
+                    <span className="text-xs xs:text-sm sm:text-xl font-black text-cyan-400 font-mono italic block">${totalRankingRewardsClaimed.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="space-y-0.5 sm:space-y-1 pl-1 sm:pl-5 text-center sm:text-left">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[90px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Total Referrals</span>
+                    <span className="text-xs xs:text-sm sm:text-xl font-black text-white font-mono block">{partners.length}</span>
+                  </div>
+                  <div className="space-y-0.5 sm:space-y-1 pl-1 sm:pl-5 text-center sm:text-left">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[90px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Active Refs</span>
+                    <span className="text-xs xs:text-sm sm:text-xl font-black text-emerald-400 font-mono block">{activeRefs}</span>
+                  </div>
+                  <div className="space-y-0.5 sm:space-y-1 pl-1 sm:pl-5 text-center sm:text-left flex flex-col justify-center">
+                    <span className="text-[7px] xs:text-[8px] sm:text-[90px] font-black uppercase tracking-wider text-gray-400 block leading-tight truncate">Current Rank</span>
+                    <span className="text-[9px] xs:text-[10px] sm:text-sm font-black text-emerald-400 uppercase tracking-widest mt-1 inline-flex items-center justify-center sm:justify-start gap-1 leading-none shrink-0 truncate">
+                      <Icon3DRankingMini />
+                      {userHighestPlan ? userHighestPlan.replace(/node/i, '').trim() : 'Starter'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* TRACK REFERRED USERS grid */}
+              <div className="p-6 bg-[#0a0d14] border border-white/5 rounded-[28px] space-y-4">
+                <div className="flex items-center gap-2">
+                  <Users size={16} className="text-[#00E5FF]" />
+                  <span className="text-xs font-black uppercase tracking-wider text-white">My Commission Network</span>
+                </div>
+                {partnersLoading ? (
+                  <div className="py-6 text-center text-xs text-gray-500 uppercase font-black tracking-widest animate-pulse">
+                    Querying network directory...
+                  </div>
+                ) : partners.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-gray-500 bg-black/20 border border-white/5 rounded-2xl">
+                    No referred users detected yet. Join the program today!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[300px] overflow-y-auto pr-1 scrollbar-thin">
+                    {partners.map((partner) => (
+                      <div key={partner.id} className="p-3 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          {/* Profile Vector Avatar */}
+                          <div className="w-10 h-10 rounded-full bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center">
+                            <img
+                              src={`https://api.dicebear.com/7.x/notionists/svg?seed=${partner.username || 'user'}`}
+                              alt={partner.username}
+                              className="w-full h-full object-cover animate-none"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-black text-sm text-white uppercase tracking-wider truncate">@{partner.username}</p>
+                            <span className="text-[10px] text-gray-500 font-bold block truncate">{partner.name}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className={cn(
+                            "px-2.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest",
+                            partner.status === 'active' 
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                              : "bg-red-500/10 text-red-400 border border-red-500/20"
+                          )}>
+                            {partner.status}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-8 bg-[#11131f] border border-white/5 rounded-[32px] space-y-8 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-[80px] rounded-full" />
+                <div className="text-center space-y-3">
+                  <Trophy className="text-yellow-400 mx-auto" size={28} />
+                  <h2 className="text-xl font-black text-white italic uppercase tracking-tight">Ecosystem Rankings</h2>
+                  
+                  {/* Dynamic User Ranking Display */}
+                  {(() => {
+                    let userRankName = "Starter";
+                    let baseRankNum = 250050;
+                    if (userHighestPlan === 'elite') {
+                      userRankName = "Elite";
+                      baseRankNum = 1240;
+                    } else if (userHighestPlan === 'premium') {
+                      userRankName = "Premium";
+                      baseRankNum = 24103;
+                    } else if (userHighestPlan === 'regular' || activeInvestments.length > 0) {
+                      userRankName = "Regular";
+                      baseRankNum = 107980;
+                    }
+                    
+                    const deduction = (activeRefs * 123) + (activeInvestments.length * 456) + (rewardHistory.length * 89);
+                    const userRankNumber = Math.max(1, baseRankNum - deduction);
+                    
+                    return (
+                      <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs font-black tracking-widest uppercase shadow-inner animate-pulse">
+                        <Icon3DRankingMini />
+                        <span>{userRankName} #{userRankNumber.toLocaleString()}</span>
+                      </div>
+                    );
+                  })()}
+
+                  <p className="text-xs text-gray-500">Nodes sorted dynamically by operational active capacity plan.</p>
+                </div>
+
+                {/* 3 Premium Ranking Cards: Premium Left, Elite Centers, Regular Right */}
+                <div className="grid grid-cols-3 gap-1.5 xs:gap-2 sm:gap-4 md:gap-6 items-stretch pt-4">
+                  {/* Premium Card (Left) */}
+                  <div className={cn(
+                    "p-2 xs:p-4 sm:p-6 pt-10 xs:pt-12 sm:pt-16 rounded-xl sm:rounded-[24px] border transition-all duration-300 flex flex-col justify-between space-y-2 text-center select-none relative",
+                    userHighestPlan === 'premium'
+                      ? "bg-purple-500/5 border-purple-500 shadow-[0_4px_30px_rgba(124,58,237,0.15)]"
+                      : "bg-black/40 border-white/5 hover:border-white/10"
+                  )}>
+                    <div className="scale-50 xs:scale-75 sm:scale-100 origin-center">
+                      <Icon3DPremiumCard />
+                    </div>
+                    {userHighestPlan === 'premium' && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-purple-500 text-white text-[6px] sm:text-[8px] font-black uppercase tracking-wider whitespace-nowrap">Active Rank</span>
+                    )}
+                    <div className="space-y-1 block w-full min-w-0">
+                      <span className="text-[6.5px] xs:text-[8px] sm:text-[9px] uppercase font-black text-emerald-400 tracking-wider inline-flex items-center justify-center gap-0.5 mb-1 leading-none w-full truncate">
+                        <Icon3DRankingMini />
+                        <span>Premium</span>
+                      </span>
+                      <span className="text-xs xs:text-sm sm:text-2xl md:text-3xl font-black text-white italic tracking-tight block truncate">{premiumCount.toLocaleString()}</span>
+                      <span className="text-[6px] xs:text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider block truncate">Active Members</span>
+                    </div>
+                  </div>
+
+                  {/* Elite Card (Center - Highlighted) */}
+                  <div className={cn(
+                    "p-2 xs:p-4 sm:p-6 pt-10 xs:pt-12 sm:pt-16 rounded-xl sm:rounded-[24px] border-2 transition-all duration-300 flex flex-col justify-between space-y-2 text-center select-none relative sm:scale-[1.03] md:scale-[1.05]",
+                    userHighestPlan === 'elite'
+                      ? "bg-amber-500/10 border-amber-500 shadow-[0_4px_45px_rgba(245,158,11,0.25)]"
+                      : "bg-gradient-to-b from-[#1c1811] to-[#0d0905] border-amber-500/30 hover:border-amber-500/60 shadow-lg shadow-amber-500/5"
+                  )}>
+                    <div className="scale-50 xs:scale-75 sm:scale-100 origin-center">
+                      <Icon3DEliteCard />
+                    </div>
+                    {userHighestPlan === 'elite' ? (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-amber-550 text-black text-[6px] sm:text-[8px] font-black uppercase tracking-wider whitespace-nowrap">Active Rank</span>
+                    ) : (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[#FEF7E0] text-[6px] sm:text-[8px] font-black uppercase tracking-wider whitespace-nowrap">Aesthetic</span>
+                    )}
+                    <div className="space-y-1 pt-1 block w-full min-w-0">
+                      <span className="text-[6.5px] xs:text-[8px] sm:text-[9px] uppercase font-black text-emerald-400 tracking-wider inline-flex items-center justify-center gap-0.5 mb-1 leading-none w-full truncate">
+                        <Icon3DRankingMini />
+                        <span>Elite</span>
+                      </span>
+                      <span className="text-xs xs:text-sm sm:text-2xl md:text-3xl font-black text-white italic tracking-tight block truncate">{eliteCount.toLocaleString()}</span>
+                      <span className="text-[6px] xs:text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider block truncate">Active Members</span>
+                    </div>
+                  </div>
+
+                  {/* Regular Card (Right) */}
+                  <div className={cn(
+                    "p-2 xs:p-4 sm:p-6 pt-10 xs:pt-12 sm:pt-16 rounded-xl sm:rounded-[24px] border transition-all duration-300 flex flex-col justify-between space-y-2 text-center select-none relative",
+                    userHighestPlan === 'regular' || (!userHighestPlan && activeInvestments.length > 0)
+                      ? "bg-emerald-500/5 border-emerald-500 shadow-[0_4px_30px_rgba(16,185,129,0.15)]"
+                      : "bg-black/40 border-white/5 hover:border-white/10"
+                  )}>
+                    <div className="scale-50 xs:scale-75 sm:scale-100 origin-center">
+                      <Icon3DRegularCard />
+                    </div>
+                    {(userHighestPlan === 'regular' || (!userHighestPlan && activeInvestments.length > 0)) && (
+                      <span className="absolute -top-2 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[6px] sm:text-[8px] font-black uppercase tracking-wider whitespace-nowrap">Active Rank</span>
+                    )}
+                    <div className="space-y-1 block w-full min-w-0">
+                      <span className="text-[6.5px] xs:text-[8px] sm:text-[9px] uppercase font-black text-emerald-400 tracking-wider inline-flex items-center justify-center gap-0.5 mb-1 leading-none w-full truncate">
+                        <Icon3DRankingMini />
+                        <span>Regular</span>
+                      </span>
+                      <span className="text-xs xs:text-sm sm:text-2xl md:text-3xl font-black text-white italic tracking-tight block truncate">{regularCount.toLocaleString()}</span>
+                      <span className="text-[6px] xs:text-[7px] sm:text-[9px] text-gray-500 uppercase font-bold tracking-wider block truncate">Active Members</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* STAR REWARD SYSTEM */}
+                <div className="pt-6 border-t border-white/5 space-y-6">
+                  <div className="text-center space-y-1">
+                    <h3 className="text-sm font-black text-white uppercase tracking-wider italic">Ecosystem Stargate Milestones</h3>
+                    <div className="flex justify-center items-center gap-1.5 pt-2">
+                      {[
+                        { idx: 1, limit: 3 },
+                        { idx: 2, limit: 5 },
+                        { idx: 3, limit: 10 },
+                        { idx: 4, limit: 20 },
+                        { idx: 5, limit: 50 },
+                        { idx: 6, limit: 200 },
+                      ].map((star) => {
+                        const isUnlocked = activeRefs >= star.limit;
+                        return (
+                          <motion.svg
+                            key={star.idx}
+                            className={cn("w-7 h-7 filter", isUnlocked ? "text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]" : "text-gray-700")}
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            animate={isUnlocked ? { scale: [1, 1.15, 1], rotate: [0, 5, -5, 0] } : {}}
+                            transition={{ repeat: isUnlocked ? Infinity : 0, duration: 4, ease: "easeInOut", delay: star.idx * 0.3 }}
+                          >
+                            <path d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.63L12 2L9.19 8.63L2 9.24L7.46 13.97L5.82 21L12 17.27Z" />
+                          </motion.svg>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest pt-1">
+                      Streak capacity: <span className="text-[#00E5FF]">{activeRefs}</span> / 200 active referrals reached
+                    </p>
+                  </div>
+                </div>
+
+                {/* REFERRAL REWARD MILESTONES */}
+                <div className="space-y-4 pt-4">
+                  <div className="flex items-center gap-2 px-2">
+                    <Gift size={16} className="text-[#00E5FF]" />
+                    <span className="text-xs font-black uppercase tracking-wider text-white">Active Milestone Allocations</span>
+                  </div>                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                    {[
+                      { id: 'ref_milestone_5', amount: 20, req: 5, title: 'Squad Recruit Booster' },
+                      { id: 'ref_milestone_10', amount: 45, req: 10, title: 'Elite Network Commander' },
+                      { id: 'ref_milestone_20', amount: 90, req: 20, title: 'Wavelength Node Overlord' },
+                      { id: 'ref_milestone_50', amount: 240, req: 50, title: 'Tavari High Council Vanguard' },
+                      { id: 'ref_milestone_100', amount: 500, req: 100, title: 'Stargate Genesis Catalyst' },
+                      { id: 'ref_milestone_200', amount: 1500, req: 200, title: 'Stargate Eternal Sovereign' }
+                    ].map((milestone) => {
+                      const isClaimed = claimed_milestones.includes(milestone.id);
+                      const isEligible = activeRefs >= milestone.req;
+                      const percent = Math.min(100, (activeRefs / milestone.req) * 100);
+                      const isSpecial = milestone.id === 'ref_milestone_200';
+
+                      return (
+                        <div 
+                          key={milestone.id}
+                          className={cn(
+                            "p-3 sm:p-5 rounded-2xl border flex flex-col justify-between space-y-3 sm:space-y-4 relative overflow-hidden transition-all duration-300",
+                            isClaimed 
+                              ? "bg-black/20 border-white/5 opacity-70"
+                              : isSpecial
+                                ? "bg-gradient-to-br from-[#2d1f08]/90 via-[#181308]/95 to-[#05080c]/98 border-amber-400 shadow-[0_0_20px_rgba(217,119,6,0.25)] hover:shadow-[0_0_30px_rgba(217,119,6,0.35)]"
+                                : isEligible
+                                  ? "bg-gradient-to-r from-cyan-950/20 to-blue-950/20 border-cyan-500/40 shadow-md shadow-cyan-500/5 hover:border-cyan-500/60"
+                                  : "bg-black/40 border-white/5"
+                          )}
+                        >
+                          <div className="flex gap-2 sm:gap-4 items-start">
+                            {/* 3D-styled mini vector reward visual */}
+                            <div className={cn(
+                              "w-8 h-8 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center border relative shrink-0",
+                              isClaimed 
+                                ? "bg-white/5 border-white/5" 
+                                : isSpecial
+                                  ? "bg-amber-500/10 border-amber-400/40 text-amber-400"
+                                  : isEligible 
+                                    ? "bg-cyan-500/10 border-cyan-500/30 text-[#00E5FF]" 
+                                    : "bg-black/60 border-white/5 text-gray-500"
+                            )}>
+                              <svg className="w-5 h-5 sm:w-8 sm:h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                              </svg>
+                              {isEligible && !isClaimed && (
+                                <span className="absolute -top-0.5 -right-0.5 w-1.5 sm:w-2.5 h-1.5 sm:h-2.5 rounded-full bg-red-500 animate-ping" />
+                              )}
+                            </div>
+
+                            <div className="space-y-0.5 min-w-0 flex-1 w-full text-left">
+                              <div className="flex items-center gap-1">
+                                <span className={cn(
+                                  "text-[6px] sm:text-[7px] font-black uppercase bg-white/5 px-1 py-0.5 rounded tracking-widest",
+                                  isSpecial ? "text-amber-400 bg-amber-405/10 border border-amber-405/20 animate-pulse" : "text-gray-500"
+                                )}>
+                                  {isSpecial ? "ELITE IMMORTAL" : "Reward Tier"}
+                                </span>
+                              </div>
+                              <h4 className="text-[10px] sm:text-xs font-black text-white truncate uppercase">{milestone.title}</h4>
+                              <p className={cn(
+                                "text-[9px] sm:text-[10px] font-black font-mono",
+                                isSpecial ? "text-amber-400" : "text-[#00E5FF]"
+                              )}>+${milestone.amount.toFixed(2)} USD</p>
+                            </div>
+                          </div>
+
+                          {/* Progress Status Bar */}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[7px] sm:text-[9px] font-mono leading-none">
+                              <span className="text-gray-500 font-bold uppercase">PROG STATUS</span>
+                              <span className={isEligible ? (isSpecial ? "text-amber-400 font-black animate-pulse" : "text-[#00E5FF] font-black") : "text-gray-400 font-bold"}>
+                                {activeRefs}/{milestone.req} ({percent.toFixed(0)}%)
+                              </span>
+                            </div>
+                            <div className="w-full h-1 sm:h-1.5 rounded-full bg-black/40 overflow-hidden border border-white/5">
+                              <div 
+                                className={cn(
+                                  "h-full rounded-full transition-all duration-500",
+                                  isClaimed 
+                                    ? "bg-gray-650"
+                                    : isSpecial
+                                      ? "bg-gradient-to-r from-amber-550 to-amber-300 animate-pulse"
+                                      : isEligible 
+                                        ? "bg-gradient-to-r from-cyan-400 to-blue-500 animate-pulse" 
+                                        : "bg-gray-650"
+                                ) } 
+                                style={{ width: `${percent}%` }} 
+                              />
+                            </div>
+                          </div>
+
+                          {/* Action buttons with Transaction support */}
+                          <button
+                            onClick={() => handleClaimMilestone(milestone.id, milestone.amount, milestone.req)}
+                            disabled={isSubmitting || !isEligible || isClaimed}
+                            className={cn(
+                              "w-full py-1.5 sm:py-2.5 rounded-lg sm:rounded-xl text-[7px] sm:text-[9px] font-black uppercase tracking-wider transition-all duration-300",
+                              isClaimed
+                                ? "bg-white/5 text-gray-400 border border-white/5 cursor-not-allowed select-none"
+                                : isSpecial
+                                  ? "bg-gradient-to-r from-amber-500 to-yellow-400 hover:brightness-110 active:scale-[0.98] text-black shadow-lg shadow-amber-505/20 font-black cursor-pointer border border-amber-300/30"
+                                  : isEligible
+                                    ? "bg-gradient-to-r from-[#00E5FF] to-[#3B82F6] hover:brightness-110 active:scale-[0.98] text-black shadow-lg shadow-cyan-500/20 font-black cursor-pointer"
+                                    : "bg-black/50 text-gray-600 border border-white/5 cursor-not-allowed select-none"
+                            )}
+                          >
+                            {isClaimed ? "✓ CLAIMED" : isEligible ? "CLAIM" : `LOCKED (${milestone.req} REFS)`}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* HOW RANKING WORKS SECTION (PREMIUM DARK GLASSMORPHISM) */}
+                <div className="p-6 bg-black/50 border border-white/5 rounded-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-[80px] rounded-full" />
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-2 h-2 rounded-full bg-[#00E5FF]" />
+                    <span className="text-xs font-black uppercase text-white tracking-wider">Protocol: How Rankings Work</span>
+                  </div>
+                  <div className="space-y-3.5 text-xs text-gray-450 leading-relaxed font-bold">
+                    <p>
+                      Your <span className="text-[#00E5FF]">Ecosystem Ranking Position</span> is dynamic and updates automatically based on operations. The core protocol evaluates your active staking containers (Regular, Premium, or Elite), active referrals count, and history of claims.
+                    </p>
+                    <ul className="list-disc pl-5 space-y-1.5 text-gray-550">
+                      <li>
+                        <span className="text-white">Active Referrals:</span> Users who signup under your link and successfully activate any node investment plan.
+                      </li>
+                      <li>
+                        <span className="text-white">Stargate Stars:</span> Progresses up through 6 levels (at 3, 5, 10, 20, 50, 200 partners) with glowing milestones.
+                      </li>
+                      <li>
+                        <span className="text-white">Escrow Milestones:</span> Instantly claimable to your cash payouts wallet once the designated threshold is passed.
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </motion.div>
-          </div>
+          );
+        })()}
+
+        {/* --- DEDICATED PAGE: POINT CONVERSION --- */}
+        {rewardView === 'conversion' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="max-w-md mx-auto space-y-6"
+          >
+            <button 
+              onClick={() => setRewardView('dashboard')}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-gray-400 hover:text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all"
+            >
+              <ArrowLeft size={14} /> Back to Dashboard
+            </button>
+
+            <div className="p-8 bg-[#11131f] border border-white/5 rounded-[32px] space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 blur-[80px] rounded-full" />
+              <div className="flex items-center gap-3">
+                <ArrowRightLeft className="text-cyan-400" size={24} />
+                <div>
+                  <h2 className="text-xl font-black text-white italic uppercase tracking-tight">Point Conversion</h2>
+                  <p className="text-xs text-gray-500 font-bold">Swap loyalty points to liquid rewards instantly.</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-black/40 border border-white/5 rounded-2xl space-y-3.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-400 uppercase font-black text-[9px]">Rate Protocol:</span>
+                  <span className="text-[#00E5FF] font-bold font-mono">1 Point = $0.10 USD</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 uppercase font-black text-[9px]">Points Balance:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-white font-black">{points_balance}</span>
+                    <span className="text-yellow-400 mt-[-2px]">★</span>
+                  </div>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400 uppercase font-black text-[9px]">USD Value Equivalent:</span>
+                  <span className="text-emerald-400 font-bold font-mono">${(points_balance * 0.10).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">Convert Points Amount</label>
+                <div className="relative">
+                  <input 
+                    type="number"
+                    placeholder="Points to swap..."
+                    value={pointsInput}
+                    onChange={(e) => setPointsInput(e.target.value)}
+                    className="w-full bg-[#0a0c10] border border-white/10 rounded-xl py-3.5 px-4 text-sm font-bold text-white outline-none focus:border-cyan-500/40 pr-16"
+                  />
+                  <button
+                    onClick={() => setPointsInput(points_balance.toString())}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-cyan-400 bg-cyan-400/10 border border-cyan-400/20 px-3 py-1.5 rounded-lg hover:bg-cyan-400/20 transition-all"
+                  >
+                    Max
+                  </button>
+                </div>
+
+                {parseFloat(pointsInput) > 0 && (
+                  <div className="flex justify-between text-[11px] px-1 font-bold">
+                    <span>You will claim:</span>
+                    <span className="text-emerald-400 font-mono">+${(parseFloat(pointsInput) * 0.10).toFixed(2)} USD</span>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handlePointsConversion}
+                disabled={isSubmitting || !pointsInput || parseInt(pointsInput) <= 0}
+                className="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-teal-500 hover:brightness-110 active:scale-[0.98] text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all disabled:opacity-30"
+              >
+                Execute Point Swap Swap
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* --- DEDICATED PAGE: ABOUT REWARDS --- */}
+        {rewardView === 'about' && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="max-w-4xl mx-auto space-y-6 text-left"
+          >
+            <button 
+              onClick={() => setRewardView('dashboard')}
+              className="px-4 py-2 rounded-xl bg-white/5 border border-white/5 text-gray-400 hover:text-white text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all"
+            >
+              <ArrowLeft size={14} /> Back to Dashboard
+            </button>
+
+            {/* HEADER HERO AREA */}
+            <div className="p-8 rounded-[32px] bg-gradient-to-br from-[#121922]/95 to-[#070a10]/98 border border-white/5 shadow-2 w-full relative overflow-hidden flex flex-col items-center text-center space-y-4">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/5 blur-[100px] rounded-full" />
+              <div className="absolute -bottom-8 -left-8 w-48 h-48 bg-purple-500/5 blur-[80px] rounded-full" />
+              
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500/10 to-indigo-500/10 border border-cyan-500/20 flex items-center justify-center animate-pulse">
+                <Trophy className="text-cyan-400" size={32} />
+              </div>
+              
+              <div className="space-y-1.5 max-w-lg">
+                <h1 className="text-2xl sm:text-3xl font-black text-white italic tracking-tight uppercase">Rewards Protocol Blueprint</h1>
+                <p className="text-xs text-gray-400 font-bold leading-relaxed">
+                  Welcome to the multi-tier Tavari Ecosystem dynamic incentive structure. Learn how to optimize, claim, and accelerate your rewards pipeline safely.
+                </p>
+              </div>
+            </div>
+
+            {/* SECTIONS GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-8">
+              {/* SECTION 1: REWARD PROGRAM OVERVIEW */}
+              <div className="p-6 bg-[#11131f]/80 backdrop-blur-md border border-white/5 rounded-2xl space-y-3 relative overflow-hidden transition-all duration-300 hover:border-cyan-500/20">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 blur-[45px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                    <Award size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Reward Program</h3>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed font-bold">
+                  The standard Reward Program forms the baseline ecosystem buffer, providing real USD equivalents for loyalty actions. It pools points generated through daily tasks and user activations, distributing them securely back to your verified wallet.
+                </p>
+              </div>
+
+              {/* SECTION 2: REFERRAL PROGRAM */}
+              <div className="p-6 bg-[#11131f]/80 backdrop-blur-md border border-white/5 rounded-2xl space-y-3 relative overflow-hidden transition-all duration-300 hover:border-indigo-500/20">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-[45px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                    <Users size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Referral Program</h3>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed font-bold">
+                  Expand your professional Node matrix today. Get dynamic welcome credits of $5.00 for every client you introduce, and secure persistent matrix commissions based on referrals' container operations as they level up.
+                </p>
+              </div>
+
+              {/* SECTION 3: DAILY CHECK-IN */}
+              <div className="p-6 bg-[#11131f]/80 backdrop-blur-md border border-white/5 rounded-2xl space-y-3 relative overflow-hidden transition-all duration-300 hover:border-yellow-500/20">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-yellow-500/5 blur-[45px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-yellow-400">
+                    <Calendar size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Daily Check-In</h3>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed font-bold">
+                  Consistency establishes momentum. Claim point multipliers every 24 hours by validating container nodes. Missed days interrupt streak growth, so remember to log in daily and collect your points without interruption.
+                </p>
+              </div>
+
+              {/* SECTION 4: POINT CONVERSION */}
+              <div className="p-6 bg-[#11131f]/80 backdrop-blur-md border border-white/5 rounded-2xl space-y-3 relative overflow-hidden transition-all duration-300 hover:border-emerald-500/20">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 blur-[45px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                    <Coins size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Point Conversion</h3>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed font-bold">
+                  Convert accumulated loyalty stars directly into highly liquid USD available balances. The rate is set statically at <span className="text-emerald-400">1 Point = $0.10 USD</span>, and can be swapped securely inside the system at any time.
+                </p>
+              </div>
+
+              {/* SECTION 5: NODE ACTIVATION REWARDS */}
+              <div className="p-6 bg-[#11131f]/80 backdrop-blur-md border border-white/5 rounded-2xl space-y-3 relative overflow-hidden transition-all duration-300 hover:border-purple-500/20">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 blur-[45px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                    <Cpu size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Node Activation Rewards</h3>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed font-bold">
+                  Scale container rewards dynamically. Operating active node systems un-locks cashbacks up to <span className="text-purple-400">2.00% multiplier</span> corresponding to Regular, Premium, or Elite allocations. Cashout instantly.
+                </p>
+              </div>
+
+              {/* SECTION 6: ECOSYSTEM RANKING */}
+              <div className="p-6 bg-[#11131f]/80 backdrop-blur-md border border-white/5 rounded-2xl space-y-3 relative overflow-hidden transition-all duration-300 hover:border-blue-500/20">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-[45px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                    <Icon3DRankingMini />
+                  </div>
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider">Ecosystem Ranking</h3>
+                </div>
+                <p className="text-xs text-gray-400 leading-relaxed font-bold">
+                  Earn points and rank up. Our dynamic star engine computes active node capacity plans, referrals, and claims to place you on the secure Stargate ladder. Unlock exclusive rewards at each tier milestone.
+                </p>
+              </div>
+
+              {/* SECTION 7: REWARD GROWTH STRATEGY (FULLSPAN) */}
+              <div className="p-6 bg-gradient-to-r from-cyan-950/20 to-indigo-950/20 border border-cyan-500/20 rounded-2xl space-y-3 relative overflow-hidden col-span-1 md:col-span-2">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-cyan-500/5 blur-[65px] rounded-full" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-[#00E5FF]">
+                    <TrendingUp size={18} />
+                  </div>
+                  <h3 className="text-sm font-black text-[#00E5FF] uppercase tracking-wider italic">Program Growth & Optimization Strategy</h3>
+                </div>
+                <p className="text-xs text-gray-300 leading-relaxed font-bold">
+                  Maximize your capital velocity! For peak efficiency, align Daily Check-ins with custom Elite node distributions. Introduce active partners to build structured network trees, allowing your accumulated points to generate massive residual conversions continuously over time.
+                </p>
+              </div>
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Payout Selection Modal/Sheet for Mobile and General Unified Premium Payout Flow */}
+      {/* --- POPUPS & MODALS --- */}
       <AnimatePresence>
+        {selectedGuide && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-[#0f111a] border border-white/10 rounded-[32px] max-w-lg w-full p-6 relative overflow-hidden shadow-2xl"
+            >
+              <button 
+                onClick={() => setSelectedGuide(null)}
+                className="absolute top-5 right-5 p-2 rounded-full bg-white/5 text-gray-400 hover:text-white transition-all"
+              >
+                <X size={16} />
+              </button>
+              <h3 className="text-lg font-black text-white italic tracking-tight uppercase mb-4">{selectedGuide.title}</h3>
+              <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-line bg-black/30 p-4 rounded-xl border border-white/5">{selectedGuide.fullDesc || selectedGuide.shortDesc}</p>
+            </motion.div>
+          </div>
+        )}
+
         {showMethodSelector && (
-          <div 
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
-            onClick={() => {
-              setShowMethodSelector(false);
-              setSelectedMobileMethod(null);
-            }}
-          >
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md" onClick={() => setShowMethodSelector(false)}>
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 12 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="bg-[#0f111a] border border-white/10 rounded-[28px] max-w-lg w-full p-6 relative shadow-[0_20px_60px_rgba(0,0,0,0.85)] max-h-[88vh] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 flex flex-col"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              className="bg-[#0f111a] border border-white/10 rounded-[28px] max-w-lg w-full p-6 relative shadow-2xl overflow-y-auto max-h-[85vh] flex flex-col text-left"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full pointer-events-none" />
-
-              {/* Header */}
-              <div className="flex items-center justify-between mb-6 shrink-0">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <Coins size={18} className="text-emerald-400" />
-                  <h3 className="text-base font-black italic text-white uppercase tracking-tight">
-                    {selectedMobileMethod ? 'Withdrawal Form' : 'Select Payout Method'}
+                  <h3 className="text-sm font-black text-white uppercase italic tracking-wider">
+                    {selectedMobileMethod ? 'Settle Request Form' : 'Choose Settlement Network'}
                   </h3>
                 </div>
                 <button 
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
+                  onClick={() => {
                     setShowMethodSelector(false);
                     setSelectedMobileMethod(null);
                   }}
-                  className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all border border-white/5"
-                  aria-label="Close modal"
+                  className="p-2 rounded-full bg-white/5 text-gray-400 hover:text-white"
                 >
                   <X size={18} />
                 </button>
@@ -1891,47 +2871,32 @@ export default function Rewards() {
 
               {!isWithdrawalAllowed() ? (
                 <div className="py-8 px-4 flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-12 h-12 mx-auto bg-rose-500/5 border border-rose-500/15 rounded-full flex items-center justify-center text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.08)] relative">
-                    <Lock size={20} className="animate-pulse" />
-                    <div className="absolute inset-0 rounded-full bg-rose-500/5 animate-ping opacity-10" />
-                  </div>
+                  <Lock size={32} className="text-rose-400 animate-pulse" />
                   <div className="space-y-1">
-                    <h3 className="text-base font-bold text-white tracking-wide font-sans">Portal Closed</h3>
-                    <p className="text-[9px] font-black text-rose-400 py-0.5 px-2 bg-rose-500/5 rounded-full border border-rose-500/10 inline-block font-mono">
-                      Service temporarily closed
-                    </p>
+                    <h3 className="text-base font-bold text-white">System Protocol Closed</h3>
+                    <p className="text-[10px] text-rose-400 bg-rose-500/10 border border-rose-550/20 px-3 py-1 rounded-full inline-block font-mono">Operations Restricted Today</p>
                   </div>
-                  <p className="text-[11px] text-white/50 leading-relaxed font-medium max-w-[280px]">
-                    Withdrawals are currently unavailable. Withdrawal window reopens Monday 9:00 AM GMT+1.
-                  </p>
-                  <div className="pt-4 border-t border-white/[0.04] w-full">
-                    <div className="text-[9px] font-semibold text-white/30 tracking-wide font-sans">
-                      Operational window: Mon 9:00 AM – Fri 4:00 PM (GMT+1)
-                    </div>
-                  </div>
+                  <p className="text-xs text-gray-500 leading-relaxed">Reward withdrawals are open Monday 9:00 AM – Friday 4:00 PM GMT+1. Please schedule during open hours.</p>
                 </div>
               ) : !selectedMobileMethod ? (
-                // Step 1: Payout Method Options
                 <div className="space-y-4">
-                  <p className="text-xs text-[#9CA3AF] mb-4 text-left">Choose your preferred settlement option below to proceed.</p>
-                  
                   <button
                     onClick={() => {
                       setWithdrawMethod('bank');
                       setSelectedMobileMethod('bank');
                     }}
-                    className="w-full text-left p-4 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group text-left"
+                    className="w-full text-left p-4 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-11 h-11 bg-purple-500/10 rounded-xl flex items-center justify-center text-[#A855F7] group-hover:scale-105 transition-transform">
+                      <div className="w-11 h-11 bg-[#7C3AED]/10 rounded-xl flex items-center justify-center text-[#A855F7]">
                         <CreditCard size={20} />
                       </div>
                       <div>
                         <span className="block text-xs font-black uppercase text-white tracking-wider">Bank Transfer</span>
-                        <span className="text-[10px] text-gray-400">Local or international direct bank settlement.</span>
+                        <span className="text-[10px] text-gray-500">Form direct wire to local regional banks.</span>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-gray-500 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight size={16} className="text-gray-500" />
                   </button>
 
                   <button
@@ -1942,30 +2907,23 @@ export default function Rewards() {
                     className="w-full text-left p-4 rounded-2xl bg-white/[0.02] hover:bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-11 h-11 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                      <div className="w-11 h-11 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400">
                         <Wallet size={20} />
                       </div>
                       <div>
-                        <span className="block text-xs font-black uppercase text-white tracking-wider">Crypto Wallet</span>
-                        <span className="text-[10px] text-gray-400">Withdraw instantly using USDT (TRC20) network.</span>
+                        <span className="block text-xs font-black uppercase text-white tracking-wider">USDT Wallet</span>
+                        <span className="text-[10px] text-gray-500">Disbursed instantly on TRC-20 protocol layer.</span>
                       </div>
                     </div>
-                    <ChevronRight size={16} className="text-gray-500 group-hover:translate-x-1 transition-transform" />
+                    <ChevronRight size={16} className="text-gray-500" />
                   </button>
                 </div>
               ) : (
-                // Step 2: Withdrawal Form Inputs
-                <div className="space-y-4 text-left">
-                  {/* Back button */}
-                  <button 
-                    onClick={() => setSelectedMobileMethod(null)}
-                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-400 hover:text-emerald-300 transition-colors mb-2"
-                  >
-                    ← Change Method
-                  </button>
+                <div className="space-y-4">
+                  <button onClick={() => setSelectedMobileMethod(null)} className="text-[10px] font-black uppercase tracking-wider text-emerald-400 block mb-2">← BACK TO SELECTION</button>
 
                   <div>
-                    <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1.5">Withdraw Amount (USD)</label>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Withdraw Amount (USD)</label>
                     <div className="relative">
                       <input 
                         type="number" 
@@ -1976,109 +2934,72 @@ export default function Rewards() {
                       />
                       <button 
                         onClick={() => setWithdrawAmount(reward_dollar_balance.toString())}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-all"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-lg"
                       >
                         All
                       </button>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-gray-500 mt-1 px-0.5">
-                      <span>Available: ${reward_dollar_balance.toFixed(2)}</span>
-                      <span>Min: $10.00</span>
                     </div>
                   </div>
 
                   {selectedMobileMethod === 'crypto' ? (
                     <div>
-                      <label className="text-xs font-bold text-aura-muted uppercase tracking-widest block mb-1.5">USDT (TRC20) Wallet Destination</label>
+                      <label className="text-xs font-bold text-gray-400 block mb-1">TRC20 Wallet Destination</label>
                       <input 
                         type="text" 
-                        placeholder="TR7NHqdj61L314G1135Y68t9..."
+                        placeholder="TR7NHq..."
                         value={cryptoAddress}
                         onChange={(e) => setCryptoAddress(e.target.value)}
-                        className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono placeholder:text-gray-700 outline-none focus:border-emerald-500/40"
+                        className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-3 text-xs text-white outline-none"
                       />
                     </div>
                   ) : (
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Bank Name</label>
-                        <button 
-                          type="button"
-                          onClick={() => setShowBankSelector(true)}
-                          className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none hover:border-emerald-500/40 transition-all text-left flex items-center justify-between"
-                        >
-                          <span className={bankName ? "text-white font-bold" : "text-gray-500 font-medium"}>
-                            {bankName || "Select Bank"}
-                          </span>
-                          <ChevronDown size={16} className="text-gray-400" />
+                        <label className="text-xs font-bold text-gray-400 block mb-1">Bank Name</label>
+                        <button type="button" onClick={() => setShowBankSelector(true)} className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white flex items-center justify-between">
+                          <span>{bankName || "Select bank institution"}</span>
+                          <ChevronDown size={14} className="text-gray-400" />
                         </button>
                       </div>
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Account Number</label>
-                        <input 
-                          type="text" 
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          placeholder="e.g. 1093129482103"
-                          value={bankAccNumber}
-                          onChange={(e) => setBankAccNumber(e.target.value.replace(/[^0-9]/g, ''))}
-                          className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white font-mono outline-none focus:border-emerald-500/40"
-                        />
+                        <label className="text-xs font-bold text-gray-400 block mb-1">Account Number</label>
+                        <input type="text" placeholder="10-digit numeric code" value={bankAccNumber} onChange={(e) => setBankAccNumber(e.target.value.replace(/[^0-9]/g, ''))} className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white" />
                       </div>
                       <div>
-                        <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Holder Name</label>
-                        <input 
-                          type="text" 
-                          placeholder={profile?.name || "Holder Name"}
-                          value={bankAccName}
-                          onChange={(e) => setBankAccName(e.target.value)}
-                          className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white outline-none focus:border-emerald-500/40"
-                        />
+                        <label className="text-xs font-bold text-gray-400 block mb-1">Holder Name</label>
+                        <input type="text" placeholder={profile?.name || "Perfect match required"} value={bankAccName} onChange={(e) => setBankAccName(e.target.value)} className="w-full bg-[#0a0c10] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white" />
                       </div>
                     </div>
                   )}
 
-                  {/* Pricing/Protocol fee breakdown */}
-                  <div className="bg-[#0a0c10] border border-white/5 p-4 rounded-2xl space-y-2 mt-4 text-xs shrink-0">
+                  <div className="bg-[#0a0c10] p-4 rounded-xl space-y-2 text-xs">
                     <div className="flex justify-between">
-                      <span>Fee Fraction (20% Protocol Fee):</span>
+                      <span>Protocol Processing Fee (20%):</span>
                       <span className="text-rose-400 font-mono">-${((parseFloat(withdrawAmount) || 0) * 0.20).toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between font-black text-white pt-2 border-t border-white/5">
+                    <div className="flex justify-between font-bold pt-2 border-t border-white/5 text-white">
                       <span>Net Payout:</span>
                       <span className="text-emerald-400 font-mono">${((parseFloat(withdrawAmount) || 0) * 0.80).toFixed(2)}</span>
                     </div>
-                    
-                    <button 
-                      onClick={() => {
-                        // Validate first
-                        if (!withdrawAmount || parseFloat(withdrawAmount) < 10) {
-                          toast.error("Minimum settlement is $10.00");
-                          return;
-                        }
-                        if (parseFloat(withdrawAmount) > reward_dollar_balance) {
-                          toast.error("Requested amount exceeds available balance.");
-                          return;
-                        }
-                        if (selectedMobileMethod === 'crypto' && !cryptoAddress) {
-                          toast.error("Please provide a USDT destination wallet.");
-                          return;
-                        }
-                        if (selectedMobileMethod === 'bank' && (!bankName || !bankAccNumber || !bankAccName)) {
-                          toast.error("Please provide complete bank account details.");
-                          return;
-                        }
-                        
-                        // Close modal, then open PIN modal
-                        setShowMethodSelector(false);
-                        setShowPinModal(true);
-                      }}
-                      disabled={isSubmitting || !withdrawAmount || parseFloat(withdrawAmount) < 10}
-                      className="w-full mt-3 py-3 bg-gradient-to-r from-emerald-600 to-teal-500 hover:brightness-110 active:scale-[0.98] transition-all rounded-xl text-xs font-black uppercase text-white tracking-widest disabled:opacity-40"
-                    >
-                      Verify PIN & Log Withdrawal
-                    </button>
                   </div>
+
+                  <button 
+                    onClick={() => {
+                      if (!withdrawAmount || parseFloat(withdrawAmount) < 10) {
+                        toast.error("Minimum settlement is $10.00");
+                        return;
+                      }
+                      if (parseFloat(withdrawAmount) > reward_dollar_balance) {
+                        toast.error("Amount exceeds balance.");
+                        return;
+                      }
+                      setShowMethodSelector(false);
+                      setShowPinModal(true);
+                    }}
+                    className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-all"
+                  >
+                    Confirm Security PIN & Log Settlement
+                  </button>
                 </div>
               )}
             </motion.div>
@@ -2086,21 +3007,18 @@ export default function Rewards() {
         )}
       </AnimatePresence>
 
-      {/* Security Verifications PIN code verification drawer modal */}
       <PinProtocolModal 
         isOpen={showPinModal}
         onClose={() => setShowPinModal(false)}
         onSuccess={handleWithdrawSubmit}
       />
 
-      {/* Selectable Nigerian bank list modal */}
       <BankSelectorModal 
         isOpen={showBankSelector}
         onClose={() => setShowBankSelector(false)}
         onSelect={(bank) => setBankName(bank)}
         selectedBank={bankName}
       />
-
     </div>
   );
 }

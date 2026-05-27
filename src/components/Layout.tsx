@@ -228,7 +228,7 @@ interface Notification {
 export default function Layout() {
   const { user, profile, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
-  const { isTransferModalOpen, openTransferModal, closeTransferModal, isDistractionFree, mrBActivationPopup, setMrBActivationPopup } = useUI();
+  const { isTransferModalOpen, openTransferModal, closeTransferModal, isDistractionFree, mrBActivationPopup, setMrBActivationPopup, requestPopup, closePopup } = useUI();
   const location = useLocation();
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -239,6 +239,10 @@ export default function Layout() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Global Adverts System Hooks
+  const [layoutAdverts, setLayoutAdverts] = useState<any[]>([]);
+  const [activeLayoutAd, setActiveLayoutAd] = useState<any | null>(null);
 
   const [showTelegramPopup, setShowTelegramPopup] = useState(false);
 
@@ -268,11 +272,11 @@ export default function Layout() {
     if (!hasTriggeredThisSession) {
       sessionStorage.setItem('referral_invite_popup_triggered', 'true');
       const timer = setTimeout(() => {
-        setShowInviteModal(true);
+        requestPopup('referral-invite', () => setShowInviteModal(true), () => setShowInviteModal(false));
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, [user, requestPopup]);
 
   // Trigger investment promotion modal after login or page refresh with randomized delay (2s to 10s)
   useEffect(() => {
@@ -284,11 +288,11 @@ export default function Layout() {
     const selectedDelay = delayOptions[Math.floor(Math.random() * delayOptions.length)];
     
     const timer = setTimeout(() => {
-      setShowInvestPromoModal(true);
+      requestPopup('investment-promo', () => setShowInvestPromoModal(true), () => setShowInvestPromoModal(false));
     }, selectedDelay);
     
     return () => clearTimeout(timer);
-  }, [user, promoTriggered]);
+  }, [user, promoTriggered, requestPopup]);
 
   // Trigger modal on every visit to the Reward page with randomized delay
   useEffect(() => {
@@ -296,11 +300,11 @@ export default function Layout() {
       const delays = [1500, 2000, 3000, 5000, 9000, 10000];
       const randomDelay = delays[Math.floor(Math.random() * delays.length)];
       const timer = setTimeout(() => {
-        setShowInviteModal(true);
+        requestPopup('referral-invite', () => setShowInviteModal(true), () => setShowInviteModal(false));
       }, randomDelay);
       return () => clearTimeout(timer);
     }
-  }, [location.pathname]);
+  }, [location.pathname, requestPopup]);
 
   // Listen to Firestore real-time 'referral_claims' and trigger top-right popup toast
   useEffect(() => {
@@ -321,7 +325,7 @@ export default function Layout() {
         // Automatically surface claims to the user immediately as a floating premium popup/toast
         const latestReferrerClaim = claims.find(c => c.type === 'referrer') || claims[0];
         if (latestReferrerClaim) {
-          setShowClaimToast(latestReferrerClaim);
+          requestPopup(`mr-a-reward-${latestReferrerClaim.id}`, () => setShowClaimToast(latestReferrerClaim), () => setShowClaimToast(null));
         }
       } else {
         setShowClaimToast(null);
@@ -330,7 +334,7 @@ export default function Layout() {
       console.error("Error listening to referral claims in layout:", err);
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, requestPopup]);
 
   useEffect(() => {
     if (!user) return;
@@ -344,20 +348,132 @@ export default function Layout() {
       const randomTimeMs = Math.floor(Math.random() * (45000 - 15000 + 1)) + 15000;
       const timer = setTimeout(() => {
         if (localStorage.getItem(closedKey) !== nowLocalDate) {
-          setShowTelegramPopup(true);
-        }
+          requestPopup('telegram', () => setShowTelegramPopup(true), () => setShowTelegramPopup(false));
+         }
       }, randomTimeMs);
       
       return () => clearTimeout(timer);
     }
-  }, [user]);
+  }, [user, requestPopup]);
 
   const handleCloseTelegram = () => {
     if (user) {
       const nowLocalDate = [new Date().getFullYear(), String(new Date().getMonth() + 1).padStart(2, '0'), String(new Date().getDate()).padStart(2, '0')].join('-');
       localStorage.setItem(`telegramPopupClosedDate_${user.uid}`, nowLocalDate);
     }
-    setShowTelegramPopup(false);
+    closePopup('telegram');
+  };
+
+  // --- GLOBAL ADVERTS SUBSCRIPTION & OBSERVER SYSTEM ---
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'adverts'), (snap) => {
+      if (snap.exists()) {
+        setLayoutAdverts(snap.data().adverts || []);
+      }
+    }, (err) => {
+      console.warn("Global layout adverts block loading failed:", err);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (layoutAdverts.length === 0) {
+      setActiveLayoutAd(null);
+      return;
+    }
+
+    const currentPath = location.pathname;
+
+    const matchingAd = layoutAdverts.find(ad => {
+      if (ad.active === false) return false;
+
+      const now = new Date().getTime();
+      if (ad.scheduling?.startDate) {
+        const start = new Date(ad.scheduling.startDate).getTime();
+        if (now < start) return false;
+      }
+      if (ad.scheduling?.endDate) {
+        const end = new Date(ad.scheduling.endDate).getTime();
+        if (now > end) return false;
+      }
+
+      const targetingType = ad.pageTargeting?.type || 'all';
+      let pageMatches = false;
+      if (targetingType === 'all') {
+        pageMatches = true;
+      } else if (targetingType === 'dashboard' && currentPath === '/dashboard') {
+        pageMatches = true;
+      } else if (targetingType === 'rewards' && currentPath === '/rewards') {
+        pageMatches = true;
+      } else if (targetingType === 'invest' && currentPath === '/invest') {
+        pageMatches = true;
+      } else if (targetingType === 'profile' && currentPath === '/profile') {
+        pageMatches = true;
+      } else if (targetingType === 'fund' && currentPath === '/fund') {
+        pageMatches = true;
+      } else if (targetingType === 'custom' && ad.pageTargeting?.customPath === currentPath) {
+        pageMatches = true;
+      }
+
+      if (!pageMatches) return false;
+
+      const frequency = ad.scheduling?.type || 'every-refresh';
+      const userId = user?.uid || 'guest';
+      const dismissedKey = `adv_dismissed_${ad.id}_${userId}`;
+      const shownSessionKey = `adv_shown_session_${ad.id}`;
+
+      if (frequency === 'once-daily') {
+        const dismissedToday = localStorage.getItem(dismissedKey);
+        const todayStr = new Date().toDateString();
+        if (dismissedToday === todayStr) return false;
+      } else if (frequency === 'every-login') {
+        const shownInSession = sessionStorage.getItem(shownSessionKey);
+        if (shownInSession === 'true') return false;
+      } else if (frequency === 'custom-interval') {
+        const dismissedIntervalAt = localStorage.getItem(dismissedKey);
+        if (dismissedIntervalAt) {
+          const mSecsElapsed = now - Number(dismissedIntervalAt);
+          const intervalMs = (ad.scheduling?.intervalMinutes || 30) * 60 * 1000;
+          if (mSecsElapsed < intervalMs) return false;
+        }
+      } else if (frequency === 'every-refresh') {
+        const dismissedRefresh = sessionStorage.getItem(`adv_dismissed_ref_${ad.id}`);
+        if (dismissedRefresh === 'true') return false;
+      }
+
+      return true;
+    });
+
+    if (matchingAd) {
+      requestPopup(
+        `global-advert-${matchingAd.id}`, 
+        () => setActiveLayoutAd(matchingAd), 
+        () => setActiveLayoutAd(null)
+      );
+    } else {
+      setActiveLayoutAd(null);
+    }
+  }, [layoutAdverts, location.pathname, user?.uid, requestPopup]);
+
+  const handleDismissLayoutAd = (ad: any) => {
+    const userId = user?.uid || 'guest';
+    const frequency = ad.scheduling?.type || 'every-refresh';
+    const dismissedKey = `adv_dismissed_${ad.id}_${userId}`;
+    const shownSessionKey = `adv_shown_session_${ad.id}`;
+
+    if (frequency === 'once-daily') {
+      const todayStr = new Date().toDateString();
+      localStorage.setItem(dismissedKey, todayStr);
+    } else if (frequency === 'every-login') {
+      sessionStorage.setItem(shownSessionKey, 'true');
+    } else if (frequency === 'custom-interval') {
+      localStorage.setItem(dismissedKey, String(new Date().getTime()));
+    } else if (frequency === 'every-refresh') {
+      sessionStorage.setItem(`adv_dismissed_ref_${ad.id}`, 'true');
+    }
+
+    closePopup(`global-advert-${ad.id}`);
+    setActiveLayoutAd(null);
   };
 
   const profileRef = useRef<HTMLDivElement>(null);
@@ -995,6 +1111,149 @@ export default function Layout() {
         onClose={closeTransferModal}
       />
 
+      {/* Global Dynamic Adverts Overlay System */}
+      <AnimatePresence>
+        {activeLayoutAd && (
+          <div 
+            className={cn(
+              "fixed z-[1100] p-4 pointer-events-none flex font-sans",
+              activeLayoutAd.position === 'center' && "inset-0 items-center justify-center",
+              activeLayoutAd.position === 'top-left' && "top-20 left-4 justify-start items-start",
+              activeLayoutAd.position === 'top-right' && "top-20 right-4 justify-end items-start",
+              activeLayoutAd.position === 'bottom-left' && "bottom-24 left-4 justify-start items-end lg:bottom-4",
+              activeLayoutAd.position === 'bottom-right' && "bottom-24 right-4 justify-end items-end lg:bottom-4",
+              activeLayoutAd.position === 'top-center' && "top-20 inset-x-0 justify-center items-start",
+              activeLayoutAd.position === 'bottom-center' && "bottom-24 inset-x-0 justify-center items-end lg:bottom-4",
+            )}
+          >
+            {/* Overlay backdrop only if center popup */}
+            {activeLayoutAd.position === 'center' && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/60 backdrop-blur-[4px] pointer-events-auto"
+                onClick={() => handleDismissLayoutAd(activeLayoutAd)}
+              />
+            )}
+
+            {/* Modal Body Container */}
+            <motion.div
+              initial={
+                activeLayoutAd.popupType === 'bottom-slide' 
+                  ? { y: 100, opacity: 0 } 
+                  : activeLayoutAd.popupType === 'top-banner' 
+                    ? { y: -100, opacity: 0 } 
+                    : { scale: 0.9, opacity: 0, y: 15 }
+              }
+              animate={{ y: 0, scale: 1, opacity: 1 }}
+              exit={
+                activeLayoutAd.popupType === 'bottom-slide' 
+                  ? { y: 100, opacity: 0 } 
+                  : activeLayoutAd.popupType === 'top-banner' 
+                    ? { y: -100, opacity: 0 } 
+                    : { scale: 0.95, opacity: 0, y: 10 }
+              }
+              transition={{ type: "spring", damping: 22, stiffness: 180 }}
+              style={{
+                width: activeLayoutAd.width || (activeLayoutAd.size === 'small' ? '290px' : activeLayoutAd.size === 'large' ? '460px' : '380px'),
+                height: activeLayoutAd.height || 'auto',
+                maxWidth: '92vw'
+              }}
+              className={cn(
+                "relative rounded-[28px] p-6 text-center select-none shadow-[0_25px_60px_rgba(0,0,0,0.8)] border overflow-hidden pointer-events-auto",
+                // styles mapping
+                activeLayoutAd.styleTemplate === 'glass' && "bg-white/[0.04] backdrop-blur-3xl border-white/10 text-white",
+                activeLayoutAd.styleTemplate === 'neon' && "bg-[#0b031c] border-purple-500 text-purple-100 shadow-[0_0_40px_rgba(168,85,247,0.3)]",
+                activeLayoutAd.styleTemplate === 'minimal' && "bg-[#111215] border-white/15 text-gray-200",
+                activeLayoutAd.styleTemplate === 'brutalist' && "bg-black border-4 border-white text-white font-mono rounded-none",
+                activeLayoutAd.styleTemplate === 'warm' && "bg-gradient-to-tr from-[#130d07] to-[#1a100a] border-amber-600/35 text-amber-50",
+              )}
+            >
+              {/* Style Decorations */}
+              {activeLayoutAd.styleTemplate === 'neon' && (
+                <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-400 to-transparent animate-pulse" />
+              )}
+              {activeLayoutAd.styleTemplate === 'warm' && (
+                <div className="absolute top-[-35%] left-[-35%] w-[60%] h-[60%] bg-amber-500/10 rounded-full blur-3xl" />
+              )}
+
+              {/* Close Button Trigger */}
+              <button
+                onClick={() => handleDismissLayoutAd(activeLayoutAd)}
+                className={cn(
+                  "absolute top-4 right-4 p-1.5 rounded-full transition-all hover:bg-white/10",
+                  activeLayoutAd.styleTemplate === 'brutalist' ? "border border-white bg-black rounded-none" : "bg-white/5 border border-white/5"
+                )}
+              >
+                <X size={14} />
+              </button>
+
+              <div className="space-y-5 mt-3">
+                {/* Image Banner */}
+                {activeLayoutAd.imageUrl && (
+                  <div className={cn("overflow-hidden mx-auto", activeLayoutAd.styleTemplate === 'brutalist' ? "border-2 border-white rounded-none w-full h-34" : "rounded-2xl w-full h-34 bg-white/5 border border-white/5")}>
+                    <img 
+                      referrerPolicy="no-referrer"
+                      src={activeLayoutAd.imageUrl} 
+                      alt="" 
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <h4 className={cn(
+                    "font-serif tracking-tight font-black uppercase italic leading-tight text-lg",
+                    activeLayoutAd.styleTemplate === 'neon' && "text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 not-italic font-sans font-extrabold tracking-wide",
+                    activeLayoutAd.styleTemplate === 'brutalist' && "font-mono not-italic tracking-normal text-left"
+                  )}>
+                    {activeLayoutAd.title}
+                  </h4>
+                  
+                  {activeLayoutAd.styleTemplate === 'brutalist' ? (
+                    <div className="w-full h-0.5 bg-white" />
+                  ) : (
+                    <div className="w-12 h-0.5 bg-gradient-to-r from-transparent via-aura-lime/30 to-transparent mx-auto" />
+                  )}
+
+                  <p className={cn(
+                    "text-xs leading-relaxed opacity-75 px-1 pt-2",
+                    activeLayoutAd.styleTemplate === 'brutalist' && "font-mono text-left opacity-100 text-xs"
+                  )}>
+                    {activeLayoutAd.message}
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const dest = activeLayoutAd.redirectLink;
+                    handleDismissLayoutAd(activeLayoutAd);
+                    if (dest) {
+                      if (dest.startsWith('http')) {
+                        window.open(dest, '_blank');
+                      } else {
+                        navigate(dest);
+                      }
+                    }
+                  }}
+                  className={cn(
+                    "w-full py-4 text-[10px] uppercase font-black tracking-widest transition-all shadow-md active:scale-95 cursor-pointer",
+                    activeLayoutAd.styleTemplate === 'glass' && "bg-white/5 border border-white/10 text-white rounded-xl hover:bg-white/10",
+                    activeLayoutAd.styleTemplate === 'neon' && "bg-gradient-to-r from-purple-600 to-cyan-500 text-white rounded-md hover:brightness-110",
+                    activeLayoutAd.styleTemplate === 'minimal' && "bg-white/10 text-white rounded-lg hover:bg-white/15",
+                    activeLayoutAd.styleTemplate === 'brutalist' && "bg-white text-black border-2 border-white rounded-none hover:bg-black hover:text-white",
+                    activeLayoutAd.styleTemplate === 'warm' && "bg-amber-600 text-white rounded-xl hover:bg-amber-500",
+                  )}
+                >
+                  {activeLayoutAd.ctaText || "Continue"}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* --- SIDEBAR DRAWER --- */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -1216,7 +1475,7 @@ export default function Layout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/45 backdrop-blur-[2px]"
-              onClick={() => setShowInviteModal(false)}
+              onClick={() => closePopup('referral-invite')}
             />
             
             <motion.div 
@@ -1323,7 +1582,7 @@ export default function Layout() {
 
               {/* Close button with soft transition */}
               <button 
-                onClick={() => setShowInviteModal(false)}
+                onClick={() => closePopup('referral-invite')}
                 className="absolute top-4 right-4 text-white/50 hover:text-white transition-all p-1.5 bg-white/5 hover:bg-white/10 rounded-full cursor-pointer hover:rotate-90 duration-300"
               >
                 <X size={14} />
@@ -1461,7 +1720,7 @@ export default function Layout() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="absolute inset-0 bg-black/60 backdrop-blur-[4px]"
-              onClick={() => setShowInvestPromoModal(false)}
+              onClick={() => closePopup('investment-promo')}
             />
             
             <motion.div 
@@ -1542,7 +1801,7 @@ export default function Layout() {
 
               {/* Close button with sweet transition */}
               <button 
-                onClick={() => setShowInvestPromoModal(false)}
+                onClick={() => closePopup('investment-promo')}
                 className="absolute top-4 right-4 text-white/50 hover:text-white transition-all p-1.5 bg-white/5 hover:bg-white/10 rounded-full cursor-pointer hover:rotate-90 duration-300"
               >
                 <X size={14} />
@@ -1580,7 +1839,7 @@ export default function Layout() {
                 {/* Ultimate Premium Call To Action */}
                 <button 
                   onClick={() => {
-                    setShowInvestPromoModal(false);
+                    closePopup('investment-promo');
                     navigate('/invest');
                   }}
                   className="w-full mt-3 py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-purple-600 hover:from-purple-600 hover:via-pink-600 hover:to-purple-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_12px_24px_rgba(236,72,153,0.3)] flex items-center justify-center gap-2 cursor-pointer"
@@ -1615,7 +1874,7 @@ export default function Layout() {
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[9px] uppercase font-semibold text-purple-400 tracking-wider">Referral Reward Active</span>
                   <button 
-                    onClick={() => setShowClaimToast(null)}
+                    onClick={() => closePopup(`mr-a-reward-${showClaimToast.id}`)}
                     className="text-gray-400 hover:text-white transition-colors cursor-pointer"
                   >
                     <X size={14} />
@@ -1630,7 +1889,7 @@ export default function Layout() {
                 <div className="mt-3.5">
                   <button 
                     onClick={() => {
-                      setShowClaimToast(null);
+                      closePopup(`mr-a-reward-${showClaimToast.id}`);
                       navigate('/rewards#referral-rewards');
                     }}
                     className="w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white text-[10px] uppercase font-semibold tracking-widest rounded-xl transition-all shadow-lg active:scale-95 text-center cursor-pointer block"

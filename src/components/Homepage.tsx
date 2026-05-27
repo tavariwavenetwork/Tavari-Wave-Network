@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useUI } from '../contexts/UIContext';
 import { DynamicBalance } from './DynamicBalance';
 import { RotatingButtonText } from './RotatingButtonText';
 import { collection, query, where, onSnapshot, doc, updateDoc, runTransaction } from 'firebase/firestore';
@@ -35,6 +36,7 @@ const MemoizedWhyChooseSection = React.memo(WhyChooseSection);
 export default function Homepage() {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
+  const { requestPopup, closePopup } = useUI();
   const navigate = useNavigate();
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -55,11 +57,11 @@ export default function Homepage() {
     if (!alreadyClaimed) {
       // Show Check-In popup first (slightly delayed for a premium entry flow)
       const timer = setTimeout(() => {
-        setShowCheckInPopup(true);
+        requestPopup('daily-check-in', () => setShowCheckInPopup(true), () => setShowCheckInPopup(false));
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [user, profile]);
+  }, [user, profile, requestPopup]);
 
   const handleDailyClaim = async () => {
     if (!user || claimStatus !== 'idle') return;
@@ -156,7 +158,7 @@ export default function Homepage() {
       
       // Automatically redirect to rewards page after a brief premium confirmation pause
       setTimeout(() => {
-        setShowCheckInPopup(false);
+        closePopup('daily-check-in');
         navigate('/rewards');
       }, 1500);
 

@@ -129,190 +129,216 @@ export default function PinProtocolModal({ isOpen, onClose, onSuccess, isSubmitt
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        className={cn(
-          "relative w-full shadow-2xl overflow-hidden transition-all duration-500 bg-white",
-          step === 'entry' ? "max-w-[300px] rounded-[40px]" : "max-w-[340px] rounded-[32px]"
-        )}
-      >
-        {/* Header - Only for setups */}
-        {step !== 'entry' && (
-          <div className="bg-slate-900 p-6 text-white relative">
-            <div className="flex justify-between items-center relative z-10">
-              <div className="flex items-center gap-2.5">
-                 <ShieldCheck className="text-emerald-400" size={20} />
-                 <h3 className="text-sm font-black uppercase tracking-widest italic font-serif">Security Protocol</h3>
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-end justify-center">
+          {/* Transparent Backdrop that fades to exactly 18% opacity */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.18 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80" 
+            onClick={onClose} 
+          />
+          
+          {/* Bottom-to-center modal sheet spanning height dynamically */}
+          <motion.div 
+            initial={{ y: "110%", opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: "110%", opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 220 }}
+            className={cn(
+              "relative w-full shadow-[0_-25px_60px_rgba(0,0,0,0.8)] overflow-hidden bg-[#09090e]/95 backdrop-blur-3xl border-t border-x border-white/10 rounded-t-[32px] sm:rounded-[36px] sm:border-b flex flex-col transition-all duration-300",
+              "w-full max-w-[420px] pb-[calc(1.5rem+env(safe-area-inset-bottom))] mb-0 sm:mb-6 px-4 sm:px-6 z-10"
+            )}
+          >
+            {/* iOS style sheet drag handle */}
+            <div 
+              className="w-12 h-1 rounded-full bg-white/15 mx-auto mt-4 shrink-0 cursor-pointer hover:bg-white/25 transition-colors" 
+              onClick={onClose} 
+            />
+
+            {/* Header for non-entry screens */}
+            {step !== 'entry' && (
+              <div className="p-4 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
+                <div className="flex items-center gap-2">
+                   <ShieldCheck className="text-purple-500" size={16} />
+                   <h3 className="text-[10px] font-black uppercase tracking-widest text-white">Security Protocol</h3>
+                </div>
+                <button onClick={onClose} className="p-1 hover:bg-white/5 rounded-lg text-white/40 hover:text-white transition-colors">
+                  <X size={14} />
+                </button>
               </div>
-              <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-        )}
+            )}
 
-        <div className={cn("p-8", step === 'entry' ? "space-y-6" : "space-y-5")}>
-          {step === 'entry' ? (
-            <div className="text-center space-y-6">
-               <div className="flex justify-between items-start">
-                  <div className="w-10" /> {/* Spacer */}
-                  <h3 className="text-sm font-black text-slate-800 italic font-serif flex items-center justify-center gap-2 lowercase">
-                    <motion.span animate={isPinValid ? { rotateY: 180, scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.4 }}>
-                      {isPinValid ? <Unlock size={18} className="text-emerald-500" /> : <Lock size={18} className="text-slate-300" />}
-                    </motion.span>
-                    auth_pin
-                  </h3>
-                  <button onClick={onClose} className="p-2 hover:bg-slate-50 rounded-full text-slate-300 transition-colors">
-                    <X size={18} />
-                  </button>
-               </div>
+            {/* Interior content block without scrollbars */}
+            <div className="flex-1 p-2 sm:p-4 text-white select-none">
+              {step === 'entry' ? (
+                <div className="space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="w-8" /> {/* Spacer to align title beautifully */}
+                      <h3 className="text-xs font-black text-white uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+                        <motion.span animate={isPinValid ? { rotateY: 360, scale: [1, 1.2, 1] } : {}} transition={{ duration: 0.5 }}>
+                          {isPinValid ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Lock size={16} className="text-purple-500/80 animate-pulse" />}
+                        </motion.span>
+                        Enter Payment Pin
+                      </h3>
+                      <button onClick={onClose} className="p-1.5 hover:bg-white/5 rounded-full text-white/40 hover:text-white transition-colors">
+                        <X size={16} />
+                      </button>
+                    </div>
 
-              <motion.div 
-                animate={isShake ? { x: [-10, 10, -10, 10, 0] } : {}}
-                transition={{ duration: 0.4 }}
-                className="flex justify-center gap-2.5"
-              >
-                {[...Array(profile?.transfer_pin?.length || 4)].map((_, i) => (
-                  <div 
-                    key={i} 
-                    className={cn(
-                      "w-11 h-11 rounded-2xl border-2 flex items-center justify-center transition-all duration-300",
-                      pinEntry.length > i 
-                        ? (isShake ? "border-red-500 bg-red-50" : "border-slate-800 bg-slate-800") 
-                        : "border-slate-100 bg-slate-50"
-                    )}
-                  >
+                    {/* PIN Entries / Bubbles Indicator */}
                     <motion.div 
-                      animate={{ scale: pinEntry.length > i ? 1 : 0 }}
-                      className={cn("w-2.5 h-2.5 rounded-full", isShake ? "bg-red-500" : "bg-white")} 
-                    />
-                  </div>
-                ))}
-              </motion.div>
-
-              <div className="grid grid-cols-3 gap-2.5 max-w-[210px] mx-auto">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, 'del'].map((num, i) => (
-                  <button
-                    key={i}
-                    disabled={num === ''}
-                    onClick={() => {
-                      if (num === 'del') {
-                        setPinEntry(prev => prev.slice(0, -1));
-                      } else if (typeof num === 'number' && pinEntry.length < (profile?.transfer_pin?.length || 4)) {
-                        const newVal = pinEntry + num;
-                        setPinEntry(newVal);
-                        if (newVal.length === (profile?.transfer_pin?.length || 4)) {
-                          handleEntryTrigger(newVal);
-                        }
-                      }
-                    }}
-                    className={cn(
-                      "h-11 rounded-2xl flex items-center justify-center text-sm font-black transition-all active:scale-90",
-                      num === '' ? "invisible" : "bg-slate-50 text-slate-800 hover:bg-slate-100 border border-slate-100/50 shadow-sm"
-                    )}
-                  >
-                    {num === 'del' ? <X size={14} className="text-slate-400" /> : num}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex flex-col items-center gap-2 pt-2">
-                <button 
-                  onClick={() => setStep('forgot-pin')}
-                  className="text-[9px] font-black text-slate-400 hover:text-blue-500 uppercase tracking-widest transition-colors"
-                >
-                  Forgot Security PIN?
-                </button>
-                {isSubmitting && (
-                   <div className="flex items-center gap-1.5 grayscale opacity-50">
-                    <RefreshCw size={10} className="animate-spin" />
-                    <span className="text-[7px] font-black uppercase tracking-[0.2em]">Authenticating</span>
-                   </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              <div className="text-center space-y-2 mb-2">
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">
-                  {step === 'setup-init' ? 'Initialize PIN' : step === 'forgot-pin' ? 'Override Security' : 'Confirm Protocol'}
-                </h4>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
-                  Verify account password to {step === 'forgot-pin' ? 'reset' : 'secure'} your node.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Account Password</label>
-                  <div className="relative">
-                    <input 
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Verification Required"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3.5 px-4 text-xs font-bold text-slate-800 outline-none focus:border-slate-800 transition-all"
-                    />
-                    <button 
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
+                      className="flex justify-center gap-3 mb-5"
+                      animate={isShake ? { x: [-8, 8, -6, 6, -3, 3, 0] } : {}}
+                      transition={{ duration: 0.4 }}
                     >
-                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      {[...Array(profile?.transfer_pin?.length || 4)].map((_, i) => (
+                        <div 
+                          key={i} 
+                          className={cn(
+                            "w-12 h-12 rounded-xl border flex items-center justify-center transition-all duration-300 shadow-sm",
+                            pinEntry.length > i 
+                              ? (isShake 
+                                  ? "border-red-500 bg-red-500/10 shadow-[0_0_12px_rgba(239,68,68,0.25)]" 
+                                  : "border-purple-500 bg-purple-500/10 shadow-[0_0_12px_rgba(124,58,237,0.3)]") 
+                              : "border-white/10 bg-white/[0.01]"
+                          )}
+                        >
+                          <motion.div 
+                            animate={{ scale: pinEntry.length > i ? 1.2 : 0 }}
+                            className={cn("w-3 h-3 rounded-full shadow-inner", isShake ? "bg-red-500" : "bg-purple-500")} 
+                          />
+                        </div>
+                      ))}
+                    </motion.div>
+                  </div>
+
+                  {/* Keypad Buttons - Compact, centered, extremely premium, rounded */}
+                  <div className="grid grid-cols-3 gap-3.5 max-w-[280px] sm:max-w-[300px] mx-auto mb-3">
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, 'del'].map((num, i) => (
+                      <button
+                        key={i}
+                        disabled={num === ''}
+                        onClick={() => {
+                          if (num === 'del') {
+                            setPinEntry(prev => prev.slice(0, -1));
+                          } else if (typeof num === 'number' && pinEntry.length < (profile?.transfer_pin?.length || 4)) {
+                            const newVal = pinEntry + num;
+                            setPinEntry(newVal);
+                            if (newVal.length === (profile?.transfer_pin?.length || 4)) {
+                              handleEntryTrigger(newVal);
+                            }
+                          }
+                        }}
+                        className={cn(
+                          "w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center text-xl sm:text-2xl font-black transition-all active:scale-90 duration-75 mx-auto",
+                          num === '' ? "invisible animate-none pointer-events-none" : "bg-white/[0.03] text-white hover:bg-white/[0.08] active:bg-white/15 border border-white/5 hover:border-white/15 shadow-sm"
+                        )}
+                      >
+                        {num === 'del' ? <X size={20} className="text-white/80 stroke-[3px]" /> : num}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Pin Recovery & Sync Footer */}
+                  <div className="flex flex-col items-center gap-2 pt-1 pb-2 text-center">
+                    <button 
+                      onClick={() => setStep('forgot-pin')}
+                      className="text-[10px] font-black text-white/40 hover:text-purple-400 uppercase tracking-widest transition-colors cursor-pointer"
+                    >
+                      Forgot Security PIN?
                     </button>
+                    {isSubmitting && (
+                       <div className="flex items-center gap-1.5 opacity-65">
+                        <RefreshCw size={11} className="animate-spin text-purple-400" />
+                        <span className="text-[8px] font-black uppercase tracking-[0.2em] text-purple-400">Authenticating</span>
+                       </div>
+                    )}
                   </div>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Institutional PIN (4 digits)</label>
-                  <input 
-                    type="password"
-                    inputMode="numeric"
-                    placeholder="••••"
-                    value={newPin}
-                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-center text-xl font-black tracking-[0.5em] focus:border-slate-800 outline-none transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Confirm Identity PIN</label>
-                  <input 
-                    type="password"
-                    inputMode="numeric"
-                    placeholder="••••"
-                    value={confirmPin}
-                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-xl py-3 px-4 text-center text-xl font-black tracking-[0.5em] focus:border-slate-800 outline-none transition-all"
-                  />
-                </div>
-
-                {error && (
-                  <div className="flex items-center justify-center gap-1.5 text-red-500 text-[10px] font-bold uppercase tracking-widest">
-                    <AlertCircle size={12} />
-                    {error}
+              ) : (
+                <div className="space-y-4 py-2">
+                  <div className="text-center space-y-1.5 mb-2">
+                    <h4 className="text-xs font-black text-white uppercase tracking-wider">
+                      {step === 'setup-init' ? 'Initialize PIN' : step === 'forgot-pin' ? 'Override Security' : 'Confirm Protocol'}
+                    </h4>
+                    <p className="text-[9px] font-bold text-aura-muted uppercase tracking-widest leading-relaxed">
+                      Verify account password to {step === 'forgot-pin' ? 'reset' : 'secure'} your node.
+                    </p>
                   </div>
-                )}
-              </div>
 
-              <div className="pt-2">
-                <button 
-                  disabled={!password || newPin.length < 4 || newPin !== confirmPin || isSubmitting}
-                  onClick={handleSetup}
-                  className="w-full py-4 bg-slate-900 text-white rounded-xl font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-slate-900/10 transition-all active:scale-[0.98] disabled:opacity-20"
-                >
-                  {isSubmitting ? 'Verifying Neural Link...' : 'Apply Security Link'}
-                </button>
-                <button onClick={onClose} className="w-full mt-3 text-[9px] font-black text-slate-300 uppercase tracking-widest hover:text-slate-500">Cancel Override</button>
-              </div>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-bold text-aura-muted uppercase tracking-widest ml-1">Account Password</label>
+                      <div className="relative">
+                        <input 
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Verification Required"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-2.5 px-3.5 text-xs font-bold text-white outline-none focus:border-purple-500 transition-all placeholder:text-white/15"
+                        />
+                        <button 
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/70"
+                        >
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-bold text-aura-muted uppercase tracking-widest ml-1">Institutional PIN (4 digits)</label>
+                      <input 
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="••••"
+                        value={newPin}
+                        onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-2.5 px-3.5 text-center text-lg font-black tracking-[0.5em] focus:border-purple-500 outline-none transition-all placeholder:text-white/15 text-purple-400"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-bold text-aura-muted uppercase tracking-widest ml-1">Confirm Identity PIN</label>
+                      <input 
+                        type="password"
+                        inputMode="numeric"
+                        placeholder="••••"
+                        value={confirmPin}
+                        onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                        className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-2.5 px-3.5 text-center text-lg font-black tracking-[0.5em] focus:border-purple-500 outline-none transition-all placeholder:text-white/15 text-purple-400"
+                      />
+                    </div>
+
+                    {error && (
+                      <div className="flex items-center justify-center gap-1.5 text-red-400 text-[9px] font-bold uppercase tracking-widest py-0.5">
+                        <AlertCircle size={10} className="shrink-0 animate-bounce" />
+                        {error}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-1">
+                    <button 
+                      disabled={!password || newPin.length < 4 || newPin !== confirmPin || isSubmitting}
+                      onClick={handleSetup}
+                      className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-black uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-purple-600/20 transition-all active:scale-[0.98] disabled:opacity-20 cursor-pointer"
+                    >
+                      {isSubmitting ? 'Verifying Neural Link...' : 'Apply Security Link'}
+                    </button>
+                    <button onClick={onClose} className="w-full mt-2 text-[8px] font-black text-white/40 uppercase tracking-widest hover:text-white/70 transition-colors cursor-pointer">Cancel Override</button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </motion.div>
         </div>
-      </motion.div>
-    </div>
+      )}
+    </AnimatePresence>
   );
 }

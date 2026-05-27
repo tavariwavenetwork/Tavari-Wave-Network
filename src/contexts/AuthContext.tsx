@@ -262,9 +262,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (totalCredit > 0) {
             const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();
             
+            const oldAvailableBalance = currentProfile.available_balance || 0;
+            const newAvailableBalance = oldAvailableBalance + totalCredit;
+
             // Update User Profile
             transaction.update(docRef, {
-              available_balance: (currentProfile.available_balance || 0) + totalCredit,
+              available_balance: newAvailableBalance,
               total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
               roi_cycle_start: newCycleStart
             });
@@ -296,6 +299,135 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (err) {
         console.error("[ROI Engine] Sync transaction failed:", err);
       }
+    }
+  }, []);
+
+  const runExistingDataCorrection = useCallback(async (firebaseUser: FirebaseUser, profileData: UserProfile) => {
+    const currentWithdrawMethods = profileData.withdraw_methods || {};
+    if (currentWithdrawMethods.rewards_migrated_v2) return;
+
+    const docRef = doc(db, 'users', firebaseUser.uid);
+    try {
+      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'approved'));
+      const txSnap = await getDocs(txQuery);
+
+      let totalReferralClaims = 0;
+
+      txSnap.docs.forEach(docSnap => {
+        const tx = docSnap.data();
+        if (tx.type === 'referral_reward') {
+          totalReferralClaims += tx.amount || 0;
+        }
+      });
+
+      if (totalReferralClaims > 0) {
+        await runTransaction(db, async (transaction) => {
+          const uSnap = await transaction.get(docRef);
+          if (!uSnap.exists()) return;
+
+          const uData = uSnap.data() as UserProfile;
+          const uWithdrawMethods = uData.withdraw_methods || {};
+          if (uWithdrawMethods.rewards_migrated_v2) return;
+
+          const currentAvailable = uData.available_balance || 0;
+          const oldRewardDollarBalance = uWithdrawMethods.reward_dollar_balance || 0;
+
+          let newAvailable = currentAvailable - totalReferralClaims;
+          if (newAvailable < 0) newAvailable = 0;
+
+          const newRewardDollar = oldRewardDollarBalance + totalReferralClaims;
+
+          transaction.update(docRef, {
+            available_balance: newAvailable,
+            withdraw_methods: {
+              ...uWithdrawMethods,
+              reward_dollar_balance: newRewardDollar,
+              rewards_migrated_v2: true
+            }
+          });
+        });
+      } else {
+        await updateDoc(docRef, {
+          withdraw_methods: {
+            ...currentWithdrawMethods,
+            rewards_migrated_v2: true
+          }
+        });
+      }
+    } catch (err) {
+      console.error("[Migration Error] Failed to execute exact data correction:", err);
+    }
+  }, []);
+
+  const runRoiRelocationCorrection = useCallback(async (firebaseUser: FirebaseUser, profileData: UserProfile) => {
+    const currentWithdrawMethods = profileData.withdraw_methods || {};
+    if (currentWithdrawMethods.roi_relocated_v3) return;
+
+    const docRef = doc(db, 'users', firebaseUser.uid);
+    try {
+      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'approved'));
+      const txSnap = await getDocs(txQuery);
+
+      let totalRoiHarvest = 0;
+
+      txSnap.docs.forEach(docSnap => {
+        const tx = docSnap.data();
+        if (tx.type === 'roi_harvest') {
+          totalRoiHarvest += tx.amount || 0;
+        }
+      });
+
+      if (totalRoiHarvest > 0) {
+        await runTransaction(db, async (transaction) => {
+          const uSnap = await transaction.get(docRef);
+          if (!uSnap.exists()) return;
+
+          const uData = uSnap.data() as UserProfile;
+          const uWithdrawMethods = uData.withdraw_methods || {};
+          if (uWithdrawMethods.roi_relocated_v3) return;
+
+          const oldRewardDollarBalance = uWithdrawMethods.reward_dollar_balance || 0;
+          const currentAvailable = uData.available_balance || 0;
+
+          // Deduct from reward balance, ensuring it doesn't go below 0
+          const deductAmount = Math.min(totalRoiHarvest, oldRewardDollarBalance);
+          const newRewardDollar = oldRewardDollarBalance - deductAmount;
+          
+          // Add back to available balance
+          const newAvailable = currentAvailable + deductAmount;
+
+          transaction.update(docRef, {
+            available_balance: newAvailable,
+            withdraw_methods: {
+              ...uWithdrawMethods,
+              reward_dollar_balance: newRewardDollar,
+              roi_relocated_v3: true
+            }
+          });
+
+          // Add transaction adjustment record for history integrity
+          const correctionTxId = `roi-relocate-adj-${firebaseUser.uid}-${Date.now()}`;
+          const correctionTxRef = doc(db, 'transactions', correctionTxId);
+          transaction.set(correctionTxRef, {
+            user_id: firebaseUser.uid,
+            type: 'adjustment',
+            amount: deductAmount,
+            plan_name: 'Harvest relocation adjustment',
+            created_at: new Date().toISOString(),
+            status: 'approved',
+            description: `ROI balance correction: Relocated $${deductAmount.toFixed(2)} from Reward Balance to Available Balance`
+          });
+        });
+      } else {
+        await updateDoc(docRef, {
+          withdraw_methods: {
+            ...currentWithdrawMethods,
+            roi_relocated_v3: true
+          }
+        });
+      }
+    } catch (err) {
+      console.error("[Correction Error] Failed to execute ROI relocation:", err);
     }
   }, []);
 
@@ -340,6 +472,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (docSnap.exists()) {
           const profileData = docSnap.data() as UserProfile;
           setProfile(profileData);
+
+          // Safe trigger existing reward balance correction once
+          if (!profileData.withdraw_methods?.rewards_migrated_v2) {
+            runExistingDataCorrection(firebaseUser, profileData);
+          }
+
+          // Trigger relocation of ROI profits to Available Balance
+          if (!profileData.withdraw_methods?.roi_relocated_v3) {
+            runRoiRelocationCorrection(firebaseUser, profileData);
+          }
 
           // ROI Background Sync
           const cycleStartStr = profileData.roi_cycle_start;

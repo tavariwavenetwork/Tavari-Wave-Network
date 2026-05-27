@@ -40,7 +40,8 @@ import {
   onSnapshot,
   updateDoc, 
   increment, 
-  runTransaction
+  runTransaction,
+  getDocs
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
@@ -227,7 +228,10 @@ export default function Invest() {
   const { config: uiConfig } = useUIConfig();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
-  const [selectedWallet, setSelectedWallet] = useState<'funding_balance' | 'available_balance' | 'referral_earnings'>('funding_balance');
+  const [selectedWallet, setSelectedWallet] = useState<'funding_balance' | 'available_balance' | 'referral_earnings' | 'reward_dollar_balance'>('funding_balance');
+  const walletBalanceToShow = selectedWallet === 'reward_dollar_balance'
+    ? (profile?.withdraw_methods?.reward_dollar_balance ?? profile?.reward_dollar_balance ?? 0)
+    : (profile?.[selectedWallet] || 0);
   const [view, setView] = useState<'plans' | 'summary' | 'payment'>('plans');
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [confirmedAmount, setConfirmedAmount] = useState<number>(0);
@@ -286,6 +290,7 @@ export default function Invest() {
 
   const activateInvestment = async (inv: any) => {
     if (!user || !profile) return;
+    if (isSubmitting) return;
     
     if (profile.suspended || profile.banned) {
       toast.error("Account access restricted by System Protocol.");
@@ -296,14 +301,24 @@ export default function Invest() {
     try {
       const now = new Date().toISOString();
       
+      // Ensure stable and race-condition free checking of previous investments
+      const q = query(collection(db, 'investments'), where('user_id', '==', user.uid));
+      const invsSnap = await getDocs(q);
+      
+      const userInvs = invsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const isFirstActivation = !userInvs.some((i: any) => 
+        i.id !== inv.id && (i.status === 'active' || i.status === 'completed' || i.referral_bonus_processed === true)
+      );
+      const dynamicActiveCount = userInvs.filter((i: any) => i.status === 'active').length;
+
       await runTransaction(db, async (transaction) => {
         const invRef = doc(db, 'investments', inv.id);
         const invSnap = await transaction.get(invRef);
         
-        if (!invSnap.exists()) throw new Error("Investment not found.");
+        if (!invSnap.exists()) throw new Error("Investment document not found in system databases.");
         const invData = invSnap.data();
         
-        if (invData.status !== 'inactive') throw new Error("Investment cannot be activated.");
+        if (invData.status !== 'inactive') throw new Error("Investment has already been activated or is in an invalid state.");
 
         // Update Investment
         transaction.update(invRef, {
@@ -314,16 +329,21 @@ export default function Invest() {
           referral_bonus_processed: true
         });
 
+        const userRef = doc(db, 'users', user.uid);
+
+        // Start user's ROI cycle timestamp if they have no other active investments
+        if (dynamicActiveCount === 0) {
+          transaction.update(userRef, {
+            roi_cycle_start: now
+          });
+        }
+
         // Referral Bonus Logic (only first investment activated)
-        if (profile.referred_by && !profile.first_investment_activated && !invData.referral_bonus_processed) {
+        if (profile.referred_by && isFirstActivation && !invData.referral_bonus_processed) {
           const bonusAmount = invData.amount * 0.05;
-          const userRef = doc(db, 'users', user.uid);
           const referrerRef = doc(db, 'users', profile.referred_by);
 
-          // Mark user's first investment as activated and increment active referrals
-          transaction.update(userRef, {
-            first_investment_activated: true
-          });
+          // Increment referrer's active referral count
           transaction.update(referrerRef, {
             active_referrals: increment(1)
           });
@@ -340,43 +360,15 @@ export default function Invest() {
             created_at: now
           });
 
-          // Create pending claim document for User B (referred)
-          const claimRef2 = doc(collection(db, 'referral_claims'));
-          transaction.set(claimRef2, {
-            user_id: user.uid, // User B
-            type: 'referred',
-            amount: bonusAmount,
-            partner_uid: profile.referred_by, // User A
-            partner_name: 'Sponsor',
-            status: 'pending',
-            created_at: now
-          });
-
-          // Notifications
-          const notificationRef1 = doc(collection(db, 'notifications'));
-          transaction.set(notificationRef1, {
-            user_id: user.uid,
-            title: 'Welcome Referral Reward Pending',
-            message: `You have a pending referral reward of ${formatCurrency(bonusAmount)}! Claim it inside the Reward page.`,
-            type: 'success',
-            read: false,
-            created_at: now
-          });
-
           const notificationRef2 = doc(collection(db, 'notifications'));
           transaction.set(notificationRef2, {
             user_id: profile.referred_by,
+            sender_id: user.uid,
             title: 'Referral Reward Pending',
             message: `Your referral ${profile.username} has activated an investment. Claim your referral reward now.`,
             type: 'success',
             read: false,
             created_at: now
-          });
-        } else {
-          // If they don't have a referrer or it's not their first investment, we still mark first_investment_activated
-          const userRef = doc(db, 'users', user.uid);
-          transaction.update(userRef, {
-            first_investment_activated: true
           });
         }
       });
@@ -391,7 +383,8 @@ export default function Invest() {
 
       toast.success("Node Pulse Detected. Core Cycle Initiated + Referral Bonuses Dispersed.");
     } catch (error: any) {
-      toast.error(error.message || "Activation failed.");
+      console.error("Activation failed:", error);
+      toast.error(`Activation failed: ${error.message || String(error)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -443,8 +436,12 @@ export default function Invest() {
         const userData = userSnap.data();
         
         // 2. SERVER-SIDE BALANCE VALIDATION
-        if (paymentMethod === 'wallet' && confirmedAmount > (userData[selectedWallet] || 0)) {
-          throw new Error(`Insufficient ${selectedWallet.replace('_', ' ')}. Please fund your wallet.`);
+        const currentWalletBalance = selectedWallet === 'reward_dollar_balance'
+          ? (userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0)
+          : (userData[selectedWallet] || 0);
+
+        if (paymentMethod === 'wallet' && confirmedAmount > currentWalletBalance) {
+          throw new Error(`Insufficient ${selectedWallet.replace(/_/g, ' ')}. Please fund your wallet.`);
         }
 
         // 3. LOG INVESTMENT
@@ -466,10 +463,22 @@ export default function Invest() {
 
         // 4. ATOMIC BALANCE UPDATE
         if (paymentMethod === 'wallet') {
-          transaction.update(userRef, {
-            [selectedWallet]: increment(-confirmedAmount),
-            total_invested: increment(confirmedAmount)
-          });
+          if (selectedWallet === 'reward_dollar_balance') {
+            const existingWithdrawMethods = userData.withdraw_methods || {};
+            const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
+            transaction.update(userRef, {
+              withdraw_methods: {
+                ...existingWithdrawMethods,
+                reward_dollar_balance: oldRewardDollarBalance - confirmedAmount
+              },
+              total_invested: increment(confirmedAmount)
+            });
+          } else {
+            transaction.update(userRef, {
+              [selectedWallet]: increment(-confirmedAmount),
+              total_invested: increment(confirmedAmount)
+            });
+          }
         }
 
         // 5. TRANSACTION RECORD
@@ -766,7 +775,7 @@ export default function Invest() {
                      const options = [
                        { id: 'bank' as const, label: 'Bank Transfer', icon: <RealisticBankIcon />, description: "Direct institutional transfer", badge: "Recommended", badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", isRecommended: true },
                        { id: 'crypto' as const, label: 'Crypto Payments', icon: <RealisticBitcoinIcon />, description: "Pay via USDT, BTC, or ERC20" },
-                       { id: 'wallet' as const, label: 'Wallet Balance', icon: <RealisticWalletIcon />, description: `${selectedWallet.split('_')[0].charAt(0).toUpperCase() + selectedWallet.split('_')[0].slice(1)} balance (${formatCurrency(profile?.[selectedWallet] || 0)})` },
+                       { id: 'wallet' as const, label: 'Wallet Balance', icon: <RealisticWalletIcon />, description: `${selectedWallet === 'reward_dollar_balance' ? 'Reward' : selectedWallet.split('_')[0].charAt(0).toUpperCase() + selectedWallet.split('_')[0].slice(1)} balance (${formatCurrency(walletBalanceToShow)})` },
                         { id: 'card' as const, label: 'Card Payment', icon: <RealisticCardIcon />, description: "Instant settlement via card integration", isUnavailable: true },
                      ];
 
@@ -792,8 +801,8 @@ export default function Invest() {
 
                          {paymentMethod === 'wallet' && opt.id === 'wallet' && (
                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-4 pt-1 overflow-hidden">
-                              <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10">
-                                {(['funding_balance', 'available_balance', 'referral_earnings'] as const).map(w => (
+                              <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 flex-wrap gap-1">
+                                {(['funding_balance', 'available_balance', 'referral_earnings', 'reward_dollar_balance'] as const).map(w => (
                                   <button 
                                     key={w}
                                     onClick={() => setSelectedWallet(w)}
@@ -802,7 +811,7 @@ export default function Invest() {
                                       selectedWallet === w ? "bg-primary text-white shadow-sm" : "text-aura-muted hover:text-white"
                                     )}
                                   >
-                                    {w.split('_')[0]}
+                                    {w === 'reward_dollar_balance' ? 'Reward' : w.split('_')[0]}
                                   </button>
                                 ))}
                               </div>
@@ -814,7 +823,7 @@ export default function Invest() {
                                 </div>
                                 <button 
                                   onClick={() => {
-                                    const balance = profile?.[selectedWallet] || 0;
+                                    const balance = walletBalanceToShow;
                                     const cleanBalance = parseFloat(balance.toFixed(2));
                                     
                                     // Validation and Plan Switch Logic
@@ -845,9 +854,9 @@ export default function Invest() {
                                 </button>
                               </div>
 
-                              {confirmedAmount > (profile?.[selectedWallet] || 0) && (
-                                <p className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center animate-pulse">Insufficient operational capital.</p>
-                              )}
+                               {confirmedAmount > walletBalanceToShow && (
+                                 <p className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center animate-pulse">Insufficient operational capital.</p>
+                               )}
                               
                               {selectedPlan && (confirmedAmount < selectedPlan.min || confirmedAmount > selectedPlan.max) && (
                                 <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
@@ -974,7 +983,7 @@ export default function Invest() {
                 </div>
  
                 <button 
-                  disabled={!paymentMethod || isSubmitting || ((paymentMethod === 'bank' || paymentMethod === 'crypto') ? !transactionId : confirmedAmount > (profile?.[selectedWallet] || 0))}
+                  disabled={!paymentMethod || isSubmitting || ((paymentMethod === 'bank' || paymentMethod === 'crypto') ? !transactionId : confirmedAmount > walletBalanceToShow)}
                   onClick={submitInvestment}
                   className={cn(
                     "w-full py-5 text-white font-black uppercase tracking-[0.3em] text-[10px] rounded-2xl shadow-lg disabled:opacity-20 transition-all",

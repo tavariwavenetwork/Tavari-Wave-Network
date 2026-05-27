@@ -78,13 +78,22 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
             <div 
               className="p-10 bg-[#11141b] border border-white/5 rounded-[40px] flex flex-col items-center justify-center text-center space-y-3 min-h-[300px] relative overflow-visible gpu-accelerate"
             >
-               <div className="relative mb-2">
-                 <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-aura-muted/20">
-                   <Bot size={32} />
+               <div className="relative mb-2 overflow-visible">
+                 <div className="w-16 h-16 bg-[#11141b]/95 rounded-2xl border border-red-500/20 flex items-center justify-center overflow-hidden shadow-inner shadow-[0_0_15px_rgba(239,68,68,0.15)] bg-gradient-to-br from-[#1c1212]/95 to-[#11141b]/95">
+                   <div className="w-14 h-14 relative flex items-center justify-center scale-[1.9]">
+                     <img 
+                       src="https://i.imgur.com/swuDIvl.png" 
+                       alt="Premium AI Bot Offline" 
+                       referrerPolicy="no-referrer"
+                       loading="lazy"
+                       decoding="async"
+                       className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-20 brightness-[0.4] grayscale contrast-75"
+                     />
+                   </div>
                  </div>
-                 {/* Glowing Green/Emerald Indicator on the top right edge of the small card element */}
-                 <div className="absolute top-0 right-0 w-3 h-3 bg-emerald-500 rounded-full shadow-[0_0_12px_#10b981] z-50 pointer-events-none">
-                   <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                 {/* Robot Not Activated text sitting across top border edge */}
+                 <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[7px] font-black uppercase text-red-550 text-red-500 whitespace-nowrap bg-[#11141b] px-1.5 py-0.5 rounded border border-red-500/20 tracking-wider">
+                   Robot Not Activated
                  </div>
                </div>
                <h3 className="text-xl font-black text-white uppercase tracking-widest">No active investment</h3>
@@ -99,46 +108,23 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
         <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.01]" />
         
-        {/* Increased robot size inside the exact same container frame */}
-        <div className="relative mb-4 lg:mb-8 z-10 group/bot">
-          <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
-            <motion.div 
-              animate={{
-                scale: [1.8, 2.0, 1.8],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="w-11 h-11 lg:w-18 lg:h-18 relative flex items-center justify-center"
-            >
+        {/* Disabled robot animation container with faint red overlay/glow styled border */}
+        <div className="relative mb-4 lg:mb-8 z-10 group/bot overflow-visible">
+          <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-red-500/20 flex items-center justify-center overflow-hidden shadow-inner shadow-[0_0_15px_rgba(239,68,68,0.15)] bg-gradient-to-br from-[#1c1212]/95 to-[#11141b]/95">
+            <div className="w-11 h-11 lg:w-18 lg:h-18 relative flex items-center justify-center scale-[1.9]">
               <img 
                 src="https://i.imgur.com/swuDIvl.png" 
                 alt="Premium AI Bot Offline" 
                 referrerPolicy="no-referrer"
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-60"
+                className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-20 brightness-[0.4] grayscale contrast-75"
               />
-              {/* Blinking eyes overlay in off-state */}
-              <div className="absolute top-[42%] left-[34%] right-[34%] flex justify-between pointer-events-none z-20">
-                <motion.div 
-                  animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                  transition={{ duration: 0.08, ease: "easeInOut" }}
-                  className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff]/60 rounded-full shadow-[0_0_6px_rgba(0,255,255,0.8)]"
-                />
-                <motion.div 
-                  animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                  transition={{ duration: 0.08, ease: "easeInOut" }}
-                  className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff]/60 rounded-full shadow-[0_0_6px_rgba(0,255,255,0.8)]"
-                />
-              </div>
-            </motion.div>
+            </div>
           </div>
-          {/* Glowing Green/Emerald Indicator sitting across the border edge of the small robot card */}
-          <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full shadow-[0_0_14px_#10b981] z-50 pointer-events-none">
-            <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
+          {/* Robot Not Activated text sitting across top border edge */}
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[6px] lg:text-[8px] font-black uppercase text-red-550 text-red-500 whitespace-nowrap bg-[#0e111a] px-1.5 py-0.5 rounded border border-red-500/20 tracking-wider">
+            Robot Not Activated
           </div>
         </div>
         
