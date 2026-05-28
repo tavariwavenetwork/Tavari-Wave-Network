@@ -86,6 +86,12 @@ const Footer = () => {
                   {t("AML Policy")}
                 </Link>
               </li>
+              <li>
+                <Link to="/certification-compliance" className="text-aura-muted hover:text-primary text-xs transition-colors flex items-center gap-2 group">
+                  <ChevronRight size={12} className="opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all text-primary" />
+                  {t("Certification & Compliance")}
+                </Link>
+              </li>
             </ul>
           </div>
 

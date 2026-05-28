@@ -1285,13 +1285,18 @@ export default function Fund() {
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-xl font-black text-white italic font-serif leading-none">Not Supported</h3>
-                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest">{notSupportedCountry} Node Offline</p>
+                <h3 className="text-2xl font-black text-white italic font-serif leading-none">Region Not Supported</h3>
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest animate-pulse">Selected Region: {notSupportedCountry}</p>
               </div>
 
-              <p className="text-xs font-bold text-aura-muted leading-relaxed uppercase tracking-wider">
-                Automated peer-to-peer settlement networks for <span className="text-white">{notSupportedCountry}</span> are currently undergoing core maintenance.
-              </p>
+              <div className="space-y-4 text-xs font-semibold text-aura-muted leading-relaxed text-center px-4">
+                <p>
+                  The region you selected does not support your location.
+                </p>
+                <p className="text-white/90">
+                  Kindly contact Tavari Wave Network administration for assistance.
+                </p>
+              </div>
 
               <button 
                 onClick={() => {
@@ -1304,12 +1309,12 @@ export default function Fund() {
               </button>
 
               <a 
-                href="https://t.me/Aura_support_Bot" 
+                href="https://wa.me/2349167953016?text=Hello%20Tavari%20Wave%20Network%20Support%2C%20I%20need%20assistance%20regarding%20unsupported%20region%20access." 
                 target="_blank" 
                 referrerPolicy="no-referrer"
                 className="w-full py-4 bg-aura-lime text-aura-black font-black uppercase tracking-[0.2em] text-[10px] rounded-xl shadow-lg shadow-aura-lime/15 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
               >
-                <Send size={12} /> Contact Telegram Support
+                <Send size={12} /> Contact Support
               </a>
             </motion.div>
           </div>

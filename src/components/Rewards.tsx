@@ -1455,9 +1455,12 @@ export default function Rewards() {
               {/* Card 1: Daily Point */}
               <div 
                 onClick={() => setRewardView('daily')}
-                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-emerald-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
+                className="relative p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/80 to-[#0c1217]/90 hover:from-[#1d2d37]/90 hover:to-[#111920] border border-white/10 hover:border-emerald-500/40 hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.96] transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-xl hover:shadow-[0_12px_24px_rgba(16,185,129,0.15),_inset_0_1px_0_rgba(255,255,255,0.05)] active:duration-75 select-none overflow-hidden"
               >
-                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/30 group-hover:scale-110 group-hover:translate-x-0.5 transition-all duration-300 text-gray-400 group-hover:text-emerald-400 shadow-sm">
+                  <ChevronRight size={10} className="sm:size-12" />
+                </div>
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0 group-hover:scale-110 group-hover:rotate-1 transition-all duration-300">
                   <Icon3DDailyPoints />
                 </div>
                 <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-emerald-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Daily Point</span>
@@ -1466,9 +1469,12 @@ export default function Rewards() {
               {/* Card 2: Refer Friends */}
               <div 
                 onClick={() => setRewardView('refer')}
-                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-purple-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
+                className="relative p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/80 to-[#0c1217]/90 hover:from-[#1d2d37]/90 hover:to-[#111920] border border-white/10 hover:border-purple-500/40 hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.96] transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-xl hover:shadow-[0_12px_24px_rgba(168,85,247,0.15),_inset_0_1px_0_rgba(255,255,255,0.05)] active:duration-75 select-none overflow-hidden"
               >
-                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-purple-500/20 group-hover:border-purple-500/30 group-hover:scale-110 group-hover:translate-x-0.5 transition-all duration-300 text-gray-400 group-hover:text-purple-400 shadow-sm">
+                  <ChevronRight size={10} className="sm:size-12" />
+                </div>
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0 group-hover:scale-110 group-hover:rotate-1 transition-all duration-300">
                   <Icon3DReferFriends />
                 </div>
                 <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-purple-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Refer Friends</span>
@@ -1477,9 +1483,12 @@ export default function Rewards() {
               {/* Card 3: Node Rewards */}
               <div 
                 onClick={() => setRewardView('nodes')}
-                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-yellow-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
+                className="relative p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/80 to-[#0c1217]/90 hover:from-[#1d2d37]/90 hover:to-[#111920] border border-white/10 hover:border-yellow-500/40 hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.96] transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-xl hover:shadow-[0_12px_24px_rgba(234,179,8,0.15),_inset_0_1px_0_rgba(255,255,255,0.05)] active:duration-75 select-none overflow-hidden"
               >
-                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-yellow-500/20 group-hover:border-yellow-500/30 group-hover:scale-110 group-hover:translate-x-0.5 transition-all duration-300 text-gray-400 group-hover:text-yellow-400 shadow-sm">
+                  <ChevronRight size={10} className="sm:size-12" />
+                </div>
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0 group-hover:scale-110 group-hover:rotate-1 transition-all duration-300">
                   <Icon3DNodeRewards />
                 </div>
                 <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-yellow-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Node Rewards</span>
@@ -1488,9 +1497,12 @@ export default function Rewards() {
               {/* Card 4: Ranking */}
               <div 
                 onClick={() => setRewardView('ranking')}
-                className="p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/40 to-[#0c1217]/50 hover:from-[#1d2d37]/50 hover:to-[#111920]/60 border border-white/5 hover:border-cyan-500/30 transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-lg select-none"
+                className="relative p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/80 to-[#0c1217]/90 hover:from-[#1d2d37]/90 hover:to-[#111920] border border-white/10 hover:border-cyan-500/40 hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.96] transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-xl hover:shadow-[0_12px_24px_rgba(6,182,212,0.15),_inset_0_1px_0_rgba(255,255,255,0.05)] active:duration-75 select-none overflow-hidden"
               >
-                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0">
+                <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-cyan-500/20 group-hover:border-cyan-500/30 group-hover:scale-110 group-hover:translate-x-0.5 transition-all duration-300 text-gray-400 group-hover:text-cyan-400 shadow-sm">
+                  <ChevronRight size={10} className="sm:size-12" />
+                </div>
+                <div className="scale-75 sm:scale-100 flex items-center justify-center h-14 sm:h-20 w-14 sm:w-20 shrink-0 group-hover:scale-110 group-hover:rotate-1 transition-all duration-300">
                   <Icon3DRanking />
                 </div>
                 <span className="text-[8px] xs:text-[9px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-cyan-400 transition-colors mt-1 sm:mt-2 block truncate w-full">Ranking</span>
@@ -1563,26 +1575,26 @@ export default function Rewards() {
             </div>
 
             {/* OVERVIEW CARD SECTION */}
-            <div className="bg-white border border-slate-100 rounded-[24px] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-4">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-100/60">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Points Overview</h3>
+            <div className="bg-[#11131f] border border-white/5 rounded-[24px] p-5 shadow-2xl space-y-4">
+              <div className="flex justify-between items-center pb-2 border-b border-white/5">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-wider">Points Overview</h3>
               </div>
               <div className="grid grid-cols-3 gap-1 xs:gap-2 sm:gap-4 items-center">
                 <div className="text-left">
-                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-bold text-slate-400 block uppercase mb-1 leading-tight truncate">Points Credited Today</span>
-                  <span className="text-emerald-500 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-black text-gray-500 block uppercase mb-1 leading-tight truncate">Points Credited Today</span>
+                  <span className="text-emerald-400 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono">
                     +{hasClaimedToday ? 1 : 0} Point{hasClaimedToday ? '' : 's'}
                   </span>
                 </div>
-                <div className="text-center border-x border-slate-100 px-1 sm:px-2">
-                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-bold text-slate-400 block uppercase mb-1 leading-tight truncate">Total Points</span>
-                  <span className="text-slate-800 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono truncate">
+                <div className="text-center border-x border-white/5 px-1 sm:px-2">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-black text-gray-500 block uppercase mb-1 leading-tight truncate">Total Points</span>
+                  <span className="text-white text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono truncate">
                     {points_balance.toLocaleString()} PTS
                   </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-bold text-slate-400 block uppercase mb-1 leading-tight truncate">Total Balance</span>
-                  <span className="text-slate-800 text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono truncate">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] font-black text-gray-500 block uppercase mb-1 leading-tight truncate">Total Balance</span>
+                  <span className="text-white text-xs xs:text-sm sm:text-2xl font-black tracking-tight block font-mono truncate">
                     ${(points_balance * 0.10).toFixed(2)}
                   </span>
                 </div>
@@ -1590,23 +1602,23 @@ export default function Rewards() {
             </div>
 
             {/* DAILY CHECK-IN CALENDAR SECTION */}
-            <div className="bg-white border border-slate-100 rounded-[28px] p-6 shadow-[0_4px_24px_rgba(0,0,0,0.02)] space-y-6">
-              <div className="flex justify-between items-center border-b border-slate-50 pb-4">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Daily Check-In Calendar</h3>
-                <div className="flex gap-1.5 bg-slate-50 border border-slate-100 p-1.5 rounded-full text-center">
-                  <span className="text-[9px] uppercase font-bold text-emerald-700 px-2.5 py-0.5 bg-emerald-50 rounded-md">Streak: {current_streak} days</span>
+            <div className="bg-[#11131f] border border-white/5 rounded-[28px] p-6 shadow-2xl space-y-6">
+              <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">Daily Check-In Calendar</h3>
+                <div className="flex gap-1.5 bg-emerald-500/10 border border-emerald-500/20 p-1.5 rounded-full text-center">
+                  <span className="text-[9px] uppercase font-black text-emerald-400 px-2.5 py-0.5 rounded-md">Streak: {current_streak} days</span>
                 </div>
               </div>
 
               {/* Day, Month, Year Tabs selector */}
-              <div className="bg-slate-100/60 border border-slate-200/40 p-1 rounded-full flex gap-1 w-full max-w-[280px] mx-auto shadow-inner">
+              <div className="bg-black/40 border border-white/5 p-1 rounded-full flex gap-1 w-full max-w-[280px] mx-auto shadow-inner">
                 <button
                   onClick={() => setCalTab('daily')}
                   className={cn(
-                    "flex-1 text-[11px] font-bold py-1.5 rounded-full transition-all cursor-pointer",
+                    "flex-1 text-[11px] font-black py-1.5 rounded-full transition-all cursor-pointer",
                     calTab === 'daily' 
-                      ? "bg-[#e8f5e9] text-emerald-700 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800 bg-transparent"
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shadow-sm" 
+                      : "text-gray-400 hover:text-white bg-transparent"
                   )}
                 >
                   Daily
@@ -1614,10 +1626,10 @@ export default function Rewards() {
                 <button
                   onClick={() => setCalTab('monthly')}
                   className={cn(
-                    "flex-1 text-[11px] font-bold py-1.5 rounded-full transition-all cursor-pointer",
+                    "flex-1 text-[11px] font-black py-1.5 rounded-full transition-all cursor-pointer",
                     calTab === 'monthly' 
-                      ? "bg-[#e8f5e9] text-emerald-700 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800 bg-transparent"
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shadow-sm" 
+                      : "text-gray-400 hover:text-white bg-transparent"
                   )}
                 >
                   Monthly
@@ -1625,10 +1637,10 @@ export default function Rewards() {
                 <button
                   onClick={() => setCalTab('yearly')}
                   className={cn(
-                    "flex-1 text-[11px] font-bold py-1.5 rounded-full transition-all cursor-pointer",
+                    "flex-1 text-[11px] font-black py-1.5 rounded-full transition-all cursor-pointer",
                     calTab === 'yearly' 
-                      ? "bg-[#e8f5e9] text-emerald-700 shadow-sm" 
-                      : "text-slate-500 hover:text-slate-800 bg-transparent"
+                      ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shadow-sm" 
+                      : "text-gray-400 hover:text-white bg-transparent"
                   )}
                 >
                   Yearly
@@ -1640,7 +1652,7 @@ export default function Rewards() {
                 {/* Left side: Points sum */}
                 <div>
                   {calTab === 'daily' && (
-                    <span className="text-emerald-600 font-bold block text-sm">
+                    <span className="text-emerald-400 font-bold block text-sm">
                       Sum +{(() => {
                         const monthPrefix = `${calYear}-${String(calMonth + 1).padStart(2, '0')}`;
                         return claimed_dates.filter((dStr: string) => dStr.startsWith(monthPrefix)).length;
@@ -1648,7 +1660,7 @@ export default function Rewards() {
                     </span>
                   )}
                   {calTab === 'monthly' && (
-                    <span className="text-emerald-600 font-bold block text-sm">
+                    <span className="text-emerald-400 font-bold block text-sm">
                       Sum +{(() => {
                         const yearPrefix = `${calYear}-`;
                         return claimed_dates.filter((dStr: string) => dStr.startsWith(yearPrefix)).length;
@@ -1656,7 +1668,7 @@ export default function Rewards() {
                     </span>
                   )}
                   {calTab === 'yearly' && (
-                    <span className="text-emerald-600 font-bold block text-sm">
+                    <span className="text-emerald-400 font-bold block text-sm">
                       Sum +{claimed_dates.length} Points
                     </span>
                   )}
@@ -1682,12 +1694,12 @@ export default function Rewards() {
                       }
                     }}
                     disabled={calYear <= 1980}
-                    className="p-1 rounded-full hover:bg-slate-100 text-slate-600 active:scale-90 transition-all cursor-pointer disabled:opacity-20"
+                    className="p-1 rounded-full hover:bg-white/5 text-gray-400 hover:text-white active:scale-90 transition-all cursor-pointer disabled:opacity-20"
                   >
                     <ChevronLeft size={16} strokeWidth={2.5} />
                   </button>
 
-                  <span className="font-bold text-slate-800 tracking-wide font-mono text-xs sm:text-sm">
+                  <span className="font-bold text-white tracking-wide font-mono text-xs sm:text-sm">
                     {calTab === 'daily' 
                       ? `${calYear}.${String(calMonth + 1).padStart(2, '0')}`
                       : `${calYear}`
@@ -1712,7 +1724,7 @@ export default function Rewards() {
                       }
                     }}
                     disabled={calYear >= 2099}
-                    className="p-1 rounded-full hover:bg-slate-100 text-slate-600 active:scale-90 transition-all cursor-pointer disabled:opacity-20"
+                    className="p-1 rounded-full hover:bg-white/5 text-gray-400 hover:text-white active:scale-90 transition-all cursor-pointer disabled:opacity-20"
                   >
                     <ChevronRight size={16} strokeWidth={2.5} />
                   </button>
@@ -1731,7 +1743,7 @@ export default function Rewards() {
                     className="space-y-4"
                   >
                     {/* Weekday headers list */}
-                    <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-slate-400 tracking-wider">
+                    <div className="grid grid-cols-7 gap-1 text-center font-bold text-[10px] text-gray-500 tracking-wider">
                       {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map(lbl => (
                         <div key={lbl} className="py-1">{lbl}</div>
                       ))}
@@ -1776,10 +1788,10 @@ export default function Rewards() {
                               list.push(
                                 <div 
                                   key={`day-${d}`}
-                                  className="w-full aspect-square rounded-[14px] bg-[#e6f4ea] border border-[#a3e635]/15 flex flex-col items-center justify-center cursor-default select-none group"
+                                  className="w-full aspect-square rounded-[14px] bg-emerald-950/20 border border-emerald-500/15 flex flex-col items-center justify-center cursor-default select-none group"
                                 >
-                                  <span className="text-[#137333] text-xs sm:text-sm font-bold">{d}</span>
-                                  <span className="text-[7px] sm:text-[9px] font-black text-emerald-500 mt-0.5 block">+1</span>
+                                  <span className="text-emerald-400 text-xs sm:text-sm font-bold">{d}</span>
+                                  <span className="text-[7px] sm:text-[9px] font-black text-emerald-500/60 mt-0.5 block">+1</span>
                                 </div>
                               );
                             }
@@ -1789,11 +1801,11 @@ export default function Rewards() {
                               <button 
                                 key={`day-${d}`}
                                 onClick={handleDailyCheckIn}
-                                className="w-full aspect-square rounded-[14px] border-2 border-emerald-500 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 font-bold flex flex-col items-center justify-center hover:scale-[1.03] transition-all cursor-pointer animate-pulse"
+                                className="w-full aspect-square rounded-[14px] border border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold flex flex-col items-center justify-center hover:scale-[1.03] transition-all cursor-pointer animate-pulse"
                                 title="Click to check-in now"
                               >
                                 <span className="text-xs sm:text-sm font-black">{d}</span>
-                                <span className="text-[7px] sm:text-[9px] font-bold text-emerald-600 mt-0.5 block">CLAIM</span>
+                                <span className="text-[7px] sm:text-[9px] font-bold text-emerald-400 mt-0.5 block">CLAIM</span>
                               </button>
                             );
                           } else {
@@ -1801,7 +1813,7 @@ export default function Rewards() {
                             list.push(
                               <div 
                                 key={`day-${d}`}
-                                className="w-full aspect-square rounded-[14px] bg-slate-50/30 border border-slate-100 flex items-center justify-center text-slate-800 font-semibold text-xs sm:text-sm select-none"
+                                className="w-full aspect-square rounded-[14px] bg-white/[0.02] border border-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 font-semibold text-xs sm:text-sm select-none transition-colors"
                               >
                                 {d}
                               </div>
@@ -1838,12 +1850,12 @@ export default function Rewards() {
                           className={cn(
                             "py-4 px-2 rounded-2xl flex flex-col items-center justify-center transition-all border cursor-pointer active:scale-95",
                             hasClaims 
-                              ? "bg-[#e8f5e9] border-[#a3e635]/10 text-[#137333] hover:brightness-95"
-                              : "bg-slate-50/20 border-slate-100 text-slate-700 hover:bg-slate-50"
+                              ? "bg-emerald-950/20 border-emerald-500/20 text-emerald-400 hover:bg-emerald-950/30"
+                              : "bg-white/[0.02] border-white/5 text-gray-400 hover:bg-white/5 hover:text-white"
                           )}
                         >
                           <span className="text-xs sm:text-sm font-black block uppercase">{name}</span>
-                          <span className="text-[9px] font-black text-slate-500 mt-1 block">
+                          <span className="text-[9px] font-black text-gray-500 mt-1 block">
                             {hasClaims ? `+${claimCount} Points` : '0 points'}
                           </span>
                         </button>
@@ -1879,12 +1891,12 @@ export default function Rewards() {
                             className={cn(
                               "py-4 px-2 rounded-2xl flex flex-col items-center justify-center transition-all border cursor-pointer active:scale-95",
                               hasClaims 
-                                ? "bg-[#e8f5e9] border-[#a3e635]/10 text-[#137333] hover:brightness-95"
-                                : "bg-slate-50/20 border-slate-100 text-slate-700 hover:bg-slate-50"
+                                ? "bg-emerald-950/20 border-emerald-500/20 text-emerald-400 hover:bg-emerald-950/30"
+                                : "bg-white/[0.02] border-white/5 text-gray-400 hover:bg-white/5 hover:text-white"
                             )}
                           >
                             <span className="text-xs sm:text-sm font-black block">{y}</span>
-                            <span className="text-[9px] font-black text-slate-500 mt-1 block">
+                            <span className="text-[9px] font-black text-gray-500 mt-1 block">
                               {hasClaims ? `+${claimCount} Points` : '0 points'}
                             </span>
                           </button>
@@ -1898,10 +1910,10 @@ export default function Rewards() {
             </div>
 
             {/* ATTEST / CLAIM ACTION BUTTON COMPONENT */}
-            <div className="bg-white border border-slate-100 rounded-[24px] p-5 shadow-[0_4px_24px_rgba(0,0,0,0.015)] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="bg-[#11131f] border border-white/5 rounded-[24px] p-5 shadow-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="text-center sm:text-left">
-                <p className="text-xs font-black text-slate-800 uppercase tracking-wider">Claim attendance credit</p>
-                <p className="text-[10px] text-slate-400 font-medium">Must attest once every global 24-hour cycle.</p>
+                <p className="text-xs font-black text-white uppercase tracking-wider">Claim attendance credit</p>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Must attest once every global 24-hour cycle.</p>
               </div>
 
               <button
@@ -1911,7 +1923,7 @@ export default function Rewards() {
                   "w-full sm:w-auto px-8 py-3.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all cursor-pointer",
                   isDailyClaimable 
                     ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-105 text-white shadow-md shadow-emerald-500/10" 
-                    : "bg-slate-100 text-slate-400 border border-slate-100 cursor-not-allowed"
+                    : "bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed"
                 )}
               >
                 {hasClaimedToday ? "Already Checked In Today" : countdownStr ? `Cycle rest in ${countdownStr}` : "Claim +1 Daily PTS"}

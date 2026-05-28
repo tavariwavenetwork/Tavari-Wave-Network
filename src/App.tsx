@@ -34,6 +34,7 @@ import LiquidityPools from './components/FooterPages/LiquidityPools';
 import NeuralAnalytics from './components/FooterPages/NeuralAnalytics';
 import CookiePolicy from './components/FooterPages/CookiePolicy';
 import AMLPolicy from './components/FooterPages/AMLPolicy';
+import CertificationCompliance from './components/FooterPages/CertificationCompliance';
 import TWNTokenPortal from './components/TWNTokenPortal';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -186,6 +187,7 @@ export default function App() {
               <Route path="/terms" element={<TermsOfService />} />
               <Route path="/privacy" element={<PrivacyPolicy />} />
               <Route path="/investment-terms" element={<InvestmentTerms />} />
+              <Route path="/certification-compliance" element={<CertificationCompliance />} />
               <Route path="/cipher" element={
                 <CipherProtectedRoute>
                   <CipherAdmin />
@@ -222,6 +224,7 @@ export default function App() {
                 <Route path="/neural-analytics" element={<NeuralAnalytics />} />
                 <Route path="/cookies" element={<CookiePolicy />} />
                 <Route path="/aml" element={<AMLPolicy />} />
+                <Route path="/certification-compliance" element={<CertificationCompliance />} />
               </Route>
               <Route path="*" element={<Navigate to="/home" replace />} />
             </Routes>

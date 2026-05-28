@@ -24,6 +24,7 @@ import {
   Lock,
   Shield,
   Ban,
+  MessageSquare,
   UserPlus,
   UserMinus,
   RefreshCw,
@@ -244,7 +245,7 @@ function StatCard({ label, value, icon: Icon, color, onClick }: { label: string,
 export default function CipherAdmin() {
   const { user, profile, logout, plans } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings' | 'cadverts'>('canalytics');
+  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings' | 'cadverts' | 'ctwn_token' | 'csupport_tickets'>('canalytics');
   const [isMobileAdminMenuOpen, setIsMobileAdminMenuOpen] = useState(false);
   const [initialUsersCount, setInitialUsersCount] = useState<number | null>(null);
   const [initialSubscribersCount, setInitialSubscribersCount] = useState<number | null>(null);
@@ -252,6 +253,7 @@ export default function CipherAdmin() {
   const [depositFilter, setDepositFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
+  const [selectedSupportTicket, setSelectedSupportTicket] = useState<any>(null);
   const [ticketType, setTicketType] = useState<'deposit' | 'withdrawal' | 'investment' | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -332,8 +334,25 @@ export default function CipherAdmin() {
   const [investments, setInvestments] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [subscribers, setSubscribers] = useState<any[]>([]);
+  const [supportTickets, setSupportTickets] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
   const [withdrawExchangeRate, setWithdrawExchangeRate] = useState<number>(1400);
+
+  const [seenSupportTicketIds, setSeenSupportTicketIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('seen_support_ticket_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const pendingSupportTicketsCount = useMemo(() => {
+    return supportTickets.filter((st: any) => 
+      st.status === 'open' && 
+      !seenSupportTicketIds.includes(st.id)
+    ).length;
+  }, [supportTickets, seenSupportTicketIds]);
 
   // Broadcaster and monitor session states
   const [seenDepositIds, setSeenDepositIds] = useState<string[]>(() => {
@@ -362,6 +381,18 @@ export default function CipherAdmin() {
       return [];
     }
   });
+
+  const [seenTwnIds, setSeenTwnIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('seen_twn_ids');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [twnFilter, setTwnFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [twnSubTab, setTwnSubTab] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
 
   const [investmentPreviewType, setInvestmentPreviewType] = useState<'active' | 'inactive' | null>(null);
 
@@ -561,6 +592,28 @@ export default function CipherAdmin() {
     }
   }, [activeTab, investments, seenInvestmentIds]);
 
+  const pendingTwnCount = useMemo(() => {
+    return transactions.filter((tx: any) => 
+      tx.is_twn_activity === true && 
+      tx.status === 'pending' && 
+      !seenTwnIds.includes(tx.id)
+    ).length;
+  }, [transactions, seenTwnIds]);
+
+  useEffect(() => {
+    if (activeTab === 'ctwn_token') {
+      const pendingIds = transactions.filter((tx: any) => 
+        tx.is_twn_activity === true && 
+        tx.status === 'pending'
+      ).map((tx: any) => tx.id);
+      if (pendingIds.some(id => !seenTwnIds.includes(id))) {
+        const updated = Array.from(new Set([...seenTwnIds, ...pendingIds]));
+        setSeenTwnIds(updated);
+        localStorage.setItem('seen_twn_ids', JSON.stringify(updated));
+      }
+    }
+  }, [activeTab, transactions, seenTwnIds]);
+
   const getUserDetails = (userId: string, defaultName?: string) => {
     const matchedUser = users.find(u => u?.id === userId);
     return {
@@ -697,6 +750,14 @@ export default function CipherAdmin() {
       (err) => console.error("Investments sync failed:", err.message)
     );
 
+    const unsubscribeSupportTickets = onSnapshot(query(collection(db, 'support_tickets'), orderBy('created_at', 'desc')), 
+      (snap) => {
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any);
+        setSupportTickets(list);
+      },
+      (err) => console.error("Support tickets sync failed:", err.message)
+    );
+
     const unsubscribeAudit = onSnapshot(query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(50)), 
       (snap) => {
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -801,6 +862,7 @@ export default function CipherAdmin() {
       unsubscribeDeposits();
       unsubscribeWithdrawals();
       unsubscribeInvestments();
+      unsubscribeSupportTickets();
       unsubscribeAudit();
       unsubscribeUI();
       unsubscribeUIVersions();
@@ -916,6 +978,130 @@ export default function CipherAdmin() {
       toast.error(`Broadcast failed: ${e?.message || 'Operation Denied'}`);
     } finally {
       setIsSendingNotif(false);
+    }
+  };
+
+  const approveTwnTransaction = async (tx: any) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const txRef = doc(db, 'transactions', tx.id);
+        const userRef = doc(db, 'users', tx.user_id);
+
+        const txDoc = await transaction.get(txRef);
+        if (!txDoc.exists()) throw new Error("Transaction record missing");
+
+        const txData = txDoc.data();
+        if (txData.status !== 'pending') throw new Error("This transaction has already been processed.");
+
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User profile not found");
+
+        if (txData.type === 'twn_purchase') {
+          // Increase user's twn_balance
+          const twnCredited = txData.twn_amount || 0;
+          transaction.update(userRef, { 
+            twn_balance: increment(twnCredited)
+          });
+
+          // Update transaction
+          transaction.update(txRef, { 
+            status: 'approved', 
+            updated_at: new Date().toISOString() 
+          });
+
+          // Add User Notification
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: tx.user_id,
+            title: 'TWN Token Purchase Approved ✅',
+            message: `Your deposit request has been validated. ${twnCredited.toLocaleString()} TWN tokens have been successfully credited to your wallet.`,
+            type: 'success',
+            read: false,
+            created_at: new Date().toISOString()
+          });
+
+        } else if (txData.type === 'twn_withdrawal_request') {
+          // If withdrawal is approved, tokens remain deducted (escrowed)
+          transaction.update(txRef, { 
+            status: 'approved', 
+            updated_at: new Date().toISOString() 
+          });
+
+          // Add User Notification
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: tx.user_id,
+            title: 'TWN Token Withdrawal Disbursed ✅',
+            message: `Your TWN withdrawal of ${(txData.twn_amount || 0).toLocaleString()} TWN to address ${txData.wallet_address || 'N/A'} has been approved and cleared on the blockchain layer.`,
+            type: 'success',
+            read: false,
+            created_at: new Date().toISOString()
+          });
+        }
+      });
+
+      toast.success("TWN Transaction Approved!");
+    } catch (error: any) {
+      console.error("TWN APPROVAL ERROR:", error);
+      toast.error("Process failed: " + error.message);
+    }
+  };
+
+  const declineTwnTransaction = async (tx: any) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const txRef = doc(db, 'transactions', tx.id);
+        const userRef = doc(db, 'users', tx.user_id);
+
+        const txDoc = await transaction.get(txRef);
+        if (!txDoc.exists()) throw new Error("Transaction record missing");
+
+        const txData = txDoc.data();
+        if (txData.status !== 'pending') throw new Error("This transaction has already been processed.");
+
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User profile not found");
+
+        if (txData.type === 'twn_withdrawal_request') {
+          // Rejection of withdrawal means tokens are safely returned to user's twn_balance
+          const twnRefunded = txData.twn_amount || 0;
+          transaction.update(userRef, { 
+            twn_balance: increment(twnRefunded)
+          });
+
+          // Add Notification
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: tx.user_id,
+            title: 'TWN Withdrawal Declined ❌',
+            message: `Your withdrawal request of ${twnRefunded.toLocaleString()} TWN has been declined by the compliance auditor. Escrowed tokens have been safely returned.`,
+            type: 'info',
+            read: false,
+            created_at: new Date().toISOString()
+          });
+        } else if (txData.type === 'twn_purchase') {
+          // Add Notification for purchase declination
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: tx.user_id,
+            title: 'TWN Purchase Declined ❌',
+            message: `Your purchase request of ${(txData.twn_amount || 0).toLocaleString()} TWN has been declined. Please verify your reference/hash and try again.`,
+            type: 'info',
+            read: false,
+            created_at: new Date().toISOString()
+          });
+        }
+
+        transaction.update(txRef, { 
+          status: 'rejected', 
+          updated_at: new Date().toISOString() 
+        });
+      });
+
+      toast.success("TWN Transaction Declined!");
+    } catch (error: any) {
+      console.error("TWN REJECTION ERROR:", error);
+      toast.error("Process failed: " + error.message);
     }
   };
 
@@ -1485,6 +1671,24 @@ export default function CipherAdmin() {
                 </button>
 
                 <button
+                  onClick={() => { handleTabChange('csupport_tickets'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'csupport_tickets' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <MessageSquare size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">User Support</span>
+                  </div>
+                  {pendingSupportTicketsCount > 0 && (
+                    <span className="px-2 py-0.5 bg-red-500 text-white font-mono font-black text-[9px] rounded-full">
+                      {pendingSupportTicketsCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
                   onClick={() => { handleTabChange('csettings'); setIsMobileAdminMenuOpen(false); }}
                   className={cn(
                     "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
@@ -1537,7 +1741,9 @@ export default function CipherAdmin() {
           <SidebarItem icon={<Mail size={18} />} label="Newsletter" active={activeTab === 'cnewsletter'} onClick={() => handleTabChange('cnewsletter')} />
           <SidebarItem icon={<Mail size={18} />} label="Notifications" active={activeTab === 'cnotifications'} onClick={() => handleTabChange('cnotifications')} />
           <SidebarItem icon={<History size={18} />} label="Transactions" active={activeTab === 'ctransactions'} onClick={() => handleTabChange('ctransactions')} />
+          <SidebarItem icon={<Coins size={18} />} label="TWN Token" active={activeTab === 'ctwn_token'} onClick={() => handleTabChange('ctwn_token')} badge={pendingTwnCount} />
           <SidebarItem icon={<Megaphone size={18} />} label="Adverts" active={activeTab === 'cadverts'} onClick={() => handleTabChange('cadverts')} />
+          <SidebarItem icon={<MessageSquare size={18} />} label="User Support" active={activeTab === 'csupport_tickets'} onClick={() => handleTabChange('csupport_tickets')} badge={pendingSupportTicketsCount} />
           <SidebarItem icon={<Settings size={18} />} label="Settings" active={activeTab === 'csettings'} onClick={() => handleTabChange('csettings')} />
         </nav>
 
@@ -2916,6 +3122,472 @@ export default function CipherAdmin() {
                    ))}
                 </tbody>
              </table>
+          </div>
+        )}
+
+        {activeTab === 'ctwn_token' && (
+          <div className="space-y-8">
+            {/* Header info card */}
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden backdrop-blur-xl">
+              <div className="space-y-1.5 relative z-10">
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-aura-lime flex items-center gap-2">
+                  <Coins size={16} /> TWN Token Operations Center
+                </h3>
+                <p className="text-[10px] text-aura-muted uppercase tracking-widest font-black">Isolate, review, and disburse blockchain ledger movements</p>
+              </div>
+
+              {/* Sub tab selectors */}
+              <div className="flex flex-wrap gap-2 relative z-10">
+                {[
+                  { id: 'all', label: 'All Activities' },
+                  { id: 'pending', label: 'Pending Approvals' },
+                  { id: 'completed', label: 'Processed' },
+                  { id: 'rejected', label: 'Declined' }
+                ].map(sub => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setTwnSubTab(sub.id as any)}
+                    className={cn(
+                      "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border",
+                      twnSubTab === sub.id 
+                        ? "bg-aura-lime text-aura-black border-aura-lime font-black" 
+                        : "bg-white/5 border-transparent text-slate-300 hover:text-white"
+                    )}
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List Table */}
+            <div className="bg-white/5 border border-white/5 rounded-[40px] overflow-hidden">
+               <table className="w-full text-left">
+                  <thead>
+                     <tr className="border-b border-white/5 text-[9px] font-black uppercase tracking-widest text-aura-muted">
+                        <th className="px-8 py-6">Operation / Reference ID</th>
+                        <th className="px-8 py-6">User Account Details</th>
+                        <th className="px-8 py-6 text-right">USD Val / TWN Quantity</th>
+                        <th className="px-8 py-6 text-right">Index Pricing Details</th>
+                        <th className="px-8 py-6 text-center">Protocol Actions</th>
+                     </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.02]">
+                     {transactions
+                       .filter((tx: any) => tx.is_twn_activity === true)
+                       .filter((tx: any) => {
+                         if (twnSubTab === 'pending' && tx.status !== 'pending') return false;
+                         if (twnSubTab === 'completed' && tx.status !== 'approved' && tx.status !== 'completed') return false;
+                         if (twnSubTab === 'rejected' && tx.status !== 'rejected' && tx.status !== 'declined') return false;
+                         return true;
+                       })
+                       .length === 0 ? (
+                         <tr>
+                           <td colSpan={5} className="px-8 py-16 text-center">
+                             <Coins size={32} className="mx-auto mb-4 text-slate-600 stroke-[1.5px] animate-pulse" />
+                             <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">No isolated token activities match selection filters.</p>
+                           </td>
+                         </tr>
+                       ) : (
+                         transactions
+                           .filter((tx: any) => tx.is_twn_activity === true)
+                           .filter((tx: any) => {
+                             if (twnSubTab === 'pending' && tx.status !== 'pending') return false;
+                             if (twnSubTab === 'completed' && tx.status !== 'approved' && tx.status !== 'completed') return false;
+                             if (twnSubTab === 'rejected' && tx.status !== 'rejected' && tx.status !== 'declined') return false;
+                             return true;
+                           })
+                           .map((tx: any) => {
+                             const isIncoming = tx.type === 'twn_purchase' || tx.type === 'twn_transfer_received';
+                             const isWithdrawal = tx.type === 'twn_withdrawal_request';
+                             
+                             return (
+                               <tr key={tx.id} className="hover:bg-white/[0.01] transition-all">
+                                  {/* Operation / ID */}
+                                  <td className="px-8 py-6">
+                                     <span className={cn(
+                                       "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded leading-none w-fit mb-1 block",
+                                       tx.type === 'twn_purchase' 
+                                         ? "bg-purple-500/10 text-purple-400" 
+                                         : tx.type === 'twn_withdrawal_request'
+                                           ? "bg-amber-500/10 text-amber-400"
+                                           : "bg-blue-500/10 text-blue-400"
+                                     )}>
+                                       {tx.type === 'twn_purchase' 
+                                         ? "TOKEN PURCHASE" 
+                                         : tx.type === 'twn_withdrawal_request'
+                                           ? "ESCROW WITHDRAWAL"
+                                           : tx.type?.replace(/_/g, ' ')
+                                       }
+                                     </span>
+                                     <p className="text-[10px] font-bold text-white font-mono tracking-wider">Ref: {tx.id?.substring(0, 10)}...</p>
+                                     {tx.reference && <p className="text-[8px] text-slate-400 font-mono italic">Hash: {tx.reference}</p>}
+                                     {tx.wallet_address && <p className="text-[8px] text-purple-300 font-mono">Address: {tx.wallet_address}</p>}
+                                  </td>
+
+                                  {/* User Details */}
+                                  <td className="px-8 py-6">
+                                     <p className="text-[10px] font-black text-white uppercase">{tx.user_name || 'User'}</p>
+                                     <p className="text-[8px] italic text-aura-muted font-semibold">{tx.user_email || tx.user_id}</p>
+                                     <p className="text-[7px] text-slate-500 font-bold uppercase">{tx.created_at ? new Date(tx.created_at).toLocaleString() : 'N/A'}</p>
+                                  </td>
+
+                                  {/* USD / TWN Amounts */}
+                                  <td className="px-8 py-6 text-right">
+                                     <p className="text-xs font-black font-mono text-white">{(tx.twn_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN</p>
+                                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{formatCurrency(tx.amount || 0)} <span className="text-[7px]">USD</span></p>
+                                     {tx.source_balance && <span className="text-[7px] text-amber-500 font-black uppercase tracking-widest">{tx.source_balance} Wallet</span>}
+                                  </td>
+
+                                  {/* Reference conversion metrics */}
+                                  <td className="px-8 py-6 text-right font-mono">
+                                     <p className="text-[10px] font-black text-rose-400">${tx.twn_price ? tx.twn_price.toFixed(5) : '0.00446'}</p>
+                                     <p className="text-[7px] text-slate-500 uppercase tracking-widest font-sans font-bold">Trading Index Price</p>
+                                  </td>
+
+                                  {/* Actions */}
+                                  <td className="px-8 py-6">
+                                     <div className="flex items-center justify-center gap-2">
+                                        {tx.status === 'pending' ? (
+                                          <>
+                                            <button 
+                                              onClick={() => approveTwnTransaction(tx)}
+                                              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 duration-200 transition-all text-black font-black text-[9px] uppercase tracking-widest rounded-lg cursor-pointer"
+                                            >
+                                              Approve ✅
+                                            </button>
+                                            <button 
+                                              onClick={() => declineTwnTransaction(tx)}
+                                              className="px-3 py-1.5 bg-red-500 hover:bg-red-600 active:scale-95 duration-200 transition-all text-white font-black text-[9px] uppercase tracking-widest rounded-lg cursor-pointer"
+                                            >
+                                              Decline ❌
+                                            </button>
+                                          </>
+                                        ) : (
+                                          <span className={cn(
+                                            "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded leading-none w-fit",
+                                            tx.status === 'approved' || tx.status === 'completed'
+                                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                              : "bg-red-500/10 text-red-400 border border-red-500/25"
+                                          )}>
+                                            {tx.status === 'approved' || tx.status === 'completed' ? 'Verified / Success' : 'Declined'}
+                                          </span>
+                                        )}
+                                     </div>
+                                  </td>
+                               </tr>
+                             );
+                           })
+                       )}
+                  </tbody>
+               </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'csupport_tickets' && (
+          <div className="space-y-8">
+            {/* Header info card */}
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden backdrop-blur-xl">
+              <div className="space-y-1.5 relative z-10">
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-aura-lime flex items-center gap-2">
+                  <MessageSquare size={16} /> User Support Ticket Operations
+                </h3>
+                <p className="text-[10px] text-aura-muted uppercase tracking-widest font-black">
+                  Monitor, review, and handle customer complaints and questions in real-time
+                </p>
+              </div>
+
+              {/* Stats highlights */}
+              <div className="flex gap-4 relative z-10">
+                <div className="px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-[#ffffff60] block">Open Tickets</span>
+                  <span className="text-xl font-black text-rose-400 font-mono">
+                    {supportTickets.filter(t => t.status === 'open' || t.status === 'in-progress').length}
+                  </span>
+                </div>
+                <div className="px-4 py-2 bg-white/5 border border-white/5 rounded-2xl">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-[#ffffff60] block">Resolved</span>
+                  <span className="text-xl font-black text-emerald-400 font-mono">
+                    {supportTickets.filter(t => t.status === 'resolved').length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-85 h-85 bg-aura-lime/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-85 h-85 bg-blue-500/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl pointer-events-none" />
+            </div>
+
+            {/* List and Details Layout */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+              {/* Left column - Tickets List */}
+              <div className="xl:col-span-7 space-y-4">
+                <div className="flex justify-between items-center bg-white/5 border border-white/5 p-4 rounded-3xl">
+                  <span className="text-xs font-black uppercase tracking-widest text-white/90">Tickets queue ({supportTickets.length})</span>
+                  {supportTickets.length > 0 && (
+                    <button 
+                      onClick={() => {
+                        const allIds = supportTickets.map(t => t.id);
+                        setSeenSupportTicketIds(allIds);
+                        localStorage.setItem('seen_support_ticket_ids', JSON.stringify(allIds));
+                        toast.success("All tickets marked as read");
+                      }}
+                      className="text-[10px] font-black uppercase tracking-widest text-aura-lime hover:underline"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                {supportTickets.length === 0 ? (
+                  <div className="p-16 text-center border border-dashed border-white/15 rounded-[40px] bg-white/[0.01]">
+                    <MessageSquare className="mx-auto text-white/10 mb-4 animate-bounce" size={48} />
+                    <p className="text-sm font-semibold text-white/40">No priority support tickets found</p>
+                    <p className="text-[10px] text-white/20 mt-1 uppercase tracking-widest leading-none font-bold">Inbox clear</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[700px] overflow-y-auto pr-2 scrollbar-none">
+                    {supportTickets.map((ticket) => {
+                      const isUnseen = !seenSupportTicketIds.includes(ticket.id) && ticket.status === 'open';
+                      const createdStr = ticket.created_at ? 
+                        (ticket.created_at.toDate ? ticket.created_at.toDate().toLocaleString() : new Date(ticket.created_at.seconds ? ticket.created_at.seconds * 1000 : ticket.created_at).toLocaleString()) 
+                        : "No date";
+                      
+                      return (
+                        <div 
+                          key={ticket.id}
+                          onClick={() => {
+                            setSelectedSupportTicket(ticket);
+                            if (!seenSupportTicketIds.includes(ticket.id)) {
+                              const updated = [...seenSupportTicketIds, ticket.id];
+                              setSeenSupportTicketIds(updated);
+                              localStorage.setItem('seen_support_ticket_ids', JSON.stringify(updated));
+                            }
+                          }}
+                          className={cn(
+                            "p-5 border rounded-3xl transition-all duration-300 cursor-pointer text-left relative overflow-hidden flex flex-col gap-3",
+                            selectedSupportTicket?.id === ticket.id
+                              ? "bg-white/10 border-aura-lime/40 ring-1 ring-aura-lime/20"
+                              : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04] hover:border-white/10"
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="space-y-1">
+                              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                                {isUnseen && <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />}
+                                Ticket ID: <span className="font-mono bg-white/5 px-1.5 py-0.5 rounded text-white">{ticket.id.substring(0, 8)}...</span>
+                              </span>
+                              <h4 className="text-sm font-bold text-white leading-snug tracking-tight mt-1">
+                                {ticket.subject || ticket.message.substring(0, 40) + '...'}
+                              </h4>
+                            </div>
+
+                            <span className={cn(
+                              "text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border leading-none",
+                              ticket.status === 'resolved' 
+                                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                                : ticket.status === 'in-progress'
+                                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                  : "bg-red-500/10 text-red-400 border-red-500/20 animate-pulse"
+                            )}>
+                              {ticket.status || 'open'}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-white/60 line-clamp-2 leading-relaxed">
+                            {ticket.message}
+                          </p>
+
+                          <div className="flex justify-between items-center pt-2 border-t border-white/5 text-[9px] font-bold text-white/45">
+                            <div className="flex items-center gap-2">
+                              <span className="text-aura-lime">@{ticket.username || 'user'}</span>
+                              <span className="text-white/20">•</span>
+                              <span>{ticket.email}</span>
+                            </div>
+                            <span className="font-mono text-[8px]">{createdStr}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Right column - Ticket Details */}
+              <div className="xl:col-span-5">
+                {selectedSupportTicket ? (
+                  <div className="bg-white/5 border border-white/5 p-6 rounded-[36px] space-y-6 relative overflow-hidden backdrop-blur-xl">
+                    <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                      <div>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-aura-muted">Active Ticket File</span>
+                        <h3 className="text-md font-bold text-white mt-1">
+                          Subject: {selectedSupportTicket.subject || 'Platform Support Request'}
+                        </h3>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedSupportTicket(null)}
+                        className="p-1 px-2.5 bg-white/20 border border-white/20 rounded-xl text-xs text-slate-300 hover:bg-white/30"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    {/* Quick user meta info card */}
+                    <div className="space-y-3 bg-white/[0.02] border border-white/5 p-4 rounded-2xl">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-[#ffffff50] border-b border-white/5 pb-1.5">User Profile</h4>
+                      
+                      <div className="grid grid-cols-2 gap-3 text-xs leading-none">
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] mb-1">Username</p>
+                          <p className="font-bold text-white">@{selectedSupportTicket.username || 'user'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] mb-1">Account Public ID</p>
+                          <p className="font-bold text-white font-mono">{selectedSupportTicket.publicId || selectedSupportTicket.userId || 'N/A'}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] mb-1">Email</p>
+                        <p className="font-bold text-white break-all">{selectedSupportTicket.email}</p>
+                      </div>
+                    </div>
+
+                    {/* Timestamp Info */}
+                    <div className="grid grid-cols-2 gap-3 bg-white/[0.02] border border-white/5 p-4 rounded-2xl text-xs leading-none">
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] mb-1">Created Date</p>
+                        <p className="font-bold text-white font-mono">
+                          {selectedSupportTicket.created_at ? 
+                            (selectedSupportTicket.created_at.toDate ? selectedSupportTicket.created_at.toDate().toLocaleDateString() : new Date(selectedSupportTicket.created_at.seconds ? selectedSupportTicket.created_at.seconds * 1000 : selectedSupportTicket.created_at).toLocaleDateString()) 
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] mb-1">Created Time</p>
+                        <p className="font-bold text-white font-mono">
+                          {selectedSupportTicket.created_at ? 
+                            (selectedSupportTicket.created_at.toDate ? selectedSupportTicket.created_at.toDate().toLocaleTimeString() : new Date(selectedSupportTicket.created_at.seconds ? selectedSupportTicket.created_at.seconds * 1000 : selectedSupportTicket.created_at).toLocaleTimeString()) 
+                            : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Query Message Description */}
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] ml-1">Message Description</p>
+                      <div className="p-5 bg-white/5 border border-white/5 rounded-3xl text-sm font-medium text-slate-200 leading-relaxed whitespace-pre-wrap">
+                        {selectedSupportTicket.message}
+                      </div>
+                    </div>
+
+                    {/* Support history matching emails/usernames */}
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-[#ffffff30] ml-1">User Support History</p>
+                      {supportTickets.filter(t => t.email === selectedSupportTicket.email && t.id !== selectedSupportTicket.id).length === 0 ? (
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest ml-1">No prior tickets for this user.</p>
+                      ) : (
+                        <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                          {supportTickets
+                            .filter(t => t.email === selectedSupportTicket.email && t.id !== selectedSupportTicket.id)
+                            .map(prevTicket => (
+                              <div 
+                                key={prevTicket.id}
+                                onClick={() => setSelectedSupportTicket(prevTicket)}
+                                className="p-3 bg-white/[0.01] border border-white/5 rounded-xl flex justify-between items-center hover:bg-white/[0.03] cursor-pointer"
+                              >
+                                <div className="space-y-0.5">
+                                  <p className="text-xs font-bold text-white truncate max-w-[200px]">{prevTicket.subject || prevTicket.message}</p>
+                                  <p className="text-[8px] font-black uppercase font-mono text-slate-500">Doc ID: {prevTicket.id.substring(0,8)}</p>
+                                </div>
+                                <span className={cn(
+                                  "text-[7px] font-black uppercase px-2 py-0.5 rounded leading-none border",
+                                  prevTicket.status === 'resolved' 
+                                    ? "bg-emerald-500/10 text-emerald-450 border-emerald-500/15" 
+                                    : "bg-red-500/10 text-red-500 border-red-500/15"
+                                )}>
+                                  {prevTicket.status || 'open'}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action Controls for Status */}
+                    <div className="space-y-3 pt-4 border-t border-white/5">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#ffffff50] ml-1">Update Status</p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await updateDoc(doc(db, 'support_tickets', selectedSupportTicket.id), { status: 'open' });
+                              setSelectedSupportTicket(prev => ({ ...prev, status: 'open' }));
+                              toast.success("Updated status to open");
+                            } catch (err: any) {
+                              toast.error("Failed to update status: " + err.message);
+                            }
+                          }}
+                          className={cn(
+                            "py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] transition-all",
+                            selectedSupportTicket.status === 'open'
+                              ? "bg-rose-500 text-white"
+                              : "bg-white/5 border border-white/5 text-rose-400 hover:bg-white/10"
+                          )}
+                        >
+                          Open
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await updateDoc(doc(db, 'support_tickets', selectedSupportTicket.id), { status: 'in-progress' });
+                              setSelectedSupportTicket(prev => ({ ...prev, status: 'in-progress' }));
+                              toast.success("Updated status to in-progress");
+                            } catch (err: any) {
+                              toast.error("Failed to update status: " + err.message);
+                            }
+                          }}
+                          className={cn(
+                            "py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] transition-all",
+                            selectedSupportTicket.status === 'in-progress'
+                              ? "bg-amber-500 text-white"
+                              : "bg-white/5 border border-white/5 text-amber-400 hover:bg-white/10"
+                          )}
+                        >
+                          In Progress
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await updateDoc(doc(db, 'support_tickets', selectedSupportTicket.id), { status: 'resolved' });
+                              setSelectedSupportTicket(prev => ({ ...prev, status: 'resolved' }));
+                              toast.success("Updated status to resolved");
+                            } catch (err: any) {
+                              toast.error("Failed to update status: " + err.message);
+                            }
+                          }}
+                          className={cn(
+                            "py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] transition-all",
+                            selectedSupportTicket.status === 'resolved'
+                              ? "bg-emerald-500 text-white"
+                              : "bg-white/5 border border-white/5 text-emerald-400 hover:bg-white/10"
+                          )}
+                        >
+                          Resolved
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-16 text-center border border-dashed border-white/10 rounded-[40px] bg-white/[0.01]">
+                    <MessageSquare className="mx-auto text-white/5 mb-4 animate-pulse" size={48} />
+                    <p className="text-sm font-semibold text-white/30">Select a support ticket to audit details & responses</p>
+                    <p className="text-[9px] text-white/15 mt-1 uppercase tracking-widest font-bold">Awaiting Selection</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 

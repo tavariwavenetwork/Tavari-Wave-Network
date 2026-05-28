@@ -1116,26 +1116,26 @@ export default function Invest() {
 
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-white italic font-serif leading-none">Region Not Supported</h3>
-                <p className="text-[10px] font-bold text-red-400 capitalize tracking-widest">Selected region: {notSupportedCountry}</p>
+                <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest animate-pulse">Selected Region: {notSupportedCountry}</p>
               </div>
 
-              <div className="space-y-4 text-xs font-bold text-aura-muted leading-relaxed uppercase tracking-wider text-center px-2">
+              <div className="space-y-4 text-xs font-semibold text-aura-muted leading-relaxed text-center px-4">
                 <p>
                   The region you selected does not support your location.
                 </p>
-                <p className="text-[10px] text-white/90">
-                  Kindly contact Tavari Wave Network administration on Telegram for assistance.
+                <p className="text-white/90">
+                  Kindly contact Tavari Wave Network administration for assistance.
                 </p>
               </div>
 
               <div className="flex flex-col gap-2.5 pt-2">
                 <a 
-                  href="https://t.me/tavariwavenetwork" 
+                  href="https://wa.me/2349167953016?text=Hello%20Tavari%20Wave%20Network%20Support%2C%20I%20need%20assistance%20regarding%20unsupported%20region%20access." 
                   target="_blank" 
                   rel="noreferrer"
                   className="w-full py-4 bg-primary text-white font-black uppercase tracking-[0.25em] text-[10px] rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/45 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2"
                 >
-                  <Send size={12} /> Contact Admin
+                  <Send size={12} /> Contact Support
                 </a>
                 <button 
                   onClick={() => setNotSupportedCountry(null)}

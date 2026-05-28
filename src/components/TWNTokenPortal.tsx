@@ -40,7 +40,9 @@ import {
   where, 
   getDocs, 
   increment,
-  addDoc
+  addDoc,
+  onSnapshot,
+  orderBy
 } from 'firebase/firestore';
 import { toast } from 'sonner';
 import PinProtocolModal from './PinProtocolModal';
@@ -53,13 +55,13 @@ const CRYPTO_ADDRESSES = {
 type CryptoKey = 'ETH' | 'BTC' | 'USDT' | 'USD';
 
 const CONVERSION_RATES: Record<CryptoKey, number> = {
-  ETH: 2350,   // 1 ETH = 2350 TWN (0.000425 ETH per TWN)
-  BTC: 120000, // 1 BTC = 120000 TWN (approx)
-  USDT: 235.29, // 1 USDT = 235.29 TWN ($0.00425 per TWN)
-  USD: 235.29  // 1 USD = 235.29 TWN
+  ETH: 2500,   // approx
+  BTC: 130000, // approx
+  USDT: 224.2152466, // 1 USDT / 0.00446 = 224.2152466
+  USD: 224.2152466  // 1 USD / 0.00446 = 224.2152466
 };
 
-const REFERENCE_PRICE = 0.00425;
+const REFERENCE_PRICE = 0.00446;
 
 export default function TWNTokenPortal() {
   const { user, profile } = useAuth();
@@ -76,7 +78,7 @@ export default function TWNTokenPortal() {
   }, []);
 
   // Price & Market Metrics Fluctuation States (Requirements 6 & 7)
-  const [currentPrice, setCurrentPrice] = useState(0.00425);
+  const [currentPrice, setCurrentPrice] = useState(0.00446);
   
   // Real percentage change calculation derived solely from currentPrice and REFERENCE_PRICE
   const percentageChange = ((currentPrice - REFERENCE_PRICE) / REFERENCE_PRICE) * 100;
@@ -163,6 +165,16 @@ export default function TWNTokenPortal() {
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  
+  // Withdrawal specific states
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawAddress, setWithdrawAddress] = useState('');
+
+  // Dedicated TWN Transactions history state & filters
+  const [twnTransactions, setTwnTransactions] = useState<any[]>([]);
+  const [activeTwnTab, setActiveTwnTab] = useState<'all' | 'purchases' | 'transfers' | 'withdrawals'>('all');
+  const [twnSearchQuery, setTwnSearchQuery] = useState('');
   
   // Premium Purchase Flow states
   const [buyFlowStep, setBuyFlowStep] = useState<'choice' | 'deposit' | 'balance'>('choice');
@@ -261,6 +273,29 @@ export default function TWNTokenPortal() {
     lookupRecipient();
   }, [sendUserId, user?.uid]);
 
+  // Real-time listener for user's isolated TWN transactions
+  useEffect(() => {
+    if (!user) return;
+    
+    // Listen to user's transactions with 'is_twn_activity: true'
+    const q = query(
+      collection(db, 'transactions'),
+      where('user_id', '==', user.uid),
+      where('is_twn_activity', '==', true)
+    );
+    
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any);
+      // Client-side sort to avoid requiring composite indexes
+      const sorted = list.sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setTwnTransactions(sorted);
+    }, (error) => {
+      console.warn("TWN isolated transactions sync blocked:", error.message);
+    });
+    
+    return unsubscribe;
+  }, [user]);
+
   // Reset Send states
   useEffect(() => {
     if (!showSendModal) {
@@ -354,6 +389,8 @@ export default function TWNTokenPortal() {
       await executeSendTransfer();
     } else if (pinAction === 'deposit') {
       await executeDirectDepositSubmit();
+    } else if (pinAction === 'withdraw') {
+      await executeWithdrawalSubmit();
     }
     setPinAction(null);
   };
@@ -363,48 +400,39 @@ export default function TWNTokenPortal() {
     if (isNaN(amountVal) || amountVal <= 0) return;
 
     setIsSubmittingTx(true);
-    const calculatedTwn = amountVal * 50; // $1 = 50 TWN
+    const calculatedTwn = Number((amountVal / currentPrice).toFixed(4));
 
     try {
-      const newDeposit = {
+      // Secure record creation solely inside the transactions collection
+      const newTx = {
         user_id: user!.uid,
         user_name: profile?.name || 'User',
+        user_email: user!.email || '',
+        type: 'twn_purchase',
+        type_detail: 'twn_purchase_crypto',
         amount: amountVal,
-        method: directDepositMethod,
+        twn_amount: calculatedTwn,
+        twn_price: currentPrice,
+        method: 'usdt',
         reference: directDepositTxId,
         status: 'pending',
-        is_twn_deposit: true,
-        twn_amount: calculatedTwn,
-        created_at: new Date().toISOString(),
+        is_twn_activity: true,
+        created_at: new Date().toISOString()
       };
 
-      await addDoc(collection(db, 'deposits'), newDeposit);
-      
-      // Also add transaction entry
-      const txRef = doc(collection(db, 'transactions'));
-      await addDoc(collection(db, 'transactions'), {
-        user_id: user!.uid,
-        type: 'deposit',
-        type_detail: 'twn_deposit_pending',
-        amount: amountVal,
-        twn_amount: calculatedTwn,
-        method: directDepositMethod,
-        reference: directDepositTxId,
-        status: 'pending',
-        created_at: new Date().toISOString()
-      });
+      await addDoc(collection(db, 'transactions'), newTx);
 
       // Add Notification
       await addDoc(collection(db, 'notifications'), {
         user_id: user!.uid,
-        title: 'TWN Deposit Submitted',
-        message: `Your deposit request of ${formatCurrency(amountVal)} for ${calculatedTwn.toLocaleString()} TWN is matching verification protocol node queues.`,
+        title: 'TWN Purchase Submitted',
+        message: `Your purchase request of ${formatCurrency(amountVal)} for ${calculatedTwn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN is matching verification protocol node queues.`,
         type: 'info',
         read: false,
         created_at: new Date().toISOString()
       });
 
-      toast.success("Deposit Request logged successfully! Pending Admin verification.");
+      toast.success("Purchase Request logged successfully! Pending Admin verification.");
       setDirectDepositAmount('');
       setDirectDepositTxId('');
       setBuyFlowStep('choice');
@@ -427,7 +455,7 @@ export default function TWNTokenPortal() {
     }
 
     setIsSubmittingTx(true);
-    const calculatedTwn = usdToSpend * 50; // $1 = 50 TWN!
+    const calculatedTwn = Number((usdToSpend / currentPrice).toFixed(4));
 
     try {
       await runTransaction(db, async (transaction) => {
@@ -476,12 +504,16 @@ export default function TWNTokenPortal() {
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: user!.uid,
-          type: 'purchase',
+          user_name: profile?.name || 'User',
+          user_email: user!.email || '',
+          type: 'twn_purchase',
           type_detail: 'twn_purchase_balance',
           amount: usdToSpend,
           twn_amount: calculatedTwn,
+          twn_price: currentPrice,
           source_balance: selectedBalanceSource,
           status: 'completed',
+          is_twn_activity: true,
           created_at: new Date().toISOString()
         });
 
@@ -490,14 +522,14 @@ export default function TWNTokenPortal() {
         transaction.set(notifRef, {
           user_id: user!.uid,
           title: 'TWN Tokens Acquired',
-          message: `Successfully purchased ${calculatedTwn.toLocaleString()} TWN tokens with ${formatCurrency(usdToSpend)} from your ${selectedBalanceSource === 'reward' ? 'Reward' : selectedBalanceSource === 'funding' ? 'Funding' : 'Available'} balance.`,
+          message: `Successfully purchased ${calculatedTwn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN tokens with ${formatCurrency(usdToSpend)} from your ${selectedBalanceSource === 'reward' ? 'Reward' : selectedBalanceSource === 'funding' ? 'Funding' : 'Available'} balance.`,
           type: 'success',
           read: false,
           created_at: new Date().toISOString()
         });
       });
 
-      toast.success(`Purchase Completed! Got ${calculatedTwn.toLocaleString()} TWN.`);
+      toast.success(`Purchase Completed! Got ${calculatedTwn.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN.`);
       setBalanceBuyAmount('');
       setBuyFlowStep('choice');
       setShowBuyModal(false);
@@ -563,29 +595,38 @@ export default function TWNTokenPortal() {
         const txSenderRef = doc(collection(db, 'transactions'));
         transaction.set(txSenderRef, {
           user_id: user!.uid,
-          type: 'transfer',
+          user_name: profile?.name || 'User',
+          user_email: user!.email || '',
+          type: 'twn_transfer_sent',
           type_detail: 'twn_token_transfer',
-          amount: twnToSend,
+          twn_amount: twnToSend,
+          twn_price: currentPrice,
+          amount: twnToSend * currentPrice,
           sender_id: user!.uid,
           receiver_id: verifiedRecipient.id,
           receiver_public_id: verifiedRecipient.public_id,
           receiver_name: verifiedRecipient.name,
           token: 'TWN',
           status: 'completed',
+          is_twn_activity: true,
           created_at: new Date().toISOString()
         });
 
         const txReceiverRef = doc(collection(db, 'transactions'));
         transaction.set(txReceiverRef, {
           user_id: verifiedRecipient.id,
-          type: 'transfer',
+          user_name: verifiedRecipient.name || 'Recipient',
+          type: 'twn_transfer_received',
           type_detail: 'twn_token_transfer',
-          amount: twnToSend,
+          twn_amount: twnToSend,
+          twn_price: currentPrice,
+          amount: twnToSend * currentPrice,
           sender_id: user!.uid,
           sender_public_id: profile?.public_id,
           sender_name: profile?.name,
           token: 'TWN',
           status: 'completed',
+          is_twn_activity: true,
           created_at: new Date().toISOString()
         });
 
@@ -616,6 +657,101 @@ export default function TWNTokenPortal() {
     } catch (e: any) {
       console.error(e);
       toast.error(e.message || "Transfer Rejected by Security Protocol.");
+    } finally {
+      setIsSubmittingTx(false);
+    }
+  };
+
+  const initiateWithdrawal = () => {
+    const amt = parseFloat(withdrawAmount);
+    if (isNaN(amt) || amt <= 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+    const userTwn = profile?.twn_balance || 0;
+    if (amt > userTwn) {
+      toast.error("Insufficient TWN token balance.");
+      return;
+    }
+    if (!withdrawAddress.trim()) {
+      toast.error("Please enter your destination wallet address.");
+      return;
+    }
+
+    setPinAction('withdraw');
+    setShowPinModal(true);
+  };
+
+  const executeWithdrawalSubmit = async () => {
+    const twnVal = parseFloat(withdrawAmount);
+    if (isNaN(twnVal) || twnVal <= 0) return;
+
+    if (profile?.suspended || profile?.banned) {
+      toast.error("Your account features are currently restricted.");
+      return;
+    }
+
+    const currentTwn = profile?.twn_balance || 0;
+    if (twnVal > currentTwn) {
+      toast.error("Insufficient TWN token balance.");
+      return;
+    }
+
+    setIsSubmittingTx(true);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', user!.uid);
+        const userSnap = await transaction.get(userRef);
+
+        if (!userSnap.exists()) throw new Error("Profile synchronization failed.");
+
+        const userData = userSnap.data();
+        const twnBalance = userData.twn_balance || 0;
+
+        if (twnBalance < twnVal) throw new Error("Insufficient TWN Balance.");
+
+        // Deduct TWN balance immediately (placing in escrow)
+        transaction.update(userRef, {
+          twn_balance: increment(-twnVal)
+        });
+
+        // Add transaction entry
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: user!.uid,
+          user_name: profile?.name || 'User',
+          user_email: user!.email || '',
+          type: 'twn_withdrawal_request',
+          type_detail: 'twn_token_withdrawal',
+          is_twn_activity: true,
+          status: 'pending',
+          twn_amount: twnVal,
+          twn_price: currentPrice,
+          amount: twnVal * currentPrice,
+          wallet_address: withdrawAddress,
+          created_at: new Date().toISOString()
+        });
+
+        // Add Notification
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: user!.uid,
+          title: 'TWN Withdrawal Submitted',
+          message: `Your withdrawal request of ${twnVal.toLocaleString()} TWN is undergoing network audit verification. Address: ${withdrawAddress}`,
+          type: 'info',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      });
+
+      toast.success("Withdrawal Request submitted successfully! Tokens are held in Escrow verification.");
+      setWithdrawAmount('');
+      setWithdrawAddress('');
+      setShowWithdrawModal(false);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error.message || "Withdrawal failed.");
     } finally {
       setIsSubmittingTx(false);
     }
@@ -877,23 +1013,31 @@ export default function TWNTokenPortal() {
                 </div>
 
                 {/* Direct Action Triggers */}
-                <div className="grid grid-cols-2 gap-2 mt-6">
+                <div className="grid grid-cols-3 gap-2 mt-6">
                   <button 
                     onClick={() => {
                       setBuyFlowStep('choice');
                       setShowBuyModal(true);
                     }}
-                    className="py-3.5 bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 duration-200 active:scale-95 transition-all text-white font-black text-[9px] uppercase tracking-[0.2em] rounded-xl cursor-pointer"
+                    className="py-3 bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 duration-200 active:scale-95 transition-all text-white font-black text-[9px] uppercase tracking-[0.1em] rounded-xl cursor-pointer"
                   >
-                    🚀 Buy TWN
+                    🚀 Buy
                   </button>
                   <button 
                     onClick={() => {
                       setShowSendModal(true);
                     }}
-                    className="py-3.5 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black text-[9px] uppercase tracking-[0.2em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer"
+                    className="py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black text-[9px] uppercase tracking-[0.1em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer"
                   >
-                    📤 Transfer
+                    📤 Send
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setShowWithdrawModal(true);
+                    }}
+                    className="py-3 bg-white/5 border border-purple-500/20 hover:border-purple-500/40 hover:bg-[#3b0764]/20 text-purple-300 font-black text-[9px] uppercase tracking-[0.1em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer"
+                  >
+                    📥 Withdraw
                   </button>
                 </div>
 
@@ -930,6 +1074,191 @@ export default function TWNTokenPortal() {
           ))}
         </div>
 
+        {/* DEDICATED TWN TRANSACTION HISTORY SYSTEM */}
+        <div className="bg-[#0b0c16]/75 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-[0_12px_45px_rgba(0,0,0,0.6)] space-y-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-6">
+            <div className="space-y-1">
+              <h3 className="text-lg font-black uppercase tracking-widest text-white flex items-center gap-2">
+                <Coins size={18} className="text-purple-400" />
+                TWN Transaction History
+              </h3>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Neural immutable decentralized ledger records</p>
+            </div>
+
+            {/* Micro search controller */}
+            <div className="relative max-w-xs w-full">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <Search size={14} />
+              </span>
+              <input 
+                type="text"
+                placeholder="Search ledger..."
+                value={twnSearchQuery}
+                onChange={(e) => setTwnSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition-colors uppercase tracking-wider"
+              />
+            </div>
+          </div>
+
+          {/* Segmented active Tab controllers */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: 'all', label: 'All Token Activity' },
+              { id: 'purchases', label: 'Purchases' },
+              { id: 'transfers', label: 'Transfers' },
+              { id: 'withdrawals', label: 'Withdrawals' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTwnTab(tab.id as any)}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer border",
+                  activeTwnTab === tab.id 
+                    ? "bg-purple-600/10 border-purple-500/30 text-purple-300 shadow-[0_4px_12px_rgba(168,85,247,0.15)]" 
+                    : "bg-white/5 border-transparent text-slate-400 hover:text-white"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Dynamic Records Listing rendering flow */}
+          <div className="space-y-3 pt-2">
+            {twnTransactions
+              .filter(tx => {
+                if (activeTwnTab === 'purchases' && tx.type !== 'twn_purchase') return false;
+                if (activeTwnTab === 'transfers' && tx.type !== 'twn_transfer_sent' && tx.type !== 'twn_transfer_received') return false;
+                if (activeTwnTab === 'withdrawals' && tx.type !== 'twn_withdrawal_request') return false;
+                
+                if (twnSearchQuery.trim()) {
+                  const q = twnSearchQuery.toLowerCase();
+                  return (
+                    tx.id?.toLowerCase().includes(q) ||
+                    tx.reference?.toLowerCase().includes(q) ||
+                    tx.wallet_address?.toLowerCase().includes(q) ||
+                    tx.sender_name?.toLowerCase().includes(q) ||
+                    tx.receiver_name?.toLowerCase().includes(q)
+                  );
+                }
+                return true;
+              })
+              .length === 0 ? (
+                <div className="py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center text-center space-y-3">
+                  <Coins size={36} className="text-slate-600 stroke-[1.5px] animate-pulse" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-black uppercase text-slate-400 tracking-widest">Decentralized Ledger Silent</p>
+                    <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">No transactions found match active filters</p>
+                  </div>
+                </div>
+              ) : (
+                twnTransactions
+                  .filter(tx => {
+                    if (activeTwnTab === 'purchases' && tx.type !== 'twn_purchase') return false;
+                    if (activeTwnTab === 'transfers' && tx.type !== 'twn_transfer_sent' && tx.type !== 'twn_transfer_received') return false;
+                    if (activeTwnTab === 'withdrawals' && tx.type !== 'twn_withdrawal_request') return false;
+                    
+                    if (twnSearchQuery.trim()) {
+                      const q = twnSearchQuery.toLowerCase();
+                      return (
+                        tx.id?.toLowerCase().includes(q) ||
+                        tx.reference?.toLowerCase().includes(q) ||
+                        tx.wallet_address?.toLowerCase().includes(q) ||
+                        tx.sender_name?.toLowerCase().includes(q) ||
+                        tx.receiver_name?.toLowerCase().includes(q)
+                      );
+                    }
+                    return true;
+                  })
+                  .map((tx) => {
+                    const isIncoming = tx.type === 'twn_purchase' || tx.type === 'twn_transfer_received';
+                    const isWithdrawal = tx.type === 'twn_withdrawal_request';
+                    
+                    return (
+                      <div 
+                        key={tx.id}
+                        className="p-4 bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors"
+                      >
+                        <div className="flex items-start gap-3.5">
+                          <div className={cn(
+                            "p-2.5 rounded-xl border flex-shrink-0 mt-0.5",
+                            isIncoming
+                              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                              : isWithdrawal
+                                ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                                : "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                          )}>
+                            {isIncoming ? (
+                              <ArrowRightLeft size={16} className="rotate-90" />
+                            ) : isWithdrawal ? (
+                              <ArrowUpRight size={16} className="rotate-185" />
+                            ) : (
+                              <ArrowUpRight size={16} />
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-white">
+                              {tx.type === 'twn_purchase' 
+                                ? "TWN Token Purchase" 
+                                : tx.type === 'twn_transfer_sent'
+                                  ? "Token Send"
+                                  : tx.type === 'twn_transfer_received'
+                                    ? "Token Receive"
+                                    : "Escrow Withdrawal"
+                              }
+                            </h4>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[8px] font-black text-slate-400 uppercase tracking-widest font-mono">
+                              <span>Ref: {tx.id?.substring(0, 8)}...</span>
+                              {tx.type_detail === 'twn_purchase_crypto' && <span className="text-purple-400">Direct USDT</span>}
+                              {tx.type_detail === 'twn_purchase_balance' && <span className="text-amber-500">{tx.source_balance} balance</span>}
+                              {tx.type === 'twn_transfer_sent' && <span>To: {tx.receiver_name || tx.receiver_id?.substring(0, 8)}</span>}
+                              {tx.type === 'twn_transfer_received' && <span>From: {tx.sender_name || tx.sender_id?.substring(0, 8)}</span>}
+                              {tx.wallet_address && <span className="truncate max-w-[150px]">To: {tx.wallet_address}</span>}
+                              <span>•</span>
+                              <span>{tx.created_at ? new Date(tx.created_at).toLocaleString() : 'Just now'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Right balance / status display */}
+                        <div className="flex sm:flex-col items-between sm:items-end justify-between sm:justify-center gap-2">
+                          <div className="text-right">
+                            <p className={cn(
+                              "text-sm font-black font-mono tracking-tight",
+                              isIncoming ? "text-emerald-400" : "text-white"
+                            )}>
+                              {isIncoming ? "+" : "-"}{(tx.twn_amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN
+                            </p>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                              ≈ {formatCurrency(tx.amount || 0)} <span className="text-[7px]">USD</span>
+                            </p>
+                            {tx.twn_price && (
+                              <p className="text-[7px] text-slate-500 font-mono tracking-wider italic mt-0.5">
+                                At purchase price: ${tx.twn_price.toFixed(5)}
+                              </p>
+                            )}
+                          </div>
+
+                          <span className={cn(
+                            "text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded leading-none w-fit",
+                            tx.status === 'pending'
+                              ? "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 animate-pulse"
+                              : tx.status === 'approved' || tx.status === 'completed'
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : "bg-red-500/10 text-red-400 border border-red-500/25"
+                          )}>
+                            {tx.status === 'pending' ? 'Under Review' : tx.status === 'approved' || tx.status === 'completed' ? 'Verified Secure' : 'Declined'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+              )}
+          </div>
+        </div>
+
 
 
       </div>
@@ -938,10 +1267,9 @@ export default function TWNTokenPortal() {
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[99] max-w-lg w-[90%] select-none px-4 md:px-0">
         <div className="backdrop-blur-xl bg-[#080916]/80 border border-white/10 py-3.5 px-6 rounded-2xl flex items-center justify-around gap-2 shadow-[0_15px_40px_rgba(0,0,0,0.6)]">
           {[
-            { label: 'BUY', action: () => setShowBuyModal(true), style: 'hover:text-amber-400 active:scale-95' },
-            { label: 'SELL', action: () => setShowSellModal(true), style: 'hover:text-rose-400 active:scale-95' },
-            { label: 'SWAP', action: () => setShowSwapModal(true), style: 'hover:text-blue-400 active:scale-95' },
-            { label: 'SEND', action: () => setShowSendModal(true), style: 'hover:text-purple-400 active:scale-95' }
+            { label: 'BUY', action: () => { setBuyFlowStep('choice'); setShowBuyModal(true); }, style: 'hover:text-amber-400 active:scale-95' },
+            { label: 'SEND', action: () => setShowSendModal(true), style: 'hover:text-purple-400 active:scale-95' },
+            { label: 'WITHDRAW', action: () => setShowWithdrawModal(true), style: 'hover:text-purple-300 active:scale-95' }
           ].map((dockBtn, idx) => (
             <button
               key={idx}
@@ -1038,7 +1366,7 @@ export default function TWNTokenPortal() {
                   <div className="p-4 bg-[#05060f]/50 border border-white/5 rounded-2xl text-center space-y-1">
                     <span className="text-[8px] font-black tracking-widest uppercase text-[#F59E0B]">Conversion Payout Rates</span>
                     <p className="text-[9px] text-purple-200 leading-normal font-bold uppercase">
-                      All acquisitions instantly credit assets at $1 USD = 50 TWN Tokens respectively.
+                      All acquisitions instantly credit assets calculated in real-time based on the live market index: ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 5, maximumFractionDigits: 5 })} / TWN.
                     </p>
                   </div>
                 </div>
@@ -1055,43 +1383,29 @@ export default function TWNTokenPortal() {
                       ← Back
                     </button>
                     <div className="text-left">
-                      <h3 className="text-sm font-black uppercase tracking-tight text-white">Direct Cryptography Deposit</h3>
-                      <p className="text-[9px] font-black tracking-widest text-purple-400 uppercase">Step 2: Send External Transmissions</p>
+                      <h3 className="text-sm font-black uppercase tracking-tight text-white">Direct Crypto Deposit</h3>
+                      <p className="text-[9px] font-black tracking-widest text-purple-400 uppercase">Deposit Only on Tron Network</p>
                     </div>
                   </div>
 
-                  {/* Method Selector */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setDirectDepositMethod('usdt')}
-                      className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${directDepositMethod === 'usdt' ? 'bg-[#150a21] border border-[#a855f7]/40 text-[#a855f7]' : 'bg-[#05060f]/80 border border-white/5 text-[#8E8A9E] hover:border-white/10'}`}
-                    >
-                      USDT (TRC-20)
-                    </button>
-                    <button
-                      onClick={() => setDirectDepositMethod('btc')}
-                      className={`py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer ${directDepositMethod === 'btc' ? 'bg-[#150a21] border border-[#a855f7]/40 text-[#a855f7]' : 'bg-[#05060f]/80 border border-white/5 text-[#8E8A9E] hover:border-white/10'}`}
-                    >
-                      Bitcoin Native
-                    </button>
+                  {/* Real-time price banner */}
+                  <div className="flex justify-between items-center text-[9px] bg-purple-500/10 border border-purple-500/20 rounded-xl p-2.5 px-3.5 select-none">
+                    <span className="text-[#8E8A9E] font-black uppercase tracking-wider">Current Market Price:</span>
+                    <span className="text-purple-400 font-black font-mono tracking-tight">${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 5, maximumFractionDigits: 5 })}</span>
                   </div>
 
                   {/* Address Block */}
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center text-[8px] font-black text-[#8E8A9E] px-1 uppercase tracking-wider">
-                      <span>Transmission Node Address</span>
-                      {directDepositMethod === 'btc' ? (
-                        copiedBtc ? <span className="text-emerald-400">Address Copied!</span> : <span className="text-[#F59E0B]">BTC Address</span>
-                      ) : (
-                        copiedUsdt ? <span className="text-emerald-400">Address Copied!</span> : <span className="text-purple-400">TRC-20 Address</span>
-                      )}
+                      <span>USDT TRC-20 Address</span>
+                      {copiedUsdt ? <span className="text-emerald-400">Address Copied!</span> : <span className="text-purple-400">TRC-20 Node Address</span>}
                     </div>
                     <div className="bg-[#05060f] border border-white/10 hover:border-white/15 rounded-xl p-3 flex items-center justify-between gap-3 overflow-hidden transition-all duration-200">
-                      <span className="text-[9px] font-mono text-slate-300 truncate tracking-wide">
-                        {directDepositMethod === 'btc' ? CRYPTO_ADDRESSES.btc : CRYPTO_ADDRESSES.usdt}
+                      <span className="text-[9px] font-mono text-slate-300 truncate tracking-wide font-bold select-all">
+                        {CRYPTO_ADDRESSES.usdt}
                       </span>
                       <button 
-                        onClick={() => handleCopy(directDepositMethod === 'btc' ? CRYPTO_ADDRESSES.btc : CRYPTO_ADDRESSES.usdt, directDepositMethod === 'btc')}
+                        onClick={() => handleCopy(CRYPTO_ADDRESSES.usdt, false)}
                         className="p-1 px-2.5 bg-[#12132d] hover:bg-purple-500/20 text-purple-400 hover:text-white rounded-lg text-[8px] font-black uppercase transition-all duration-200 flex items-center gap-1.5 cursor-pointer shrink-0"
                       >
                         <Copy size={10} />
@@ -1107,13 +1421,13 @@ export default function TWNTokenPortal() {
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-bold">$</span>
                         <input 
                           type="number"
-                          placeholder="e.g. 100"
+                          placeholder="e.g. 10"
                           value={directDepositAmount}
                           onChange={(e) => setDirectDepositAmount(e.target.value)}
-                          className="w-full bg-[#05060f] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 pl-8 pr-12 text-xs font-black text-white focus:outline-none"
+                          className="w-full bg-[#05060f] border border-white/10 focus:border-purple-500 rounded-xl py-2.5 pl-8 pr-12 text-xs font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-purple-400">
-                          = {((parseFloat(directDepositAmount) || 0) * 50).toLocaleString()} TWN
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-[#F59E0B]">
+                          ≈ {((parseFloat(directDepositAmount) || 0) / currentPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN
                         </span>
                       </div>
                     </div>
@@ -1196,7 +1510,7 @@ export default function TWNTokenPortal() {
                   <div className="space-y-1.5 pt-1">
                     <div className="flex justify-between items-center text-[8px] font-black text-[#8E8A9E] px-1 uppercase tracking-widest">
                       <span>Amount in USD</span>
-                      <span>Rate: $1 = 50 TWN</span>
+                      <span className="text-purple-400 font-mono font-black">Current Price: ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 5, maximumFractionDigits: 5 })}</span>
                     </div>
                     
                     <div className="relative">
@@ -1206,7 +1520,7 @@ export default function TWNTokenPortal() {
                         placeholder="e.g. 50"
                         value={balanceBuyAmount}
                         onChange={(e) => setBalanceBuyAmount(e.target.value)}
-                        className="w-full bg-[#05060f] border border-white/10 focus:border-purple-500 rounded-xl py-3 pl-8 pr-12 text-xs font-black text-white focus:outline-none"
+                        className="w-full bg-[#05060f] border border-white/10 focus:border-purple-500 rounded-xl py-3 pl-8 pr-12 text-xs font-black text-white focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button 
                         type="button"
@@ -1236,7 +1550,7 @@ export default function TWNTokenPortal() {
                     <div className="text-right leading-none font-sans">
                       <span className="text-[8px] font-black text-purple-400 uppercase tracking-widest block mb-1">Acquired Payout</span>
                       <span className="text-base font-black text-[#F59E0B] font-mono">
-                        {((parseFloat(balanceBuyAmount) || 0) * 50).toLocaleString()} TWN
+                        ≈ {((parseFloat(balanceBuyAmount) || 0) / currentPrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN
                       </span>
                     </div>
                   </div>
@@ -1590,6 +1904,105 @@ export default function TWNTokenPortal() {
           })}
         </motion.div>
       </div>
+
+       {/* WITHDRAWAL MODAL */}
+        {showWithdrawModal && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowWithdrawModal(false)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 30 }}
+              className="relative w-full max-w-md bg-[#0a0d1f] border-2 border-purple-500/20 rounded-[32px] p-8 shadow-[0_0_80px_rgba(168,85,247,0.3)] overflow-hidden z-10"
+            >
+              <div className="absolute top-0 right-0 p-4">
+                <button 
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-6 pt-2">
+                <div className="text-center space-y-1">
+                  <div className="mb-3 inline-flex w-12 h-12 rounded-xl bg-purple-500/15 border border-purple-500/30 items-center justify-center text-[#A855F7]">
+                    <ArrowRightLeft size={22} className="rotate-270 drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]" />
+                  </div>
+                  <h3 className="text-xl font-black uppercase tracking-tight italic text-white font-sans">Withdraw TWN</h3>
+                  <p className="text-[9px] font-black tracking-widest text-[#8E8A9E] uppercase">Asset cash-out & external network withdrawal</p>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Balance visualization */}
+                  <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between">
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Escrow Account Balance</span>
+                    <span className="text-xs font-black text-purple-400 font-mono">{(profile?.twn_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN</span>
+                  </div>
+
+                  {/* Quantity input field */}
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400">TWN Token Quantity</label>
+                    <div className="relative">
+                      <input 
+                        type="number"
+                        placeholder="0.00"
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-semibold text-white focus:outline-none focus:border-purple-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none uppercase"
+                      />
+                      <button 
+                        onClick={() => setWithdrawAmount((profile?.twn_balance || 0).toString())}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 text-purple-300 rounded-lg text-[8px] font-black uppercase tracking-widest"
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Wallet address input field */}
+                  <div className="space-y-1.5">
+                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400">Destination USDT Wallet (BSC/TRC20)</label>
+                    <input 
+                      type="text"
+                      placeholder="Enter wallet address..."
+                      value={withdrawAddress}
+                      onChange={(e) => setWithdrawAddress(e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-semibold text-white focus:outline-none focus:focus:border-purple-500/50 uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal font-mono"
+                    />
+                  </div>
+
+                  {/* Pricing dynamic estimate conversion */}
+                  {parseFloat(withdrawAmount) > 0 && (
+                    <div className="p-4 bg-purple-500/5 border border-purple-500/10 rounded-2xl flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <p className="text-[8px] font-black uppercase tracking-wider text-purple-300">Preserved USD conversion estimation</p>
+                        <p className="text-[7px] text-purple-400 font-semibold uppercase tracking-widest">Calculated via live index pricing node</p>
+                      </div>
+                      <span className="text-xs font-black text-amber-400 font-mono">
+                        {formatCurrency(parseFloat(withdrawAmount) * currentPrice)} <span className="text-[8px] text-slate-400 font-bold uppercase font-sans">USD</span>
+                      </span>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={initiateWithdrawal}
+                    disabled={isSubmittingTx}
+                    className="w-full py-4 mt-2 bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 active:scale-95 duration-200 transition-all text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(168,85,247,0.3)] disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmittingTx ? "Processing..." : "Submit Withdrawal Request 📤"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
       {/* SECURE PIN PROTOCOL GATEWAY */}
       <PinProtocolModal 
