@@ -26,7 +26,7 @@ import {
   LayoutDashboard,
   ArrowRightLeft
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, handleFirestoreError, OperationType } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -81,6 +81,11 @@ export default function Profile() {
     } catch (e) {
       console.error(e);
       toast.error("Failed to update profile details.");
+      try {
+        handleFirestoreError(e, OperationType.UPDATE, `users/${profile.uid}`);
+      } catch (err) {
+        console.error("Logged Firestore Error:", err);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -123,6 +128,11 @@ export default function Profile() {
     } catch (error) {
       console.error("Error updating photo:", error);
       toast.error("Failed to update profile photo.");
+      try {
+        handleFirestoreError(error, OperationType.UPDATE, `users/${profile.uid}`);
+      } catch (err) {
+        console.error("Logged Firestore Error for Photo Update:", err);
+      }
     } finally {
       setIsUploading(false);
     }

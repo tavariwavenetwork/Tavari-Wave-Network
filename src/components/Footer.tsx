@@ -45,6 +45,7 @@ const Footer = () => {
                 { name: 'About WAVE', path: '/about' },
                 { name: 'How WAVE Works', path: '/how-it-works' },
                 { name: 'Our Partners', path: '/partners' },
+                { name: 'Join Our Community', path: '/join-us' },
                 { name: 'Investor Reviews', path: '/reviews' },
                 { name: 'Neural Analytics', path: '/neural-analytics' }
               ].map((link) => (
@@ -104,7 +105,7 @@ const Footer = () => {
                   <Mail size={16} className="text-primary" />
                   <div className="space-y-1">
                     <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest">{t("Global Inquiries")}</p>
-                    <p className="text-xs text-white font-mono lowercase">tavariwavenetwork@support.com</p>
+                    <p className="text-xs text-white font-mono lowercase">Support@tavariwavenetwork.com</p>
                     <p className="text-[10px] text-white/40 font-mono lowercase">tavariwavenetwork@gmail.com</p>
                   </div>
                 </div>

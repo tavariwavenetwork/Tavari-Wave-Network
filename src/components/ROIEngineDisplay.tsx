@@ -262,6 +262,13 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                     <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
                   </div>
                 </div>
+
+                {/* Mobile ONLY: Expected Daily Returns directly under the trading robot */}
+                <div className="lg:hidden mt-1.5 text-left">
+                  <span className="text-[8px] font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap">
+                    {formatCurrency(yieldSum)}/
+                  </span>
+                </div>
             </div>
 
             <div className="absolute top-1 right-1 lg:top-4 lg:right-6 flex items-center gap-2">
@@ -271,17 +278,17 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
 
         <div className="p-4 lg:p-7 pt-12 lg:pt-0 flex-1 flex flex-col justify-end lg:justify-center text-center relative z-10 bg-transparent pb-0 lg:pb-0">
             <div className="flex flex-row lg:flex-col items-center justify-start lg:justify-center w-full px-0 lg:px-0 overflow-visible transform translate-y-7 lg:translate-y-0 relative">
-                <div className="absolute left-4 lg:static lg:w-full lg:text-center text-left">
+                <div className="hidden lg:block lg:static lg:w-full lg:text-center text-left">
                 <span className="text-[8px] lg:text-lg font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap">
                     {formatCurrency(yieldSum)}/
                 </span>
                 </div>
                 
-                <div className="absolute left-[38%] lg:static lg:left-0 lg:translate-x-0 overflow-visible flex flex-col items-start lg:items-center w-full min-h-[40px] lg:min-h-[60px]">
+                <div className="absolute left-1/2 -translate-x-1/2 lg:static lg:translate-x-0 overflow-visible flex flex-col items-center lg:items-center w-fit lg:w-full min-h-[40px] lg:min-h-[60px]">
                   <DynamicBalance 
                     value={formatCurrency(liveEarnings)} 
-                    className="text-emerald-500 text-left lg:text-center"
-                    containerClassName="justify-start lg:justify-center"
+                    className="text-emerald-500 text-center lg:text-center"
+                    containerClassName="justify-center lg:justify-center"
                     baseSizeMobile="text-2xl"
                     baseSizeDesktop="lg:text-3xl"
                   />

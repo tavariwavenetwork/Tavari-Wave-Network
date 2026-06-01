@@ -1429,12 +1429,12 @@ export default function Rewards() {
                 <div className="space-y-2.5 sm:space-y-3 pl-2 sm:pl-8 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-gray-400">Points</span>
-                    <div className="px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-cyan-400/10 border border-cyan-400/20 text-[#00E5FF] text-[8px] sm:text-[10px] font-black tracking-widest animate-none">
-                      ${(points_balance * 0.10).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    <div className="px-1.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[8px] sm:text-[10px] font-black tracking-widest animate-none">
+                      {(points_balance * 10).toLocaleString()} TWN
                     </div>
                   </div>
                   <div 
-                    onClick={() => setRewardView('conversion')}
+                    onClick={() => navigate('/token')}
                     className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group select-none self-start"
                   >
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
@@ -1454,7 +1454,7 @@ export default function Rewards() {
             <div className="grid grid-cols-4 gap-1.5 xs:gap-2 sm:gap-4 md:gap-6">
               {/* Card 1: Daily Point */}
               <div 
-                onClick={() => setRewardView('daily')}
+                onClick={() => navigate('/token')}
                 className="relative p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/80 to-[#0c1217]/90 hover:from-[#1d2d37]/90 hover:to-[#111920] border border-white/10 hover:border-emerald-500/40 hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.96] transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-xl hover:shadow-[0_12px_24px_rgba(16,185,129,0.15),_inset_0_1px_0_rgba(255,255,255,0.05)] active:duration-75 select-none overflow-hidden"
               >
                 <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/30 group-hover:scale-110 group-hover:translate-x-0.5 transition-all duration-300 text-gray-400 group-hover:text-emerald-400 shadow-sm">

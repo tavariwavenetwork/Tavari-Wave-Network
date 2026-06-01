@@ -11,7 +11,8 @@ import {
   X,
   ArrowDownLeft,
   ArrowUpRight,
-  TrendingUp
+  TrendingUp,
+  BookOpen
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -153,13 +154,13 @@ export default function Homepage() {
         });
       });
 
-      toast.success("Successfully checked-in today! +1 Point credited.", { id: toastId });
+      toast.success("Successfully checked-in today! +1 TWN Point credited.", { id: toastId });
       setClaimStatus('claimed');
       
-      // Automatically redirect to rewards page after a brief premium confirmation pause
+      // Automatically redirect to the consolidated token portal after a brief premium confirmation pause
       setTimeout(() => {
         closePopup('daily-check-in');
-        navigate('/rewards');
+        navigate('/token');
       }, 1500);
 
     } catch (err: any) {
@@ -307,6 +308,35 @@ export default function Homepage() {
            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-aura-muted tracking-tighter">Terminal v1.1.0-RC</p>
         </div>
       </div>
+
+      {/* Platform Guide Preview Card */}
+      <div className="w-full max-w-5xl mx-auto px-1 mt-6">
+        <div className="bg-gradient-to-r from-[#11141b]/50 to-[#0c0d13]/80 border border-white/5 hover:border-aura-lime/20 rounded-[32px] p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-xl shadow-2xl transition-all duration-300">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-aura-lime/[0.02] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/[0.01] rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+          
+          <div className="space-y-3 text-center md:text-left">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-aura-lime/10 border border-aura-lime/20 rounded-full text-aura-lime">
+              <BookOpen size={12} />
+              <span className="text-[8px] font-black uppercase tracking-wider">Ecosystem Guide</span>
+            </div>
+            <h3 className="text-xl font-bold tracking-tight text-white uppercase italic">
+              New to the <span className="text-aura-lime">Tavari Wave</span> Protocol?
+            </h3>
+            <p className="text-xs text-[#8E8A9E] leading-relaxed max-w-2xl">
+              Our comprehensive platform guide walks you through every major feature. Discover how decentralized investments, regional rules, dynamic TWN token pricing, daily check-ins, and high-security withdraw mechanisms work in unison.
+            </p>
+          </div>
+          
+          <button 
+            onClick={() => navigate('/guide')}
+            className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-aura-lime/30 rounded-2xl text-[10px] font-black uppercase tracking-widest text-[#CCFF00] hover:text-white transition-all whitespace-nowrap active:scale-95 cursor-pointer"
+          >
+            Read More
+          </button>
+        </div>
+      </div>
+
       <MemoizedTopInvestorsSection />
       <MemoizedWhyChooseSection />
       </div>
@@ -348,7 +378,7 @@ export default function Homepage() {
                 </h3>
                 
                 <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
-                  Acknowledge your daily attendance to receive <span className="text-[#10B981] font-black tracking-wide">+1 PTS</span> loyalty token instantly credited to your active wallet node.
+                  Acknowledge your daily attendance to receive <span className="text-[#10B981] font-black tracking-wide">+1 TWN Point</span> instantly credited to your active wallet node.
                 </p>
               </motion.div>
               

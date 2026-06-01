@@ -13,6 +13,7 @@ import Fund from './components/Fund';
 import Settings from './components/Settings';
 import Profile from './components/Profile';
 import Support from './components/Support';
+import Guide from './components/Guide';
 import Referrals from './components/Referrals';
 import Rewards from './components/Rewards';
 import CipherAdmin from './components/Admin/CipherAdmin';
@@ -36,74 +37,13 @@ import CookiePolicy from './components/FooterPages/CookiePolicy';
 import AMLPolicy from './components/FooterPages/AMLPolicy';
 import CertificationCompliance from './components/FooterPages/CertificationCompliance';
 import TWNTokenPortal from './components/TWNTokenPortal';
+import JoinUs from './components/JoinUs';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { UIProvider } from './contexts/UIContext';
 import { UIConfigProvider } from './contexts/UIConfigContext';
-
-function PremiumLoader() {
-  return (
-    <div className="min-h-screen bg-[#050608] flex items-center justify-center relative overflow-hidden">
-      {/* Ambient background glows */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] bg-[#10B981]/5 blur-[120px] rounded-full pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[220px] h-[220px] bg-[#A855F7]/5 blur-[100px] rounded-full pointer-events-none" />
-
-      <div className="relative flex flex-col items-center justify-center">
-        {/* SVG Circle Loader with Solid / Dotted segments that rotate */}
-        <div className="relative w-28 h-28 flex items-center justify-center">
-          {/* Rotating Dotted Ring */}
-          <svg className="absolute inset-0 w-full h-full animate-[spin_12s_linear_infinite]" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="44"
-              fill="none"
-              stroke="#10B981"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeDasharray="2 6"
-              strokeOpacity="0.4"
-              className="origin-center"
-            />
-          </svg>
-
-          {/* Rotating Solid Ring */}
-          <svg className="absolute inset-0 w-full h-full animate-[spin_3s_linear_infinite]" viewBox="0 0 100 100">
-            <circle
-              cx="50"
-              cy="50"
-              r="38"
-              fill="none"
-              stroke="#A855F7"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeDasharray="40 180"
-              strokeOpacity="0.8"
-              className="origin-center"
-            />
-          </svg>
-
-          {/* Website Logo in center with elegant blinking/fade animation */}
-          <div className="absolute w-14 h-14 flex items-center justify-center animate-[pulse_2s_ease-in-out_infinite]">
-            <img 
-              src="https://i.imgur.com/wU33xy3.png" 
-              alt="Wave Logo" 
-              className="w-10 h-10 object-contain brightness-110"
-            />
-          </div>
-        </div>
-
-        {/* Premium Minimal Text */}
-        <div className="mt-6 text-center">
-          <span className="text-[10px] font-black tracking-[0.3em] uppercase text-white/40 italic font-sans antialiased animate-pulse">
-            Ecosystem Loading
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
+import PremiumLoader from './components/PremiumLoader';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -182,6 +122,7 @@ export default function App() {
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/help" element={<Support />} />
+              <Route path="/join-us" element={<JoinUs />} />
               <Route path="/reviews" element={<ReviewsPage />} />
               <Route path="/top-investors" element={<TopInvestorsPage />} />
               <Route path="/terms" element={<TermsOfService />} />
@@ -202,6 +143,7 @@ export default function App() {
                 }
               >
                 <Route path="/home" element={<Homepage />} />
+                <Route path="/guide" element={<Guide />} />
                 <Route path="/token" element={<TWNTokenPortal />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/invest" element={<Invest />} />
@@ -213,6 +155,7 @@ export default function App() {
                 <Route path="/referrals" element={<Referrals />} />
                 <Route path="/rewards" element={<Rewards />} />
                 <Route path="/help" element={<Support />} />
+                <Route path="/join-us" element={<JoinUs />} />
                 <Route path="/notifications" element={<NotificationsPage />} />
                 <Route path="/faq" element={<FAQ />} />
                 <Route path="/about" element={<About />} />

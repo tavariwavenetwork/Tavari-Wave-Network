@@ -750,6 +750,8 @@ export default function Layout() {
                       { label: 'Top Investors', path: '/top-investors', icon: <Trophy size={14} /> },
                       { label: 'Reviews', path: '/reviews', icon: <MessageSquarePlus size={14} /> },
                       { label: 'Reward', path: '/rewards', icon: <Gift size={14} /> },
+                      { label: 'Guide', path: '/guide', icon: <HelpCircle size={14} /> },
+                      { label: 'Join Us', path: '/join-us', icon: <Share2 size={14} /> },
                     ].map((subItem) => (
                       <button
                         key={subItem.path}
@@ -1324,7 +1326,7 @@ export default function Layout() {
                 />
                 <SidebarItem 
                   icon={<Gift size={20} />} 
-                  label={t('reviews')} 
+                  label="Reward" 
                   active={activeTab === 'rewards'}
                   onClick={() => handleNavigation('/rewards')}
                 />
@@ -1359,6 +1361,18 @@ export default function Layout() {
                     label={t('help')} 
                     active={activeTab === 'help'}
                     onClick={() => handleNavigation('/help')}
+                  />
+                  <SidebarItem 
+                    icon={<Zap size={20} className="text-emerald-400" />} 
+                    label="Guide" 
+                    active={activeTab === 'guide'}
+                    onClick={() => handleNavigation('/guide')}
+                  />
+                  <SidebarItem 
+                    icon={<Share2 size={20} className="text-[#00E5FF]" />} 
+                    label="Join Us" 
+                    active={activeTab === 'join-us'}
+                    onClick={() => handleNavigation('/join-us')}
                   />
                   <SidebarItem 
                     icon={<Info size={20} />} 

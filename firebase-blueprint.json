@@ -22,12 +22,15 @@
         "referral_earnings": { "type": "number" },
         "suspended": { "type": "boolean" },
         "banned": { "type": "boolean" },
+        "profile_edited": { "type": "boolean" },
         "roi_disabled": { "type": "boolean" },
         "withdrawals_frozen": { "type": "boolean" },
         "transfers_frozen": { "type": "boolean" },
         "last_rebook": { "type": "string", "format": "date-time" },
         "roi_cycle_start": { "type": "string", "format": "date-time" },
-        "created_at": { "type": "string", "format": "date-time" }
+        "created_at": { "type": "string", "format": "date-time" },
+        "twn_balance": { "type": "number" },
+        "points_balance": { "type": "number" }
       },
       "required": ["uid", "name", "username", "email", "funding_balance", "available_balance", "total_earnings", "total_invested"]
     },

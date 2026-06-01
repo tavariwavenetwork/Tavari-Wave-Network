@@ -21,6 +21,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 import { getRoiByAmount, isWeekendROI } from '../lib/utils';
+import PremiumLoader from '../components/PremiumLoader';
 
 export const DEFAULT_PLANS = [
   {
@@ -635,7 +636,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, logout, refreshAuth, plans: dynamicPlans }}>
-      {!loading && children}
+      {loading ? <PremiumLoader /> : children}
     </AuthContext.Provider>
   );
 }

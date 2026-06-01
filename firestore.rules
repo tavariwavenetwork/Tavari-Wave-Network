@@ -30,11 +30,11 @@ service cloud.firestore {
     }
 
     function isSuspended(data) {
-      return 'suspended' in data && data.suspended == true;
+      return data.get('suspended', false) == true;
     }
 
     function isBanned(data) {
-      return 'banned' in data && data.banned == true;
+      return data.get('banned', false) == true;
     }
 
     function isStatusActive(uid) {
@@ -48,8 +48,8 @@ service cloud.firestore {
       return data.keys().hasAll(['uid', 'role', 'email']) &&
              data.uid is string &&
              data.role in ['user', 'cipher'] &&
-             (!('suspended' in data) || data.suspended is bool) &&
-             (!('banned' in data) || data.banned is bool);
+             data.get('suspended', false) is bool &&
+             data.get('banned', false) is bool;
     }
 
     function isValidInvestment(data) {
@@ -71,8 +71,8 @@ service cloud.firestore {
     }
 
     function isAdditiveUpdate(field, incoming_data, existing_data) {
-      return !(field in incoming_data) || 
-             !(field in existing_data) || 
+      return !incoming_data.keys().hasAny([field]) || 
+             !existing_data.keys().hasAny([field]) || 
              incoming_data[field] >= existing_data[field];
     }
 
@@ -100,9 +100,10 @@ service cloud.firestore {
                           'total_invested', 'roi_cycle_start', 'referral_earnings', 'active_referrals', 
                           'referrals_count', 'withdraw_methods', 'last_rebook', 'roi_disabled', 
                           'withdrawals_frozen', 'transfers_frozen', 'email_verified', 'public_id',
-                          'referral_code', 'referral_link', 'referred_by', 'created_at', 'last_active_at'
+                          'referral_code', 'referral_link', 'referred_by', 'created_at', 'last_active_at',
+                          'twn_balance', 'points_balance', 'profile_edited'
                         ])) ||
-                       (isSignedIn() && existing().referred_by == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
+                       (isSignedIn() && existing().get('referred_by', '') == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
                        (isSignedIn() && !isOwner(userId) && 
                         incoming().diff(existing()).affectedKeys().hasOnly(['funding_balance', 'available_balance', 'referral_earnings', 'active_referrals', 'referrals_count']) && 
                         isSafeIncomingUpdate(incoming(), existing())
@@ -121,7 +122,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         isCipher() || 
         incoming().user_id == request.auth.uid || 
-        ('sender_id' in incoming() && incoming().sender_id == request.auth.uid)
+        (incoming().keys().hasAny(['sender_id']) && incoming().sender_id == request.auth.uid)
       );
       allow update, delete: if isCipher();
     }
@@ -132,10 +133,9 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         isCipher() || 
         incoming().user_id == request.auth.uid || 
-        ('sender_id' in incoming() && incoming().sender_id == request.auth.uid) ||
+        (incoming().keys().hasAny(['sender_id']) && incoming().sender_id == request.auth.uid) ||
         (exists(/databases/$(database)/documents/users/$(incoming().user_id)) && 
-         'referred_by' in get(/databases/$(database)/documents/users/$(incoming().user_id)).data &&
-         get(/databases/$(database)/documents/users/$(incoming().user_id)).data.referred_by == request.auth.uid)
+         get(/databases/$(database)/documents/users/$(incoming().user_id)).data.get('referred_by', '') == request.auth.uid)
       );
       allow update: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
       allow delete: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
@@ -161,12 +161,12 @@ service cloud.firestore {
         resource.data.user_id == request.auth.uid || 
         isCipher() || 
         (exists(/databases/$(database)/documents/users/$(resource.data.user_id)) && 
-         get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.referred_by == request.auth.uid)
+         get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.get('referred_by', '') == request.auth.uid)
       );
       allow list: if isCipher() || (isSignedIn() && (
         resource.data.user_id == request.auth.uid ||
         (exists(/databases/$(database)/documents/users/$(resource.data.user_id)) && 
-         get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.referred_by == request.auth.uid)
+         get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.get('referred_by', '') == request.auth.uid)
       ));
       allow create: if isSignedIn() && incoming().user_id == request.auth.uid && isValidInvestment(incoming()) && isStatusActive(request.auth.uid);
       allow update: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid && incoming().user_id == resource.data.user_id && isStatusActive(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'last_sync', 'total_earned', 'referral_bonus_processed', 'dailyRoi']) && isValidInvestment(incoming()));

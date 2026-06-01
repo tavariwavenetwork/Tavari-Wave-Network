@@ -17,7 +17,145 @@
     <link rel="dns-prefetch" href="https://flagcdn.com" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <style>
+        body {
+          background-color: #050608 !important;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .startup-container {
+          position: fixed;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          background-color: #050608;
+          z-index: 99999;
+          user-select: none;
+        }
+        .ambient-glow-1 {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 380px;
+          height: 380px;
+          background: rgba(16, 185, 129, 0.05); /* emerald-500 */
+          filter: blur(120px);
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .ambient-glow-2 {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 260px;
+          height: 260px;
+          background: rgba(168, 85, 247, 0.05); /* purple-500 */
+          filter: blur(100px);
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .loader-wrapper {
+          position: relative;
+          width: 112px;
+          height: 112px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .dotted-ring {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          animation: spin-dotted 12s linear infinite;
+        }
+        .solid-ring {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          animation: spin-solid 3s linear infinite;
+        }
+        .logo-container {
+          position: absolute;
+          width: 56px;
+          height: 56px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: pulse-logo 2s ease-in-out infinite;
+        }
+        .logo-img {
+          width: 44px;
+          height: 44px;
+          object-fit: contain;
+          filter: brightness(1.1);
+        }
+        .brand-title {
+          font-size: 14px;
+          font-weight: 900;
+          letter-spacing: 0.2em;
+          text-transform: uppercase;
+          color: #FFFFFF;
+          margin-top: 32px;
+          margin-bottom: 0px;
+          text-align: center;
+          opacity: 0.9;
+        }
+        .brand-subtitle {
+          font-size: 9px;
+          font-weight: 900;
+          letter-spacing: 0.35em;
+          text-transform: uppercase;
+          color: rgba(16, 185, 129, 0.6);
+          margin-top: 4px;
+          text-align: center;
+          font-style: italic;
+          animation: pulse-text 2s ease-in-out infinite;
+        }
+        
+        @keyframes spin-dotted {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes spin-solid {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes pulse-logo {
+          0%, 100% { opacity: 0.8; transform: scale(0.96); filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.1)); }
+          50% { opacity: 1; transform: scale(1.04); filter: drop-shadow(0 0 15px rgba(16, 185, 129, 0.25)); }
+        }
+        @keyframes pulse-text {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
+        }
+      </style>
+      <div class="startup-container">
+        <div class="ambient-glow-1"></div>
+        <div class="ambient-glow-2"></div>
+        <div class="loader-wrapper">
+          <svg class="dotted-ring" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="44" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 6" stroke-opacity="0.4" />
+          </svg>
+          <svg class="solid-ring" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="#A855F7" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="40 180" stroke-opacity="0.8" />
+          </svg>
+          <div class="logo-container">
+            <img class="logo-img" src="https://i.imgur.com/wU33xy3.png" alt="Tavari Wave Network Logo" />
+          </div>
+        </div>
+        <h1 class="brand-title">Tavari Wave Network</h1>
+        <div class="brand-subtitle">Ecosystem Loading</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

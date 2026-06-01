@@ -68,6 +68,213 @@ export default function TWNTokenPortal() {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
 
+  // Daily check-in & conversion states
+  const [calTab, setCalTab] = useState<'daily' | 'monthly' | 'yearly'>('daily');
+  const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState<number>(new Date().getMonth());
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
+  const [countdownStr, setCountdownStr] = useState('');
+
+  const points_balance = profile?.withdraw_methods?.points_balance ?? profile?.points_balance ?? 0;
+  const current_streak = profile?.withdraw_methods?.current_streak ?? profile?.current_streak ?? 0;
+  const last_check_in = profile?.withdraw_methods?.last_check_in ?? profile?.last_check_in ?? '';
+  const claimed_dates = profile?.withdraw_methods?.claimed_dates ?? profile?.claimed_dates ?? [];
+  const claimedDatesSet = new Set(claimed_dates);
+
+  const todayStr = [new Date().getFullYear(), String(new Date().getMonth() + 1).padStart(2, '0'), String(new Date().getDate()).padStart(2, '0')].join('-');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const nowTime = new Date();
+      const nextMidnight = new Date();
+      nextMidnight.setHours(24, 0, 0, 0);
+      const remains = nextMidnight.getTime() - nowTime.getTime();
+
+      if (remains <= 0) {
+        setCountdownStr('');
+      } else {
+        const hrs = Math.floor(remains / (60 * 60 * 1000));
+        const mins = Math.floor((remains % (60 * 60 * 1000)) / (60 * 1000));
+        const secs = Math.floor((remains % (60 * 1000)) / 1000);
+        setCountdownStr(`${hrs}h ${mins}m ${secs}s`);
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleDailyCheckIn = async () => {
+    const authUser = auth.currentUser;
+    if (!authUser || isCheckingIn) return;
+    
+    const hasClaimedToday = claimedDatesSet.has(todayStr);
+    if (hasClaimedToday) {
+      toast.error("You have already checked in today.");
+      return;
+    }
+
+    setIsCheckingIn(true);
+    const toastId = toast.loading("Processing atomic ledger attestation...");
+    try {
+      const nowIso = new Date().toISOString();
+      const userRef = doc(db, 'users', authUser.uid);
+      
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("Core profile record does not exist on Tavari Wave protocol.");
+        }
+
+        const userData = userSnap.data();
+        const existingWithdrawMethods = userData.withdraw_methods || {};
+        const currentStreak = existingWithdrawMethods.current_streak || 0;
+        const lastCheckIn = existingWithdrawMethods.last_check_in || '';
+        const claimedDatesList = existingWithdrawMethods.claimed_dates || [];
+        const claimedDatesSetLocal = new Set(claimedDatesList);
+
+        if (claimedDatesSetLocal.has(todayStr)) {
+          throw new Error("Safety protocol triggered: Attestation already signed for this cycle.");
+        }
+
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+        const yStr = [yesterdayDate.getFullYear(), String(yesterdayDate.getMonth() + 1).padStart(2, '0'), String(yesterdayDate.getDate()).padStart(2, '0')].join('-');
+        const lastCheckInDateOnly = lastCheckIn ? lastCheckIn.split('T')[0] : '';
+
+        let newStreak = 1;
+        if (lastCheckIn) {
+          if (lastCheckInDateOnly === yStr) {
+            newStreak = currentStreak + 1;
+          } else if (lastCheckInDateOnly === todayStr) {
+            newStreak = currentStreak;
+          } else {
+            newStreak = 1;
+          }
+        }
+
+        const newClaimedDates = [...claimedDatesList, todayStr];
+        const newPointsBalance = (existingWithdrawMethods.points_balance || 0) + 1;
+        const newTotalClaimedDays = (existingWithdrawMethods.total_claimed_days || 0) + 1;
+
+        transaction.update(userRef, {
+          withdraw_methods: {
+            ...existingWithdrawMethods,
+            points_balance: newPointsBalance,
+            total_claimed_days: newTotalClaimedDays,
+            current_streak: newStreak,
+            last_check_in: nowIso,
+            claimed_dates: newClaimedDates
+          }
+        });
+
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: authUser.uid,
+          type: 'points_gain',
+          amount: 1,
+          status: 'approved',
+          created_at: nowIso,
+          description: 'Daily Check-In Incentive'
+        });
+
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: authUser.uid,
+          type: 'success',
+          title: 'Daily Check-In Successful',
+          message: 'Successfully checked in! +1 Daily Point has been credited.',
+          read: false,
+          created_at: nowIso
+        });
+      });
+
+      toast.success("Successfully checked-in today! +1 TWN Point credited.", { id: toastId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Daily check-in failed.", { id: toastId });
+    } finally {
+      setIsCheckingIn(false);
+    }
+  };
+
+  const handleConvertPoints = async () => {
+    const authUser = auth.currentUser;
+    if (!authUser || isConverting) return;
+
+    if (points_balance < 10) {
+      toast.error("You need at least 10 Daily Points to convert to TWN.");
+      return;
+    }
+
+    setIsConverting(true);
+    const toastId = toast.loading("Executing point conversion protocol...");
+    try {
+      const nowIso = new Date().toISOString();
+      const userRef = doc(db, 'users', authUser.uid);
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("Core profile record does not exist.");
+        }
+
+        const userData = userSnap.data();
+        const existingWithdrawMethods = userData.withdraw_methods || {};
+        const ptsBalance = existingWithdrawMethods.points_balance ?? userData.points_balance ?? 0;
+
+        if (ptsBalance < 10) {
+          throw new Error("Insufficient Daily Points for conversion.");
+        }
+
+        const pointsToConvert = ptsBalance;
+        const twnCredited = pointsToConvert * 10; // 1 Daily Point = 10 TWN Tokens
+        const currentTwn = userData.twn_balance || 0;
+        const newTwnBalance = currentTwn + twnCredited;
+
+        transaction.update(userRef, {
+          twn_balance: newTwnBalance,
+          withdraw_methods: {
+            ...existingWithdrawMethods,
+            points_balance: 0 // Converted all points to liquid TWN
+          }
+        });
+
+        // Write Conversion record
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: authUser.uid,
+          type: 'points_conversion',
+          is_twn_activity: true,
+          points_converted: pointsToConvert,
+          twn_amount: twnCredited,
+          amount: twnCredited * currentPrice,
+          twn_price: currentPrice,
+          status: 'completed',
+          created_at: nowIso,
+          description: `Daily Points to TWN Conversion (${pointsToConvert} PTS → ${twnCredited} TWN)`
+        });
+
+        // Write Notification log
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: authUser.uid,
+          type: 'success',
+          title: 'Points Converted Successfully',
+          message: `Successfully converted ${pointsToConvert} Daily Points to ${twnCredited} TWN Tokens!`,
+          read: false,
+          created_at: nowIso
+        });
+      });
+
+      toast.success(`Successfully converted ${points_balance} points to ${points_balance * 10} TWN Tokens!`, { id: toastId });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || "Point conversion failed.", { id: toastId });
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 1024);
@@ -165,11 +372,6 @@ export default function TWNTokenPortal() {
   const [showSellModal, setShowSellModal] = useState(false);
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
-  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  
-  // Withdrawal specific states
-  const [withdrawAmount, setWithdrawAmount] = useState('');
-  const [withdrawAddress, setWithdrawAddress] = useState('');
 
   // Dedicated TWN Transactions history state & filters
   const [twnTransactions, setTwnTransactions] = useState<any[]>([]);
@@ -389,8 +591,6 @@ export default function TWNTokenPortal() {
       await executeSendTransfer();
     } else if (pinAction === 'deposit') {
       await executeDirectDepositSubmit();
-    } else if (pinAction === 'withdraw') {
-      await executeWithdrawalSubmit();
     }
     setPinAction(null);
   };
@@ -662,100 +862,6 @@ export default function TWNTokenPortal() {
     }
   };
 
-  const initiateWithdrawal = () => {
-    const amt = parseFloat(withdrawAmount);
-    if (isNaN(amt) || amt <= 0) {
-      toast.error("Please enter a valid amount.");
-      return;
-    }
-    const userTwn = profile?.twn_balance || 0;
-    if (amt > userTwn) {
-      toast.error("Insufficient TWN token balance.");
-      return;
-    }
-    if (!withdrawAddress.trim()) {
-      toast.error("Please enter your destination wallet address.");
-      return;
-    }
-
-    setPinAction('withdraw');
-    setShowPinModal(true);
-  };
-
-  const executeWithdrawalSubmit = async () => {
-    const twnVal = parseFloat(withdrawAmount);
-    if (isNaN(twnVal) || twnVal <= 0) return;
-
-    if (profile?.suspended || profile?.banned) {
-      toast.error("Your account features are currently restricted.");
-      return;
-    }
-
-    const currentTwn = profile?.twn_balance || 0;
-    if (twnVal > currentTwn) {
-      toast.error("Insufficient TWN token balance.");
-      return;
-    }
-
-    setIsSubmittingTx(true);
-
-    try {
-      await runTransaction(db, async (transaction) => {
-        const userRef = doc(db, 'users', user!.uid);
-        const userSnap = await transaction.get(userRef);
-
-        if (!userSnap.exists()) throw new Error("Profile synchronization failed.");
-
-        const userData = userSnap.data();
-        const twnBalance = userData.twn_balance || 0;
-
-        if (twnBalance < twnVal) throw new Error("Insufficient TWN Balance.");
-
-        // Deduct TWN balance immediately (placing in escrow)
-        transaction.update(userRef, {
-          twn_balance: increment(-twnVal)
-        });
-
-        // Add transaction entry
-        const txRef = doc(collection(db, 'transactions'));
-        transaction.set(txRef, {
-          user_id: user!.uid,
-          user_name: profile?.name || 'User',
-          user_email: user!.email || '',
-          type: 'twn_withdrawal_request',
-          type_detail: 'twn_token_withdrawal',
-          is_twn_activity: true,
-          status: 'pending',
-          twn_amount: twnVal,
-          twn_price: currentPrice,
-          amount: twnVal * currentPrice,
-          wallet_address: withdrawAddress,
-          created_at: new Date().toISOString()
-        });
-
-        // Add Notification
-        const notifRef = doc(collection(db, 'notifications'));
-        transaction.set(notifRef, {
-          user_id: user!.uid,
-          title: 'TWN Withdrawal Submitted',
-          message: `Your withdrawal request of ${twnVal.toLocaleString()} TWN is undergoing network audit verification. Address: ${withdrawAddress}`,
-          type: 'info',
-          read: false,
-          created_at: new Date().toISOString()
-        });
-      });
-
-      toast.success("Withdrawal Request submitted successfully! Tokens are held in Escrow verification.");
-      setWithdrawAmount('');
-      setWithdrawAddress('');
-      setShowWithdrawModal(false);
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || "Withdrawal failed.");
-    } finally {
-      setIsSubmittingTx(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#05060f] text-white selection:bg-purple-500/30 overflow-hidden relative pb-32">
@@ -1013,13 +1119,13 @@ export default function TWNTokenPortal() {
                 </div>
 
                 {/* Direct Action Triggers */}
-                <div className="grid grid-cols-3 gap-2 mt-6">
+                <div className="grid grid-cols-2 gap-2 mt-6">
                   <button 
                     onClick={() => {
                       setBuyFlowStep('choice');
                       setShowBuyModal(true);
                     }}
-                    className="py-3 bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 duration-200 active:scale-95 transition-all text-white font-black text-[9px] uppercase tracking-[0.1em] rounded-xl cursor-pointer"
+                    className="py-3 bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 duration-200 active:scale-95 transition-all text-white font-black text-[9px] uppercase tracking-[0.1em] rounded-xl cursor-pointer font-sans text-center"
                   >
                     🚀 Buy
                   </button>
@@ -1027,17 +1133,9 @@ export default function TWNTokenPortal() {
                     onClick={() => {
                       setShowSendModal(true);
                     }}
-                    className="py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black text-[9px] uppercase tracking-[0.1em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer"
+                    className="py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black text-[9px] uppercase tracking-[0.1em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer font-sans text-center"
                   >
                     📤 Send
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setShowWithdrawModal(true);
-                    }}
-                    className="py-3 bg-white/5 border border-purple-500/20 hover:border-purple-500/40 hover:bg-[#3b0764]/20 text-purple-300 font-black text-[9px] uppercase tracking-[0.1em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer"
-                  >
-                    📥 Withdraw
                   </button>
                 </div>
 
@@ -1050,7 +1148,261 @@ export default function TWNTokenPortal() {
 
           </div>
 
-        {/* 4 CORE BENEFITS GRID LAYOUT */}
+        {/* --- DAILY POINTS & CONVERSIONS SYSTEM CONTAINER --- */}
+        <div className="space-y-6 pt-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-white/5 pb-4">
+            <div className="space-y-1">
+              <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-wider text-white">Daily Rewards Hub</h2>
+              <p className="text-[10px] text-[#8E8A9E] font-black uppercase tracking-wider">Accumulate points daily and convert them instantly to TWN Tokens</p>
+            </div>
+            <div className="flex gap-2">
+              <div className="bg-purple-500/10 border border-purple-500/20 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest text-purple-300">
+                1 PTS = 10 TWN Tokens
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            {/* Section: Daily Check-In Calendar (7 cols out of 12) */}
+            <div className="lg:col-span-7 bg-[#0b0c16]/75 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-[0_12px_45px_rgba(0,0,0,0.6)] space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="flex justify-between items-center border-b border-white/5 pb-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <span className="text-emerald-400">★</span> Attendance Check-In Calendar
+                  </h3>
+                  <p className="text-[9px] text-[#8E8A9E] font-bold uppercase tracking-wider">Acknowledge attendance daily to earn TWN Points</p>
+                </div>
+                <div className="flex gap-1.5 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full text-center">
+                  <span className="text-[9px] uppercase font-black text-emerald-400">Streak: {current_streak} days</span>
+                </div>
+              </div>
+
+              {/* Calendar Component */}
+              <div className="space-y-4">
+                {/* Calendar Days grid */}
+                <div className="grid grid-cols-7 gap-2 text-center text-[9px] font-black uppercase text-slate-500 tracking-widest pb-1 border-b border-white/[0.03]">
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => <span key={d}>{d}</span>)}
+                </div>
+
+                <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                  {(() => {
+                    const list = [];
+                    const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+                    let firstDayIdx = new Date(calYear, calMonth, 1).getDay();
+                    // Adjust Sun=0 to Mon-start Mon=0, Sun=6
+                    firstDayIdx = (firstDayIdx + 6) % 7;
+
+                    // Blanks
+                    for (let k = 0; k < firstDayIdx; k++) {
+                      list.push(<div key={`blank-${k}`} className="w-full aspect-square bg-transparent" />);
+                    }
+
+                    // Day entries
+                    for (let d = 1; d <= daysInMonth; d++) {
+                      const iterDateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                      const isClaimed = claimedDatesSet.has(iterDateStr);
+                      const isToday = iterDateStr === todayStr;
+
+                      if (isClaimed) {
+                        if (isToday) {
+                          list.push(
+                            <div 
+                              key={`day-${d}`}
+                              className="w-full aspect-square rounded-[14px] bg-emerald-500 shadow-[0_4px_12px_rgba(16,185,129,0.3)] border border-emerald-600 flex flex-col items-center justify-center cursor-default select-none relative"
+                            >
+                              <span className="text-white text-xs sm:text-sm font-black">{d}</span>
+                              <span className="text-[7px] sm:text-[8px] font-black text-emerald-100 mt-0.5 block leading-none">+1 PTS</span>
+                            </div>
+                          );
+                        } else {
+                          list.push(
+                            <div 
+                              key={`day-${d}`}
+                              className="w-full aspect-square rounded-[14px] bg-emerald-950/20 border border-emerald-500/15 flex flex-col items-center justify-center cursor-default select-none"
+                            >
+                              <span className="text-emerald-400 text-xs sm:text-sm font-bold">{d}</span>
+                              <span className="text-[7px] sm:text-[8px] font-black text-emerald-500/60 mt-0.5 block leading-none">+1 PTS</span>
+                            </div>
+                          );
+                        }
+                      } else if (isToday) {
+                        list.push(
+                          <button 
+                            key={`day-${d}`}
+                            onClick={handleDailyCheckIn}
+                            disabled={isCheckingIn}
+                            className="w-full aspect-square rounded-[14px] border border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-bold flex flex-col items-center justify-center hover:scale-[1.03] transition-all cursor-pointer animate-pulse"
+                            title="Click to check-in now"
+                          >
+                            <span className="text-xs sm:text-sm font-black">{d}</span>
+                            <span className="text-[7px] sm:text-[8px] font-bold text-emerald-400 mt-0.5 block leading-none">CLAIM</span>
+                          </button>
+                        );
+                      } else {
+                        list.push(
+                          <div 
+                            key={`day-${d}`}
+                            className="w-full aspect-square rounded-[14px] bg-white/[0.02] border border-white/5 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5 font-semibold text-xs sm:text-sm select-none transition-colors"
+                          >
+                            {d}
+                          </div>
+                        );
+                      }
+                    }
+                    return list;
+                  })()}
+                </div>
+              </div>
+
+              {/* Attendance Action Button */}
+              <div className="bg-[#05060f]/60 border border-white/5 rounded-[20px] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  <p className="text-xs font-black text-white uppercase tracking-wider">Attendance Ledger Status</p>
+                  <p className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">Acknowledge attendance daily to claim reward points</p>
+                </div>
+
+                <button
+                  onClick={handleDailyCheckIn}
+                  disabled={isCheckingIn || claimedDatesSet.has(todayStr)}
+                  className={cn(
+                    "w-full sm:w-auto px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer",
+                    !claimedDatesSet.has(todayStr)
+                      ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-105 text-white shadow-md shadow-emerald-500/10" 
+                      : "bg-white/5 text-gray-500 border border-white/5 cursor-not-allowed"
+                  )}
+                >
+                  {claimedDatesSet.has(todayStr) ? "Checked In Today" : countdownStr ? `Reset in ${countdownStr}` : "Claim +1 Daily PTS"}
+                </button>
+              </div>
+            </div>
+
+            {/* Section: Daily Point Balance & Convert to TWN (5 cols out of 12) */}
+            <div className="lg:col-span-5 bg-[#0b0c16]/75 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-[0_12px_45px_rgba(0,0,0,0.6)] flex flex-col justify-between space-y-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-[50px] pointer-events-none" />
+              
+              <div className="space-y-4">
+                <div className="border-b border-white/5 pb-4">
+                  <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                    <span className="text-purple-400">★</span> Point Exchange Portal
+                  </h3>
+                  <p className="text-[9px] text-[#8E8A9E] font-bold uppercase tracking-wider">Convert accrued points into liquid TWN wallet balance</p>
+                </div>
+
+                {/* Daily Point Balance Display */}
+                <div className="bg-black/40 border border-white/5 px-5 py-6 rounded-2xl text-center space-y-1 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+                  <span className="text-[8px] font-black uppercase tracking-[0.2em] text-[#8E8A9E] block">Daily Point Balance</span>
+                  <span className="text-3xl font-black text-purple-400 tracking-tight block font-sans">
+                    {points_balance} <span className="text-xs uppercase font-bold text-gray-400">PTS</span>
+                  </span>
+                  
+                  <div className="pt-2 flex justify-center items-center gap-3 text-[9px] font-black uppercase tracking-wider">
+                    <span className="text-gray-400">Eligible for Conversion:</span>
+                    {points_balance >= 10 ? (
+                      <span className="text-emerald-400 font-extrabold flex items-center gap-1">● Ready</span>
+                    ) : (
+                      <span className="text-amber-500 font-extrabold flex items-center gap-1">● Min 10 Required</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-4 bg-white/[0.01] border border-white/5 rounded-2xl space-y-2.5 text-[9px] uppercase font-black tracking-wider leading-relaxed">
+                  <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                    <span className="text-slate-400">Conversion Rule</span>
+                    <span className="text-purple-400">1 Daily Point = 10 TWN Tokens</span>
+                  </div>
+                  <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                    <span className="text-slate-400">Minimum Threshold</span>
+                    <span className="text-amber-500">10 Points</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Active Wallet Credit</span>
+                    <span className="text-emerald-400">Standard TWN Wallet</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <button
+                  onClick={handleConvertPoints}
+                  disabled={isConverting || points_balance < 10}
+                  className={cn(
+                    "w-full py-4 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all cursor-pointer italic text-center",
+                    points_balance >= 10 
+                      ? "bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 active:scale-95 text-white shadow-lg shadow-purple-500/20" 
+                      : "bg-white/5 text-slate-500 cursor-not-allowed border border-white/5"
+                  )}
+                >
+                  {isConverting ? "Converting Points..." : points_balance >= 10 ? `Convert ${points_balance} Points to ${points_balance * 10} TWN` : "Convert Points to TWN"}
+                </button>
+                
+                {points_balance < 10 && (
+                  <p className="text-[8px] text-center text-amber-500/80 font-black uppercase tracking-wider">
+                    ⚠️ Minimum 10 points threshold required for conversion sequence.
+                  </p>
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Section: Point Conversion History */}
+          <div className="bg-[#0b0c16]/75 border border-white/5 rounded-3xl p-6 md:p-8 backdrop-blur-xl shadow-[0_12px_45px_rgba(0,0,0,0.6)] space-y-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="border-b border-white/5 pb-4">
+              <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                <span className="text-purple-400">★</span> Point Conversion History
+              </h3>
+              <p className="text-[9px] text-[#8E8A9E] font-bold uppercase tracking-wider">Ledger log of point conversion settlements to TWN</p>
+            </div>
+
+            <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2">
+              {twnTransactions.filter(tx => tx.type === 'points_conversion').length === 0 ? (
+                <div className="py-12 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center text-center space-y-2">
+                  <span className="text-slate-600 text-lg">★</span>
+                  <div>
+                    <p className="text-xs font-black uppercase text-slate-400 tracking-widest">No Conversions Logged</p>
+                    <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold">Perform daily check-ins and convert points of 10+ to begin</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {twnTransactions
+                    .filter(tx => tx.type === 'points_conversion')
+                    .map((tx) => (
+                      <div 
+                        key={tx.id}
+                        className="p-4 bg-white/[0.01] hover:bg-white/[0.02] border border-white/5 rounded-2xl flex flex-col gap-2 transition-all"
+                      >
+                        <div className="flex justify-between items-center pb-2 border-b border-white/[0.03]">
+                          <span className="text-[10px] font-black text-purple-400 tracking-wider">
+                            {tx.points_converted || tx.twn_amount || 0} PTS → {tx.twn_amount || 0} TWN
+                          </span>
+                          <span className="text-[7px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">
+                            Verified Secure
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-[8px] font-bold uppercase text-slate-400 tracking-wider">
+                          <div>
+                            <span className="block text-[7px] text-slate-500">Date & Time</span>
+                            <span className="text-white font-mono">{tx.created_at ? new Date(tx.created_at).toLocaleString() : 'Just now'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[7px] text-slate-500">Transaction ID</span>
+                            <span className="text-white font-mono truncate block max-w-[120px]">{tx.id || tx.ref_id || 'Secure Log'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { title: "Secure & Audited", desc: "Smart contract audited by leading decentralized cryptographic cybersecurity experts.", color: "from-blue-500/10" },
@@ -1173,7 +1525,7 @@ export default function TWNTokenPortal() {
                     return true;
                   })
                   .map((tx) => {
-                    const isIncoming = tx.type === 'twn_purchase' || tx.type === 'twn_transfer_received';
+                    const isIncoming = tx.type === 'twn_purchase' || tx.type === 'twn_transfer_received' || tx.type === 'points_conversion';
                     const isWithdrawal = tx.type === 'twn_withdrawal_request';
                     
                     return (
@@ -1206,7 +1558,9 @@ export default function TWNTokenPortal() {
                                   ? "Token Send"
                                   : tx.type === 'twn_transfer_received'
                                     ? "Token Receive"
-                                    : "Escrow Withdrawal"
+                                    : tx.type === 'points_conversion'
+                                      ? "Points Conversion"
+                                      : "Escrow Withdrawal"
                               }
                             </h4>
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[8px] font-black text-slate-400 uppercase tracking-widest font-mono">
@@ -1215,6 +1569,7 @@ export default function TWNTokenPortal() {
                               {tx.type_detail === 'twn_purchase_balance' && <span className="text-amber-500">{tx.source_balance} balance</span>}
                               {tx.type === 'twn_transfer_sent' && <span>To: {tx.receiver_name || tx.receiver_id?.substring(0, 8)}</span>}
                               {tx.type === 'twn_transfer_received' && <span>From: {tx.sender_name || tx.sender_id?.substring(0, 8)}</span>}
+                              {tx.type === 'points_conversion' && <span>{tx.points_converted} PTS → {tx.twn_amount} TWN</span>}
                               {tx.wallet_address && <span className="truncate max-w-[150px]">To: {tx.wallet_address}</span>}
                               <span>•</span>
                               <span>{tx.created_at ? new Date(tx.created_at).toLocaleString() : 'Just now'}</span>
@@ -1268,8 +1623,7 @@ export default function TWNTokenPortal() {
         <div className="backdrop-blur-xl bg-[#080916]/80 border border-white/10 py-3.5 px-6 rounded-2xl flex items-center justify-around gap-2 shadow-[0_15px_40px_rgba(0,0,0,0.6)]">
           {[
             { label: 'BUY', action: () => { setBuyFlowStep('choice'); setShowBuyModal(true); }, style: 'hover:text-amber-400 active:scale-95' },
-            { label: 'SEND', action: () => setShowSendModal(true), style: 'hover:text-purple-400 active:scale-95' },
-            { label: 'WITHDRAW', action: () => setShowWithdrawModal(true), style: 'hover:text-purple-300 active:scale-95' }
+            { label: 'SEND', action: () => setShowSendModal(true), style: 'hover:text-purple-400 active:scale-95' }
           ].map((dockBtn, idx) => (
             <button
               key={idx}
@@ -1904,105 +2258,6 @@ export default function TWNTokenPortal() {
           })}
         </motion.div>
       </div>
-
-       {/* WITHDRAWAL MODAL */}
-        {showWithdrawModal && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowWithdrawModal(false)}
-              className="absolute inset-0 bg-black/85 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 30 }}
-              className="relative w-full max-w-md bg-[#0a0d1f] border-2 border-purple-500/20 rounded-[32px] p-8 shadow-[0_0_80px_rgba(168,85,247,0.3)] overflow-hidden z-10"
-            >
-              <div className="absolute top-0 right-0 p-4">
-                <button 
-                  onClick={() => setShowWithdrawModal(false)}
-                  className="p-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-colors cursor-pointer"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="space-y-6 pt-2">
-                <div className="text-center space-y-1">
-                  <div className="mb-3 inline-flex w-12 h-12 rounded-xl bg-purple-500/15 border border-purple-500/30 items-center justify-center text-[#A855F7]">
-                    <ArrowRightLeft size={22} className="rotate-270 drop-shadow-[0_0_8px_rgba(168,85,247,0.4)]" />
-                  </div>
-                  <h3 className="text-xl font-black uppercase tracking-tight italic text-white font-sans">Withdraw TWN</h3>
-                  <p className="text-[9px] font-black tracking-widest text-[#8E8A9E] uppercase">Asset cash-out & external network withdrawal</p>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Balance visualization */}
-                  <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl flex items-center justify-between">
-                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">Escrow Account Balance</span>
-                    <span className="text-xs font-black text-purple-400 font-mono">{(profile?.twn_balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })} TWN</span>
-                  </div>
-
-                  {/* Quantity input field */}
-                  <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400">TWN Token Quantity</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        placeholder="0.00"
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-semibold text-white focus:outline-none focus:border-purple-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none uppercase"
-                      />
-                      <button 
-                        onClick={() => setWithdrawAmount((profile?.twn_balance || 0).toString())}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-purple-500/10 border border-purple-500/20 hover:bg-purple-500/20 text-purple-300 rounded-lg text-[8px] font-black uppercase tracking-widest"
-                      >
-                        MAX
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Wallet address input field */}
-                  <div className="space-y-1.5">
-                    <label className="text-[8px] font-black uppercase tracking-widest text-slate-400">Destination USDT Wallet (BSC/TRC20)</label>
-                    <input 
-                      type="text"
-                      placeholder="Enter wallet address..."
-                      value={withdrawAddress}
-                      onChange={(e) => setWithdrawAddress(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-xs font-semibold text-white focus:outline-none focus:focus:border-purple-500/50 uppercase tracking-widest placeholder:normal-case placeholder:tracking-normal font-mono"
-                    />
-                  </div>
-
-                  {/* Pricing dynamic estimate conversion */}
-                  {parseFloat(withdrawAmount) > 0 && (
-                    <div className="p-4 bg-purple-500/5 border border-purple-500/10 rounded-2xl flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <p className="text-[8px] font-black uppercase tracking-wider text-purple-300">Preserved USD conversion estimation</p>
-                        <p className="text-[7px] text-purple-400 font-semibold uppercase tracking-widest">Calculated via live index pricing node</p>
-                      </div>
-                      <span className="text-xs font-black text-amber-400 font-mono">
-                        {formatCurrency(parseFloat(withdrawAmount) * currentPrice)} <span className="text-[8px] text-slate-400 font-bold uppercase font-sans">USD</span>
-                      </span>
-                    </div>
-                  )}
-
-                  <button 
-                    onClick={initiateWithdrawal}
-                    disabled={isSubmittingTx}
-                    className="w-full py-4 mt-2 bg-gradient-to-r from-purple-600 to-[#F59E0B] hover:brightness-110 active:scale-95 duration-200 transition-all text-white font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(168,85,247,0.3)] disabled:opacity-50 cursor-pointer"
-                  >
-                    {isSubmittingTx ? "Processing..." : "Submit Withdrawal Request 📤"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
 
       {/* SECURE PIN PROTOCOL GATEWAY */}
       <PinProtocolModal 
