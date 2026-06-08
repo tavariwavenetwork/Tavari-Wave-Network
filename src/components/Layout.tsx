@@ -632,7 +632,7 @@ export default function Layout() {
           ? "bg-white/[0.03] border-primary/20 shadow-[inset_0_0_20px_rgba(255,255,255,0.02)]" 
           : "bg-white/70 border-primary/20",
         // Mobile visibility logic
-        ((location.pathname === '/home' || location.pathname === '/token') && !isDistractionFree) ? "flex" : "hidden lg:flex",
+        ((location.pathname === '/home' || (location.pathname === '/token' && !isMobile)) && !isDistractionFree) ? "flex" : "hidden lg:flex",
         isDistractionFree && "hidden lg:hidden"
       )}>
         {/* Left: Back Button or Menu */}

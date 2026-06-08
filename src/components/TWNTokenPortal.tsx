@@ -68,6 +68,14 @@ export default function TWNTokenPortal() {
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(false);
 
+  const handleClose = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/home');
+    }
+  };
+
   // Daily check-in & conversion states
   const [calTab, setCalTab] = useState<'daily' | 'monthly' | 'yearly'>('daily');
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
@@ -973,7 +981,7 @@ export default function TWNTokenPortal() {
         </div>
         
         {/* Top Navbar Header matching visually the references */}
-        <header className="flex items-center justify-between py-4 border-b border-white/5">
+        <header className="hidden lg:flex items-center justify-between py-4 border-b border-white/5">
           <div className="flex items-center gap-3">
             <img src="https://i.imgur.com/wU33xy3.png" alt="ZWA" className="h-8 w-auto object-contain" referrerPolicy="no-referrer" />
             <div className="flex flex-col">
@@ -1619,27 +1627,29 @@ export default function TWNTokenPortal() {
       </div>
 
       {/* FLOATABLE GLASSMORPHIC CORE NAVIGATION DEVICE (DOCK) BAR AT BOTTOM OF PORTAL */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[99] max-w-lg w-[90%] select-none px-4 md:px-0">
-        <div className="backdrop-blur-xl bg-[#080916]/80 border border-white/10 py-3.5 px-6 rounded-2xl flex items-center justify-around gap-2 shadow-[0_15px_40px_rgba(0,0,0,0.6)]">
-          {[
-            { label: 'BUY', action: () => { setBuyFlowStep('choice'); setShowBuyModal(true); }, style: 'hover:text-amber-400 active:scale-95' },
-            { label: 'SEND', action: () => setShowSendModal(true), style: 'hover:text-purple-400 active:scale-95' }
-          ].map((dockBtn, idx) => (
-            <button
-              key={idx}
-              onClick={dockBtn.action}
-              className={cn(
-                "px-4 py-2 rounded-lg text-[10px] font-black tracking-[0.2em] transition-all text-[#8E8A9E] hover:bg-white/5 hover:text-white uppercase relative group cursor-pointer",
-                dockBtn.style
-              )}
-            >
-              <span className="relative z-10">{dockBtn.label}</span>
-              {/* Pulsating glow inside buttons */}
-              <div className="absolute inset-0 rounded-lg bg-purple-500/0 group-hover:bg-purple-500/5 blur-md transition-all duration-300" />
-            </button>
-          ))}
+      {!isMobile && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[99] max-w-lg w-[90%] select-none px-4 md:px-0">
+          <div className="backdrop-blur-xl bg-[#080916]/80 border border-white/10 py-3.5 px-6 rounded-2xl flex items-center justify-around gap-2 shadow-[0_15px_40px_rgba(0,0,0,0.6)]">
+            {[
+              { label: 'BUY', action: () => { setBuyFlowStep('choice'); setShowBuyModal(true); }, style: 'hover:text-amber-400 active:scale-95' },
+              { label: 'SEND', action: () => setShowSendModal(true), style: 'hover:text-purple-400 active:scale-95' }
+            ].map((dockBtn, idx) => (
+              <button
+                key={idx}
+                onClick={dockBtn.action}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-[10px] font-black tracking-[0.2em] transition-all text-[#8E8A9E] hover:bg-white/5 hover:text-white uppercase relative group cursor-pointer",
+                  dockBtn.style
+                )}
+              >
+                <span className="relative z-10">{dockBtn.label}</span>
+                {/* Pulsating glow inside buttons */}
+                <div className="absolute inset-0 rounded-lg bg-purple-500/0 group-hover:bg-purple-500/5 blur-md transition-all duration-300" />
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* GLOBAL BACKGROUND INTERACTIVE PARTICLES */}
       <div className="fixed inset-0 pointer-events-none opacity-20 z-0">
@@ -2187,12 +2197,28 @@ export default function TWNTokenPortal() {
       </AnimatePresence>
 
       {/* PREMIUM FLOATING GLASS BOTTOM NAVIGATION DOCK */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] w-full max-w-sm px-4 md:px-0">
+      <div className={cn(
+        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] px-4 md:px-0 transition-all duration-300 w-full",
+        isMobile ? "max-w-md" : "max-w-sm"
+      )}>
         <motion.div 
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5, type: 'spring', stiffness: 100 }}
-          className="relative bg-[#060814]/80 backdrop-blur-xl border border-white/10 rounded-[24px] p-2.5 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(168,85,247,0.15)] flex justify-between items-center gap-1 overflow-hidden"
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: { y: 60, opacity: 0 },
+            visible: { 
+              y: 0, 
+              opacity: 1,
+              transition: {
+                type: 'spring',
+                stiffness: 120,
+                damping: 20,
+                staggerChildren: 0.08,
+                delayChildren: 0.1
+              }
+            }
+          }}
+          className="relative bg-[#060814]/95 backdrop-blur-2xl border border-white/10 rounded-[28px] p-2.5 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_35px_rgba(168,85,247,0.15)] flex justify-between items-center gap-1.5 overflow-hidden"
         >
           {/* Subtle colored glow blur effects inside dock background */}
           <div className="absolute top-0 left-1/4 -translate-y-1/2 w-12 h-6 bg-purple-500/20 blur-xl pointer-events-none" />
@@ -2204,8 +2230,9 @@ export default function TWNTokenPortal() {
               name: 'Buy', 
               icon: Wallet, 
               color: 'text-purple-400', 
-              glow: 'rgba(168,85,247,0.4)',
-              bg: 'bg-purple-500/10 border-purple-500/20',
+              glow: 'rgba(168,85,247,0.45)',
+              bg: 'bg-purple-500/10 border-purple-500/15',
+              hoverBg: 'hover:bg-purple-500/20 hover:border-purple-500/30',
               action: () => {
                 setBuyFlowStep('choice');
                 setShowBuyModal(true);
@@ -2215,44 +2242,68 @@ export default function TWNTokenPortal() {
               name: 'Sell', 
               icon: Flame, 
               color: 'text-rose-400', 
-              glow: 'rgba(239,68,68,0.4)',
-              bg: 'bg-rose-500/10 border-rose-500/20',
+              glow: 'rgba(239,68,68,0.45)',
+              bg: 'bg-rose-500/10 border-rose-500/15',
+              hoverBg: 'hover:bg-rose-500/20 hover:border-rose-500/30',
               action: () => setShowSellModal(true)
             },
             { 
               name: 'Swap', 
               icon: RefreshCw, 
               color: 'text-blue-400', 
-              glow: 'rgba(59,130,246,0.4)',
-              bg: 'bg-blue-500/10 border-blue-500/20',
+              glow: 'rgba(59,130,246,0.45)',
+              bg: 'bg-blue-500/10 border-blue-500/15',
+              hoverBg: 'hover:bg-blue-500/20 hover:border-blue-500/30',
               action: () => setShowSwapModal(true)
             },
             { 
               name: 'Send', 
               icon: Send, 
               color: 'text-[#F59E0B]', 
-              glow: 'rgba(245,158,11,0.4)',
-              bg: 'bg-amber-500/10 border-amber-500/20',
+              glow: 'rgba(245,158,11,0.45)',
+              bg: 'bg-amber-500/10 border-amber-500/15',
+              hoverBg: 'hover:bg-amber-500/20 hover:border-amber-500/30',
               action: () => {
                 setSendStep('form');
                 setShowSendModal(true);
               }
-            }
+            },
+            ...(isMobile ? [{
+              name: 'Close', 
+              icon: X, 
+              color: 'text-slate-400', 
+              glow: 'rgba(148,163,184,0.45)',
+              bg: 'bg-slate-500/10 border-slate-500/15',
+              hoverBg: 'hover:bg-slate-500/20 hover:border-slate-500/30',
+              action: handleClose
+            }] : [])
           ].map((tab) => {
             const Icon = tab.icon;
             return (
               <motion.button
                 key={tab.name}
-                whileHover={{ scale: 1.1, y: -4 }}
-                whileTap={{ scale: 0.9 }}
+                variants={{
+                  hidden: { y: 25, opacity: 0 },
+                  visible: { 
+                    y: 0, 
+                    opacity: 1,
+                    transition: { type: 'spring', stiffness: 140, damping: 14 }
+                  }
+                }}
+                whileHover={{ scale: 1.08, y: -4 }}
+                whileTap={{ scale: 0.93 }}
                 onClick={tab.action}
-                className={`flex-1 py-3 px-2 rounded-2xl border flex flex-col items-center justify-center gap-1.5 transition-all select-none cursor-pointer ${tab.bg} relative group`}
+                className={cn(
+                  "flex-1 py-3 px-1 rounded-2xl border flex flex-col items-center justify-center gap-1.5 transition-all select-none cursor-pointer relative group",
+                  tab.bg,
+                  tab.hoverBg
+                )}
               >
-                {/* Active glow on hover hover:shadow */}
-                <span className="absolute inset-x-0 bottom-1 h-px bg-current opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: tab.color }} />
+                {/* Active glow pointer on top on hover */}
+                <span className="absolute inset-x-3 -top-0.5 h-[2px] rounded-full bg-current opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: tab.color }} />
                 
-                <Icon size={18} className={`${tab.color} drop-shadow-[0_0_8px_var(--glow-color)]`} style={{ '--glow-color': tab.glow } as any} />
-                <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">{tab.name}</span>
+                <Icon size={18} className={cn(tab.color, "drop-shadow-[0_0_8px_var(--glow-color)] transition-transform duration-250 group-hover:scale-110")} style={{ '--glow-color': tab.glow } as any} />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">{tab.name}</span>
               </motion.button>
             );
           })}
