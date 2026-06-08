@@ -2197,118 +2197,94 @@ export default function TWNTokenPortal() {
       </AnimatePresence>
 
       {/* PREMIUM FLOATING GLASS BOTTOM NAVIGATION DOCK */}
-      <div className={cn(
-        "fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] px-4 md:px-0 transition-all duration-300 w-full",
-        isMobile ? "max-w-md" : "max-w-sm"
-      )}>
-        <motion.div 
-          initial="hidden"
-          animate="visible"
-          variants={{
-            hidden: { y: 60, opacity: 0 },
-            visible: { 
-              y: 0, 
-              opacity: 1,
-              transition: {
-                type: 'spring',
-                stiffness: 120,
-                damping: 20,
-                staggerChildren: 0.08,
-                delayChildren: 0.1
-              }
-            }
-          }}
-          className="relative bg-[#060814]/95 backdrop-blur-2xl border border-white/10 rounded-[28px] p-2.5 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_35px_rgba(168,85,247,0.15)] flex justify-between items-center gap-1.5 overflow-hidden"
-        >
-          {/* Subtle colored glow blur effects inside dock background */}
-          <div className="absolute top-0 left-1/4 -translate-y-1/2 w-12 h-6 bg-purple-500/20 blur-xl pointer-events-none" />
-          <div className="absolute top-0 right-1/4 -translate-y-1/2 w-12 h-6 bg-amber-500/20 blur-xl pointer-events-none" />
+      {isMobile && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] w-full max-w-md px-4 flex items-center justify-between gap-3 select-none">
+          {/* Unified Floating Action Bar */}
+          <motion.div 
+            initial={{ x: 120, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ 
+              type: 'spring', 
+              stiffness: 100, 
+              damping: 18, 
+              delay: 0.1 
+            }}
+            className="flex-1 flex items-center justify-around h-14 bg-slate-950/85 backdrop-blur-2xl border border-white/10 rounded-full px-3 shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_35px_rgba(168,85,247,0.15)] relative overflow-hidden"
+          >
+            {/* Subtle glow blur effects inside the container */}
+            <div className="absolute top-0 left-1/4 -translate-y-1/2 w-12 h-6 bg-purple-500/20 blur-xl pointer-events-none" />
+            <div className="absolute top-0 right-1/4 -translate-y-1/2 w-12 h-6 bg-amber-500/20 blur-xl pointer-events-none" />
 
-          {/* Action Tabs */}
-          {[
-            { 
-              name: 'Buy', 
-              icon: Wallet, 
-              color: 'text-purple-400', 
-              glow: 'rgba(168,85,247,0.45)',
-              bg: 'bg-purple-500/10 border-purple-500/15',
-              hoverBg: 'hover:bg-purple-500/20 hover:border-purple-500/30',
-              action: () => {
+            {/* Buy Action */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
                 setBuyFlowStep('choice');
                 setShowBuyModal(true);
-              }
-            },
-            { 
-              name: 'Sell', 
-              icon: Flame, 
-              color: 'text-rose-400', 
-              glow: 'rgba(239,68,68,0.45)',
-              bg: 'bg-rose-500/10 border-rose-500/15',
-              hoverBg: 'hover:bg-rose-500/20 hover:border-rose-500/30',
-              action: () => setShowSellModal(true)
-            },
-            { 
-              name: 'Swap', 
-              icon: RefreshCw, 
-              color: 'text-blue-400', 
-              glow: 'rgba(59,130,246,0.45)',
-              bg: 'bg-blue-500/10 border-blue-500/15',
-              hoverBg: 'hover:bg-blue-500/20 hover:border-blue-500/30',
-              action: () => setShowSwapModal(true)
-            },
-            { 
-              name: 'Send', 
-              icon: Send, 
-              color: 'text-[#F59E0B]', 
-              glow: 'rgba(245,158,11,0.45)',
-              bg: 'bg-amber-500/10 border-amber-500/15',
-              hoverBg: 'hover:bg-amber-500/20 hover:border-amber-500/30',
-              action: () => {
+              }}
+              className="flex flex-col items-center justify-center flex-1 h-full relative group cursor-pointer text-center"
+            >
+              <Wallet size={19} className="text-purple-400 drop-shadow-[0_0_8px_rgba(168,85,247,0.55)] transition-transform duration-250 group-hover:scale-110" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 mt-1 transition-colors group-hover:text-white">Buy</span>
+            </motion.button>
+
+            {/* Sell Action */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowSellModal(true)}
+              className="flex flex-col items-center justify-center flex-1 h-full relative group cursor-pointer text-center"
+            >
+              <Flame size={19} className="text-rose-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.55)] transition-transform duration-250 group-hover:scale-110" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 mt-1 transition-colors group-hover:text-white">Sell</span>
+            </motion.button>
+
+            {/* Swap Action */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowSwapModal(true)}
+              className="flex flex-col items-center justify-center flex-1 h-full relative group cursor-pointer text-center"
+            >
+              <RefreshCw size={19} className="text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.55)] transition-transform duration-250 group-hover:scale-110" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 mt-1 transition-colors group-hover:text-white">Swap</span>
+            </motion.button>
+
+            {/* Send Action */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
                 setSendStep('form');
                 setShowSendModal(true);
-              }
-            },
-            ...(isMobile ? [{
-              name: 'Close', 
-              icon: X, 
-              color: 'text-slate-400', 
-              glow: 'rgba(148,163,184,0.45)',
-              bg: 'bg-slate-500/10 border-slate-500/15',
-              hoverBg: 'hover:bg-slate-500/20 hover:border-slate-500/30',
-              action: handleClose
-            }] : [])
-          ].map((tab) => {
-            const Icon = tab.icon;
-            return (
-              <motion.button
-                key={tab.name}
-                variants={{
-                  hidden: { y: 25, opacity: 0 },
-                  visible: { 
-                    y: 0, 
-                    opacity: 1,
-                    transition: { type: 'spring', stiffness: 140, damping: 14 }
-                  }
-                }}
-                whileHover={{ scale: 1.08, y: -4 }}
-                whileTap={{ scale: 0.93 }}
-                onClick={tab.action}
-                className={cn(
-                  "flex-1 py-3 px-1 rounded-2xl border flex flex-col items-center justify-center gap-1.5 transition-all select-none cursor-pointer relative group",
-                  tab.bg,
-                  tab.hoverBg
-                )}
-              >
-                {/* Active glow pointer on top on hover */}
-                <span className="absolute inset-x-3 -top-0.5 h-[2px] rounded-full bg-current opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: tab.color }} />
-                
-                <Icon size={18} className={cn(tab.color, "drop-shadow-[0_0_8px_var(--glow-color)] transition-transform duration-250 group-hover:scale-110")} style={{ '--glow-color': tab.glow } as any} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 group-hover:text-white transition-colors">{tab.name}</span>
-              </motion.button>
-            );
-          })}
-        </motion.div>
-      </div>
+              }}
+              className="flex flex-col items-center justify-center flex-1 h-full relative group cursor-pointer text-center"
+            >
+              <Send size={19} className="text-amber-400 drop-shadow-[0_0_8px_rgba(245,158,11,0.55)] transition-transform duration-250 group-hover:scale-110" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-300 mt-1 transition-colors group-hover:text-white">Send</span>
+            </motion.button>
+          </motion.div>
+
+          {/* Independent Circular Floating X Exit Button */}
+          <motion.button
+            initial={{ x: 120, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ 
+              type: 'spring', 
+              stiffness: 100, 
+              damping: 18, 
+              delay: 0.18 
+            }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={handleClose}
+            className="w-14 h-14 bg-slate-950/85 backdrop-blur-2xl border border-white/10 rounded-full flex items-center justify-center shadow-[0_25px_60px_rgba(0,0,0,0.95),0_0_35px_rgba(168,85,247,0.15)] cursor-pointer text-slate-400 hover:text-white hover:border-white/20 transition-colors group flex-shrink-0"
+          >
+            <X size={20} className="transition-transform duration-250 group-hover:rotate-90 text-slate-300 group-hover:text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]" />
+          </motion.button>
+        </div>
+      )}
 
       {/* SECURE PIN PROTOCOL GATEWAY */}
       <PinProtocolModal 
