@@ -25,6 +25,7 @@ import { RotatingButtonText } from './RotatingButtonText';
 import { collection, query, where, onSnapshot, doc, updateDoc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
+import { broadcastActivity } from '../lib/activity_logger';
 
 import TopInvestorsSection from './TopInvestorsSection';
 import WhyChooseSection from './WhyChooseSection';
@@ -232,7 +233,7 @@ export default function Homepage() {
       // Automatically redirect to the consolidated token portal after a brief premium confirmation pause
       setTimeout(() => {
         closePopup('daily-check-in');
-        navigate('/token');
+        navigate('/daily-points');
       }, 1500);
 
     } catch (err: any) {
@@ -261,6 +262,7 @@ export default function Homepage() {
     if (!user || isCompounding) return;
     setIsCompounding(true);
     const toastId = toast.loading("Processing atomic compounding protocol...");
+    let compoundedAmountCalculated = 0;
 
     try {
       const userRef = doc(db, 'users', user.uid);
@@ -293,6 +295,8 @@ export default function Homepage() {
         if (totalToCompound <= 0) {
           throw new Error("Selected balance amount is 0.");
         }
+
+        compoundedAmountCalculated = totalToCompound;
 
         const updates: any = {};
 
@@ -362,6 +366,14 @@ export default function Homepage() {
 
       localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
       toast.success("Successfully compounded earnings! Assets updated.", { id: toastId });
+      
+      broadcastActivity(
+        profile?.name || "Client",
+        "Compounded Profit",
+        `$${compoundedAmountCalculated.toFixed(2)}`,
+        true,
+        "🔁"
+      );
       
       closePopup('compound-profits');
       setShowCompoundSuccess(true);

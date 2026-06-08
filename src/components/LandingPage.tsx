@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { broadcastActivity } from '../lib/activity_logger';
 import { 
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
@@ -585,6 +586,14 @@ export default function LandingPage() {
         try {
           await setDoc(doc(db, 'users', firebaseUser.uid), newUserProfile);
           
+          broadcastActivity(
+            newUserProfile.name || "New Partner",
+            "Registered",
+            undefined,
+            true,
+            "👤"
+          );
+          
           // Generate an idempotent signup bonus transaction record
           const txId = `signup-bonus-${firebaseUser.uid}`;
           await setDoc(doc(db, 'transactions', txId), {
@@ -803,6 +812,14 @@ export default function LandingPage() {
 
         try {
           await setDoc(doc(db, 'users', user.uid), newUserProfile);
+
+          broadcastActivity(
+            newUserProfile.name || "New Partner",
+            "Registered",
+            undefined,
+            true,
+            "👤"
+          );
 
           // Generate an idempotent signup bonus transaction record
           const txId = `signup-bonus-${user.uid}`;

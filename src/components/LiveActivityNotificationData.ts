@@ -4,270 +4,326 @@ export interface CountryConfig {
   names: string[];
 }
 
+const buildNames = (firsts: string[], lasts: string[]): string[] => {
+  const result: string[] = [];
+  for (const f of firsts) {
+    for (const l of lasts) {
+      result.push(`${f} ${l}`);
+    }
+  }
+  return result;
+};
+
 export const COUNTRIES: { [key: string]: CountryConfig } = {
   nigeria: {
     name: "Nigeria",
     flag: "🇳🇬",
-    names: [
-      // Yoruba
-      "Tunde Bakare", "Femi Falana", "Babajide Sanwo", "Adebayo Adelabu", "Olatunji Oladapo",
-      "Temilade Openiyi", "Segun Arinze", "Toyin Abraham", "Funke Akindele", "Adewale Ayuba",
-      "Hakeem Balogun", "Mariam Salami", "Ramat Lawal", "Suleiman Jimoh", "Rasheed Gbadamosi",
-      "Aminat Bello", "Olamide Adedeji", "Tiwa Savage", "Ayodeji Balogun", "Damini Ogulu",
-      // Igbo
-      "Chinedu Ikedieze", "Obi Cubana", "Ngozi Okonjo", "Nkem Owoh", "Emeka Ike",
-      "Genevieve Nnaji", "Chukwuma Soludo", "Amaka Okafor", "Chioma Nnadi", "Ezenwa Charles",
-      "Daniel Okoro", "David Nwosu", "Victor Chidi", "Promise Ani", "Nnamdi Kanu",
-      "Uche Okechukwu", "Kanu Nwankwo", "Rita Dominic", "Osita Iheme", "Ebuka Obi-Uchendu",
-      // Hausa
-      "Aliko Dangote", "Aminu Tambuwal", "Musa Rabiu", "Abubakar Shehu", "Halima Ibrahim",
-      "Sani Bello", "Aisha Buhari", "Kabiru Yusuf", "Bashir Ahmad", "Fatima Umar",
-      "Ismaila Abubakar", "Yusuf Mohammed", "Bashir Ibrahim", "Zainab Ahmed", "Hadiza Usman",
-      // English-Christian & English-Muslim
-      "Grace Ekpo", "Emmanuel Umoh", "Blessing Joseph", "Samuel Peters", "Peace George",
-      "Caleb Ogar", "Abdul Lateef"
-    ]
+    names: buildNames(
+      [
+        "Tunde", "Femi", "Biyi", "Segun", "Babajide", "Temilade", "Mariam", "Suleiman", "Adewale", "Grace",
+        "Emmanuel", "Blessing", "Samuel", "Peace", "Caleb", "Chinedu", "Emeka", "Ngozi", "Chioma", "Daniel",
+        "David", "Chidi", "Uche", "Rita", "Halima", "Sani", "Zainab", "Bashir", "Ismaila", "Fatima"
+      ],
+      [
+        "Balogun", "Olayinka", "Adedeji", "Lawal", "Bello", "Jimoh", "Okonkwo", "Nwosu", "Ani", "Okechukwu",
+        "Ibrahim", "Abubakar", "Yusuf", "Ahmed", "Usman", "Ekpo", "George", "Daniel", "Abiola", "Oloyede",
+        "Salami", "Gbadamosi", "Ezenwa", "Chukwu", "Nnadi", "Adebayo", "Falana", "Bakare", "Daramola", "Ajayi"
+      ]
+    )
   },
-  uganda: {
-    name: "Uganda",
-    flag: "🇺🇬",
-    names: [
-      "Moses Kigozi", "Florence Kateregga", "Sarah Namubiru", "Joseph Nsubuga", "John Mukasa",
-      "Grace Mugisha", "Robert Kizza", "Charles Byaruhanga", "Richard Ochieng", "David Okello",
-      "Patrick Oryem", "James Ssewankambo", "Peter Mayanja", "Mary Nakintu", "Margaret Namaganda",
-      "Elizabeth Nabakooza", "Harriet Nabosa", "Susan Atim", "Joyce Acan", "Isma Lule",
-      "Stephen Wasswa", "Ronald Kato", "Denis Ssemwogerere", "Andrew Mwesigwa", "William Kaboyo",
-      "Arthur Musoke", "Nicholas Ssenyonga", "Brian Masembe", "Paul Mugerwa", "Christopher Opio",
-      "Kenneth Odong", "Simon Awori", "George Kakooza", "Henry Kasekende", "Fred Ssebandeke",
-      "Michael Nyanzi", "Innocent Muhumuza", "Allan Kyambadde", "Gerald Mutebi", "Douglas Tumusiime",
-      "Emmanuel Rubaihayo", "Yusuf Ssenkoloto", "Alex Wandera", "Edward Bwambale", "Godfrey Ssekabira",
-      "Ivan Ssebaggala", "Samuel Walusimbi", "Timothy Kizito", "Daniel Baguma", "Thomas Rugunda",
-      "Phiona Mutesi", "Halimah Nakaayi", "Joshua Cheptegei", "Jacob Kiplimo"
-    ]
+  japan: {
+    name: "Japan",
+    flag: "🇯🇵",
+    names: buildNames(
+      [
+        "Kaito", "Takuya", "Haruto", "Yuto", "Sota", "Yuki", "Hiroshi", "Kenji", "Daiki", "Ryota",
+        "Yuka", "Mei", "Sakura", "Himari", "Aoi", "Hana", "Yui", "Rio", "Ichika", "Minoru",
+        "Shinji", "Satoshi", "Daigo", "Takashi", "Asuka", "Naoki", "Rei", "Chiyo", "Kazuo", "Arata"
+      ],
+      [
+        "Sato", "Suzuki", "Takahashi", "Tanaka", "Watanabe", "Ito", "Yamamoto", "Nakamura", "Kobayashi", "Kato",
+        "Yoshida", "Yamada", "Sasaki", "Yamaguchi", "Saito", "Kimura", "Mori", "Hayashi", "Shimizu", "Yamazaki",
+        "Ikeda", "Hashimoto", "Abe", "Inoue", "Maeda", "Fujita", "Nakajima", "Seki", "Goto", "Okada"
+      ]
+    )
   },
-  tanzania: {
-    name: "Tanzania",
-    flag: "🇹🇿",
-    names: [
-      "Juma Kikwete", "Halima Hassan", "Asha Kawawa", "Said Salim", "Salama Sokoine",
-      "Daudi Mrema", "Baraka Shibuda", "Neema Zitto", "Rehema Lema", "Mwajuma Mkapa",
-      "Ali Massanja", "Anna Malecela", "Amina Magufuli", "Ibrahim Kapama", "John Nyerere",
-      "Mwita Chacha", "Abdallah Ally", "Ramadhani Salum", "Hamisi Juma", "Shabani Bakari",
-      "Selemani Athumani", "Yusufu Rashidi", "Kassim Shaban", "Hussein Omari", "Yahaya Kibwana",
-      "Bakari Makame", "Fatuma Abeid", "Mariamu Khalfan", "Khadija Khamis", "Mwanahamis Seif",
-      "Zulfa Nassor", "Grace Mwakasege", "Happiness Mshana", "Upendo Mlay", "Faraja Lyimo",
-      "Godfrey Massawe", "Charles Shirima", "Lazaro Nyalandu", "Faustine Ndugulile", "January Makamba",
-      "George Simbachawene", "Kassim Majaliwa", "Dorothy Gwajima", "Ummy Mwalimu", "Philip Mpango",
-      "Tulia Ackson", "Job Ndugai", "Freeman Mbowe", "Tundu Lissu", "Edward Lowassa"
-    ]
+  brazil: {
+    name: "Brazil",
+    flag: "🇧🇷",
+    names: buildNames(
+      [
+        "Gabriel", "Lucas", "Matheus", "Pedro", "Thiago", "Joao", "Felipe", "Bruno", "Gustavo", "Rodrigo",
+        "Douglas", "Rafael", "Andre", "Ana", "Maria", "Julia", "Beatriz", "Leticia", "Amanda", "Gabriela",
+        "Mariana", "Fernanda", "Juliana", "Camila", "Larissa", "Luana", "Aline", "Patricia", "Fabio", "Ricardo"
+      ],
+      [
+        "Silva", "Santos", "Oliveira", "Souza", "Rodrigues", "Ferreira", "Alves", "Pereira", "Lima", "Gomes",
+        "Costa", "Ribeiro", "Martins", "Carvalho", "Almeida", "Pinto", "Rocha", "Teixeira", "Mendes", "Barros",
+        "Cardoso", "Moreira", "Nunes", "Vieira", "Castro", "Dias", "Barbosa", "Araujo", "Cardoso", "Borges"
+      ]
+    )
   },
-  cameroon: {
-    name: "Cameroon",
-    flag: "🇨🇲",
-    names: [
-      "Samuel Eto'o", "Roger Milla", "Rigobert Song", "Vincent Aboubakar", "Eric Choupo",
-      "Frank Anguissa", "Toko Ekambi", "Nicolas N'Koulou", "Christian Bassogog", "Ambroise Oyongo",
-      "Pierre Kunde", "Francois Omam-Biyik", "Patrick Mboma", "Pierre Wome", "Geremi Njitap",
-      "Jacques Songoo", "Clinton N'Jie", "Georges Mandjeck", "Jean Makoun", "Alex Song",
-      "Joel Matip", "Stephane Mbia", "Landry N'Guemo", "Aurelien Chedjou", "Benoit Assou-Ekotto",
-      "Sebastien Bassong", "Idress Kameni", "Charles Itandje", "Guy N'dy Assembe", "Jean-Armel Kana-Biyik",
-      "Gaetan Bong", "Dany Nounkeu", "Allan Nyom", "Michael Ngadeu", "Adolo Teikeu",
-      "Collins Fai", "Jonathan Ngwem", "Siani Sebastien", "Arnaud Djoum", "Christian Mougang",
-      "Robert Ndip", "Tambe Ntip", "Karl Toko", "Edgar Salli", "Zoua Jacques",
-      "Clinton Njie", "Jean-Pierre Nsame", "Ignatius Ganago", "Jerome Onguene", "Jean-Charles Castelletto"
-    ]
+  india: {
+    name: "India",
+    flag: "🇮🇳",
+    names: buildNames(
+      [
+        "Aarav", "Arjun", "Aditya", "Vihaan", "Krishna", "Sai", "Ishaan", "Pranav", "Kabir", "Rohan",
+        "Rahul", "Ananya", "Diya", "Ishita", "Kiara", "Meera", "Neha", "Shreya", "Tanvi", "Amit",
+        "Rajesh", "Suresh", "Vikram", "Shyam", "Divya", "Priya", "Karan", "Anoop", "Sanjay", "Vijay"
+      ],
+      [
+        "Sharma", "Kumar", "Singh", "Patel", "Chawla", "Joshi", "Mehta", "Nair", "Reddy", "Rao",
+        "Prasad", "Iyer", "Gupta", "Sen", "Chatterjee", "Mukherjee", "Roy", "Das", "Deshmukh", "Kulkarni",
+        "Choudhury", "Verma", "Pandey", "Mishra", "Dubey", "Banerjee", "Bose", "Menon", "Bhat", "Pathak"
+      ]
+    )
   },
-  south_africa: {
-    name: "South Africa",
-    flag: "🇿🇦",
-    names: [
-      "Sipho Zuma", "Thabo Nkosi", "Zolani Mahlangu", "Bongani Khumalo", "Sibusiso Mthethwa",
-      "Jabulani Dlamini", "Mandla Ndlovu", "Nkosana Ntuli", "Zola Sibiya", "Lerato Mokwena",
-      "Bongi Mokoena", "Nomusa Cele", "Temba Mthembu", "Pieter Botha", "Johan De Wet",
-      "Andre Pretorius", "Francois van der Merwe", "Gerrit Coetzee", "Barend Kruger", "Willem Nel",
-      "Frikkie du Plessis", "Schalk Burger", "Dirk Jansen", "Mark Boucher", "Craig Joubert",
-      "Brett Wilkinson", "Gareth Edwards", "Vernon Philander", "Wayne Parnell", "Moeneeb Josephs",
-      "Hashim Amla", "Devendra Naidoo", "Kagiso Rabada", "Lungi Ngidi", "Temba Bavuma",
-      "Keshav Maharaj", "Heinrich Klaasen", "Quinton de Kock", "David Miller", "Aiden Markram",
-      "Rassie van der Dussen", "Marco Jansen", "Gerald Coetzee", "Anrich Nortje", "Tabraiz Shamsi",
-      "Reeza Hendricks", "Wiaan Mulder", "Bjorn Fortuin", "Lizaad Williams", "Nandre Burger"
-    ]
-  },
-  kenya: {
-    name: "Kenya",
-    flag: "🇰🇪",
-    names: [
-      "Brian Mwangi", "John Otieno", "Kevin Omondi", "Peter Onyango", "David Odhiambo",
-      "James Ochieng", "Michael Okoth", "Eliud Kipchoge", "Paul Kiprop", "Bernard Kipruto",
-      "Evans Kipkoech", "Brigid Kosgei", "Ruth Chepngetich", "Faith Chelangat", "Grace Nekesa",
-      "Beatrice Nafula", "Moses Wafula", "Joseph Makokha", "Silas Simiyu", "Daniel Wambua",
-      "Patrick Musyoka", "Alex Mutua", "Mary Wanjiku", "Simon Kamau", "Stephen Njoroge",
-      "Benson Ndwiga", "Geofrey Gicheru", "Anthony Maina", "Charles Kariuki", "Francis Nderitu",
-      "Samuel Gichuru", "Amos Kimunya", "William Ruto", "Raila Odinga", "Kalonzo Musyoka",
-      "Musalia Mudavadi", "Moses Wetangula", "Kithure Kindiki", "Aden Duale", "Kipchumba Murkomen",
-      "Ababu Namwamba", "Aisha Jumwa", "Susan Kihika", "Gladys Wanga", "Johnson Sakaja",
-      "Anne Waiguru", "Hassan Joho", "Alfred Mutua", "James Orengo", "Anyang Nyong'o"
-    ]
-  },
-  singapore: {
-    name: "Singapore",
-    flag: "🇸🇬",
-    names: [
-      "Ryan Tan", "Rachel Lim", "Amanda Wong", "Kenneth Goh", "Adrian Teo",
-      "Marcus Seah", "Cheryl Neo", "Michelle Low", "Benjamin Kheng", "David Tan",
-      "Tan Wei Jie", "Lim Li Ting", "Chen Aaron", "Chia Derrick", "Yap Brandon",
-      "Farhan Roslan", "Syazwan Buhari", "Hariss Harun", "Safuwan Baharudin", "Shakir Hamzah",
-      "Shahril Ishak", "Khairul Amri", "Baihakki Khaizan", "Karthik Raj", "Vignesh Ravichandran",
-      "Shalini Devi", "Kumar Prasanna", "Anantha Krishnan", "Lionel Lewis", "Noh Rahman",
-      "Juma'at Jantan", "Mustafic Fahrudin", "Isa Halim", "Shi Jiayi", "Qiu Li",
-      "Fazrul Nawaz", "Agu Casmir", "Daniel Bennett", "John Wilkinson", "Ridhuan Muhammad",
-      "Shaiful Esah", "Hafiz Abu Sujad", "Gabriel Quak", "Faris Ramli", "Shahdan Sulaiman",
-      "Zulfahmi Arifin", "Izwan Mahbud", "Hassan Sunny", "Joshua Pereira", "Jacob Mahler"
-    ]
-  },
-  switzerland: {
-    name: "Switzerland",
-    flag: "🇨🇭",
-    names: [
-      "Beat Müller", "Urs Meier", "Reto Schmid", "Christian Keller", "Daniel Weber",
-      "Thomas Berger", "Stefan Huber", "Markus Gerber", "Martin Baumann", "Andreas Fischer",
-      "Peter Frei", "Michael Suter", "Werner Wenger", "Hans Staub", "Jean-Pierre Egger",
-      "Pierre-Andre Luthy", "Francois Giger", "Jean Philippe", "Philippe Glarner", "Laurent Kolly",
-      "Stephane Riesen", "Marc Gisler", "Olivier Berset", "Nicolas Parmelin", "Eric Maurer",
-      "Alain Cassis", "Michel Amherd", "Didier Sommaruga", "Marco Keller", "Giuseppe Schmid",
-      "Francesco Meier", "Antonio Weber", "Roberto Huber", "Andrea Fischer", "Giovanni Suter",
-      "Stefano Wenger", "Luca Staub", "Fabrizio Giger", "Yann Sommer", "Manuel Akanji",
-      "Nico Elvedi", "Granit Xhaka", "Remo Freuler", "Denis Zakaria", "Silvan Widmer",
-      "Michel Aebischer", "Dan Ndoye", "Ruben Vargas", "Breel Embolo", "Gregor Kobel"
-    ]
-  },
-  netherlands: {
-    name: "Netherlands",
-    flag: "🇳🇱",
-    names: [
-      "Jan de Jong", "Willem de Vries", "Johannes van de Berg", "Cornelis van Dijk", "Hendrik Bakker",
-      "Pieter Janssen", "Gerrit Visser", "Dirk Smit", "Thomas Meijer", "Martijn de Graaf",
-      "Sander de Cock", "Bas van Dongen", "Daan Mulder", "Luuk Peters", "Sem de Wilde",
-      "Milan Bos", "Levi Dekker", "Lucas Vos", "Thijs Brouwer", "Bram de Ruiter",
-      "Milan Hofman", "Lars van Gelder", "Sven van der Meer", "Gijs Kroon", "Jayden Hendriks",
-      "Finn de Beer", "Stijn Schouten", "Ruben Jacobs", "Jesse van Loon", "Mats de Ridder",
-      "Virgil van Dijk", "Frenkie de Jong", "Matthijs de Ligt", "Memphis Depay", "Nathan Ake",
-      "Cody Gakpo", "Teun Koopmeiners", "Tijjani Reijnders", "Jeremie Frimpong", "Stefan de Vrij",
-      "Daley Blind", "Georginio Wijnaldum", "Denzel Dumfries", "Mark van Bommel", "Wesley Sneijder",
-      "Robin van Persie", "Arjen Robben", "Ruud van Nistelrooy", "Edwin van der Sar", "Joey Veerman"
-    ]
-  },
-  sweden: {
-    name: "Sweden",
-    flag: "🇸🇪",
-    names: [
-      "Lars Andersson", "Anders Johansson", "Mikael Karlsson", "Johan Nilsson", "Per Eriksson",
-      "Erik Larsson", "Jan Olsson", "Peter Persson", "Karl Svensson", "Thomas Gustafsson",
-      "Olof Hansson", "Sven Jönsson", "Nils Pettersson", "Bo Petersson", "Bengt Magnusson",
-      "Sven Ekdahl", "Karin Lindqvist", "Marie Bergman", "Anna Sjöberg", "Kristofer Hivju",
-      "Victor Lindelöf", "Emil Forsberg", "Alexander Isak", "Robin Olsen", "Ludwig Augustinsson",
-      "Filip Helander", "Pontus Jansson", "Dejan Kulusevski", "Albin Ekdal", "Kristoffer Olsson",
-      "Marcus Berg", "Sebastian Larsson", "Zlatan Ibrahimović", "Ken Sema", "Karl-Johan Johnsson",
-      "Jens Cajuste", "Mattias Svanberg", "Gustav Svensson", "Jordan Larsson", "Mikael Lustig",
-      "Andreas Granqvist", "Martin Olsson", "Pierre Bengtsson", "Emil Krafth", "Kristoffer Nordfeldt",
-      "Joakim Nilsson", "Jesper Karlsson", "Viktor Claesson", "Isaac Kiese Thelin", "Robin Quaison"
-    ]
-  },
-  egypt: {
-    name: "Egypt",
-    flag: "🇪🇬",
-    names: [
-      "Mohamed Salah", "Ahmed Hegazi", "Mahmoud Trezeguet", "Ali El-Shenawy", "Mustafa Gabal",
-      "Osama Hamdy", "Ibrahim Fatouh", "Mohamed Elneny", "Amr Sulaya", "Omar Marmoush",
-      "Khaled Mohamed", "Tarek Hamed", "Sherif Ashour", "Ehab Elneny", "Yasser Ibrahim",
-      "Hany Ramzy", "Adel Emam", "Wael Gomaa", "Essam El-Hadary", "Ahmed Hassan",
-      "Hosny Abd Rababo", "Mohamed Aboutrika", "Amr Zaki", "Mido Kamel", "Shikabala Shabaan",
-      "Emad Meteb", "Geddo Mohamed", "Ahmed Fathi", "Wael Said", "Sayed Moawad",
-      "Mohamed Shawky", "Hany Said", "Mahmoud Fathallah", "Ahmed Elmohamady", "Mohamed Abdel-Shafy",
-      "Sherif Ekramy", "Saad Samir", "Marwan Mohsen", "Ramadan Sobhi", "Abdallah El-Said",
-      "Mahmoud Hamdy", "Ayman Ashraf", "Mohamed Magdy", "Akram Tawfik", "Hamdi Fathi",
-      "Mohamed Abdelmonem", "Omar Kamal", "Emam Ashour", "Zizo Ahmed", "Mostafa Mohamed"
-    ]
+  germany: {
+    name: "Germany",
+    flag: "🇩🇪",
+    names: buildNames(
+      [
+        "Lukas", "Maximilian", "Jakob", "Jonas", "Alexander", "Leon", "Paul", "Ben", "Noah", "Emil",
+        "Marie", "Sophie", "Maria", "Mia", "Emma", "Hannah", "Emilia", "Anna", "Lea", "Felix",
+        "David", "Tim", "Sebastian", "Philipp", "Laura", "Sarah", "Julia", "Katharina", "Lisa", "Melanie"
+      ],
+      [
+        "Müller", "Schmidt", "Schneider", "Fischer", "Weber", "Meyer", "Wagner", "Becker", "Schulz", "Hoffmann",
+        "Schäfer", "Koch", "Bauer", "Richter", "Klein", "Wolf", "Neumann", "Schwarz", "Zimmermann", "Braun",
+        "Krüger", "Hofmann", "Hartmann", "Lange", "Schmitt", "Werner", "Schmitz", "Krause", "Meier", "Lehmann"
+      ]
+    )
   },
   united_kingdom: {
     name: "United Kingdom",
     flag: "🇬🇧",
-    names: [
-      "Oliver Smith", "Jack Jones", "Harry Williams", "Charlie Brown", "Thomas Taylor",
-      "George Davies", "James Wilson", "William Evans", "Alfie Thomas", "Joshua Roberts",
-      "Henry Johnson", "Arthur Lewis", "Fred Walker", "Edward Wood", "Albert Robinson",
-      "Oscar Watson", "Albie Hughes", "Teddy White", "Archie Green", "Leo Hall",
-      "Theo Martin", "Tommy Jackson", "Freddie Clarke", "Isaac Ward", "Connor Turner",
-      "Max Carter", "Jude Simpson", "Edward Mitchell", "Harry Morrison", "George Cox",
-      "James Bennett", "Thomas Gray", "William Cooper", "Joshua James", "Henry King",
-      "Arthur Lee", "Fred Allen", "Edward Harris", "Albert Clark", "Oscar Lewis",
-      "Marcus Rashford", "Declan Rice", "Bukayo Saka", "Jude Bellingham", "Harry Kane",
-      "John Stones", "Kyle Walker", "Jordan Pickford", "Kieran Trippier", "Luke Shaw"
-    ]
+    names: buildNames(
+      [
+        "Oliver", "Jack", "Harry", "Charlie", "Thomas", "George", "James", "William", "Alfie", "Joshua",
+        "Henry", "Arthur", "Fred", "Edward", "Albert", "Oscar", "Albie", "Teddy", "Archie", "Leo",
+        "Theo", "Tommy", "Freddie", "Isaac", "Connor", "Max", "Jude", "Emily", "Olivia", "Lily"
+      ],
+      [
+        "Smith", "Jones", "Williams", "Brown", "Taylor", "Davies", "Wilson", "Evans", "Thomas", "Roberts",
+        "Johnson", "Lewis", "Walker", "Wood", "Robinson", "Watson", "Hughes", "White", "Green", "Hall",
+        "Martin", "Jackson", "Clarke", "Ward", "Turner", "Carter", "Simpson", "Mitchell", "Morrison", "Cox"
+      ]
+    )
   },
   united_states: {
     name: "United States",
     flag: "🇺🇸",
-    names: [
-      "Liam Smith", "Noah Johnson", "Oliver Williams", "Elijah Brown", "William Jones",
-      "James Garcia", "Benjamin Miller", "Lucas Davis", "Henry Rodriguez", "Alexander Martinez",
-      "Mason Hernandez", "Michael Lopez", "Ethan Gonzalez", "Daniel Wilson", "Jacob Anderson",
-      "Logan Thomas", "Jackson Taylor", "Levi Moore", "Sebastian Jackson", "Mateo Martin",
-      "Jack Lee", "Owen Perez", "Theodore Thompson", "Aiden White", "Samuel Harris",
-      "Wyatt Sanchez", "John Clark", "David Ramirez", "Carter Campbell", "Julian Mitchell",
-      "Hudson Roberts", "Christian Carter", "Hunter Phillips", "Connor Evans", "Eli Turner",
-      "Ezra Torres", "Aaron Parker", "Landon Collins", "Adrian Edwards", "Jonathan Stewart",
-      "Nolan Morris", "Jeremiah Nguyen", "Ezekiel Murphy", "Colton Rivera", "Jose Cook",
-      "Asher Rogers", "Luke Morgan", "Jameson Peterson", "Bryson Cooper", "Christopher Reed"
-    ]
+    names: buildNames(
+      [
+        "Liam", "Noah", "Oliver", "Elijah", "William", "James", "Benjamin", "Lucas", "Henry", "Alexander",
+        "Mason", "Michael", "Ethan", "Daniel", "Jacob", "Logan", "Jackson", "Levi", "Sebastian", "Mateo",
+        "Jack", "Owen", "Theodore", "Samuel", "Wyatt", "John", "David", "Emma", "Olivia", "Ava"
+      ],
+      [
+        "Smith", "Johnson", "Williams", "Brown", "Jones", "Miller", "Davis", "Garcia", "Rodriguez", "Wilson",
+        "Martinez", "Anderson", "Taylor", "Thomas", "Hernandez", "Moore", "Martin", "Jackson", "Thompson", "White",
+        "Lopez", "Lee", "Gonzalez", "Harris", "Clark", "Lewis", "Robinson", "Walker", "Young", "Allen"
+      ]
+    )
   },
   canada: {
     name: "Canada",
     flag: "🇨🇦",
-    names: [
-      "Ethan Brooks", "Liam Tremblay", "William Roy", "Lucas Gagnon", "Logan Cote",
-      "Benjamin Bouchard", "Noah Gagne", "Jacob Lefebvre", "James Landry", "Robert Mercer",
-      "John Campbell", "Mary Smith", "David Brown", "Joseph Wilson", "Charles Macdonald",
-      "Thomas Fraser", "Daniel Belanger", "Paul Fortin", "Patrick Pelletier", "Gabriel Nadeau",
-      "Samuel Hebert", "Olivier Lapointe", "Felix Simard", "Jean-Francois Ouellet", "Marc-Andre Larouche",
-      "Pierre-Luc Lavoie", "Alexandre Dubé", "Mathieu Villeneuve", "Jonathan Fournier", "Nicolas Morin",
-      "Maxime Girard", "Guillaume Richard", "Charles-Antoine Cloutier", "Jean-Philippe Landry", "Justin Trudeau",
-      "Alphonso Davies", "Jonathan David", "Cyle Larin", "Tajon Buchanan", "Stephen Eustaquio",
-      "Alistair Johnston", "Kamal Miller", "Richie Laryea", "Samuel Piette", "Milan Borjan",
-      "Maxime Crepeau", "Dayne St. Clair", "Junior Hoilett", "Lucas Cavallini", "Ike Ugbo"
-    ]
+    names: buildNames(
+      [
+        "Ethan", "Liam", "William", "Lucas", "Logan", "Benjamin", "Noah", "Jacob", "James", "Robert",
+        "John", "David", "Joseph", "Charles", "Thomas", "Daniel", "Paul", "Patrick", "Samuel", "Olivier",
+        "Felix", "Alexandre", "Mathieu", "Jonathan", "Nicolas", "Maxime", "Emma", "Olivia", "Chloe", "Emily"
+      ],
+      [
+        "Brooks", "Tremblay", "Roy", "Gagnon", "Cote", "Bouchard", "Gagne", "Lefebvre", "Landry", "Mercer",
+        "Campbell", "Smith", "Brown", "Wilson", "Macdonald", "Fraser", "Belanger", "Fortin", "Pelletier", "Nadeau",
+        "Hebert", "Lapointe", "Simard", "Ouellet", "Larouche", "Lavoie", "Dube", "Villeneuve", "Fournier", "Morin"
+      ]
+    )
   },
   australia: {
     name: "Australia",
     flag: "🇦🇺",
-    names: [
-      "Mason Clarke", "Oliver Smith", "Noah Jones", "Jack Williams", "William Brown",
-      "Leo Wilson", "Lucas Taylor", "Thomas Morton", "Henry Kelly", "Charlie Johnston",
-      "James Davies", "Harry Singh", "Hudson Nguyen", "Hunter Patel", "Eli Wright",
-      "Cooper Smith", "Archie Cox", "Alexander Jenkins", "Samuel Morris", "Ethan Wood",
-      "Christian Hall", "Liam Ward", "Benjamin Green", "Lucas Abbott", "Daniel Andrews",
-      "Matthew Howard", "Timothy Hughes", "Andrew Fisher", "Scott Morrison", "Anthony Albanese",
-      "Peter Dutton", "Richard Marles", "Penny Wong", "Jim Chalmers", "Chris Bowen",
-      "Tanya Plibersek", "Mark Dreyfus", "Catherine King", "Amanda Rishworth", "Bill Shorten",
-      "Linda Burney", "Julie Collins", "Michelle Rowland", "Madeleine King", "Jason Clare",
-      "Brendan O'Connor", "Clare O'Neil", "Don Farrell", "Pat Conroy", "Stephen Jones"
-    ]
+    names: buildNames(
+      [
+        "Mason", "Oliver", "Noah", "Jack", "William", "Leo", "Lucas", "Thomas", "Henry", "Charlie",
+        "James", "Harry", "Hudson", "Hunter", "Eli", "Cooper", "Archie", "Alexander", "Samuel", "Ethan",
+        "Christian", "Liam", "Benjamin", "Daniel", "Matthew", "Timothy", "Andrew", "Charlotte", "Amelia", "Mia"
+      ],
+      [
+        "Clarke", "Smith", "Jones", "Williams", "Brown", "Wilson", "Taylor", "Morton", "Kelly", "Johnston",
+        "Davies", "Singh", "Nguyen", "Patel", "Wright", "Cox", "Jenkins", "Morris", "Wood", "Hall",
+        "Ward", "Green", "Abbott", "Fisher", "Howard", "Hughes", "Carter", "Walker", "Nolan", "Barker"
+      ]
+    )
   },
   bangladesh: {
     name: "Bangladesh",
     flag: "🇧🇩",
-    names: [
-      "Shakib Al Hasan", "Tamim Iqbal", "Mushfiqur Rahim", "Mahmudullah Riyad", "Mustafizur Rahman",
-      "Taskin Ahmed", "Shoriful Islam", "Taijul Islam", "Mehidy Hasan", "Litton Das",
-      "Soumya Sarkar", "Towhid Hridoy", "Najmul Hossain", "Zakir Hasan", "Shahadat Hossain",
-      "nurul Hasan", "Mahedi Hasan", "Afif Hossain", "Shamim Hossain", "Nasum Ahmed",
-      "Hasan Mahmud", "Tanzim Hasan", "Khaled Ahmed", "Ebadot Hossain", "Nayeem Hasan",
-      "Abu Jayed", "Al-Amin Hossain", "Rubel Hossain", "Shafiul Islam", "Mohammad Saifuddin",
-      "Mosaddek Hossain", "Sabbir Rahman", "Anamul Haque", "Nasir Hossain", "Imrul Kayes",
-      "Jahurul Islam", "Shahriar Nafees", "Abdur Razzak", "Syed Rasel", "Mashrafe Mortaza",
-      "Mohammad Ashraful", "Habibul Bashar", "Khaled Mashud", "Javed Omar", "Mehrab Hossain",
-      "Aminul Islam", "Akram Khan", "Minhajul Abedin", "Naimur Rahman", "Enamul Haque Jr."
-    ]
+    names: buildNames(
+      [
+        "Tamim", "Mushfiq", "Taskin", "Shoriful", "Taijul", "Mehidy", "Litton", "Soumya", "Towhid", "Najmul",
+        "Zakir", "Shahadat", "Nurul", "Afif", "Hasan", "Khaled", "Ebadot", "Nayeem", "Abu", "Rubel",
+        "Shafiul", "Saif", "Mosaddek", "Anamul", "Nasir", "Imrul", "Jahurul", "Shahriar", "Habib", "Amin"
+      ],
+      [
+        "Rahman", "Iqbal", "Hasan", "Ahmed", "Islam", "Hossain", "Riyad", "Miraz", "Sarkar", "Hridoy",
+        "Shanto", "Joy", "Ali", "Miah", "Kazi", "Munshi", "Chowdhury", "Patwari", "Bhuiyan", "Uddin",
+        "Molla", "Sikder", "Akand", "Sheikh", "Siddique", "Talukder", "Howlader", "Dewan", "Talha", "Zaman"
+      ]
+    )
+  },
+  south_africa: {
+    name: "South Africa",
+    flag: "🇿🇦",
+    names: buildNames(
+      [
+        "Sipho", "Thabo", "Zolani", "Bongani", "Sibusiso", "Jabulani", "Mandla", "Nkosana", "Zola", "Lerato",
+        "Bongi", "Nomusa", "Temba", "Pieter", "Johan", "Andre", "Francois", "Gerrit", "Barend", "Willem",
+        "Frikkie", "Schalk", "Dirk", "Gareth", "Kagiso", "Lungi", "Keshav", "Heinrich", "Quinton", "Aiden"
+      ],
+      [
+        "Zuma", "Nkosi", "Mahlangu", "Khumalo", "Mthethwa", "Dlamini", "Ndlovu", "Ntuli", "Sibiya", "Mokwena",
+        "Mokoena", "Cele", "Mthembu", "Botha", "De Wet", "Pretorius", "Coetzee", "Kruger", "Nel", "du Plessis",
+        "Burger", "Jansen", "Boucher", "Joubert", "Wilkinson", "Naidoo", "Rabada", "Ngidi", "Bavuma", "Maharaj"
+      ]
+    )
+  },
+  kenya: {
+    name: "Kenya",
+    flag: "🇰🇪",
+    names: buildNames(
+      [
+        "Brian", "John", "Kevin", "Peter", "David", "James", "Michael", "Eliud", "Paul", "Bernard",
+        "Evans", "Moses", "Joseph", "Silas", "Daniel", "Patrick", "Alex", "Simon", "Stephen", "Benson",
+        "Geofrey", "Anthony", "Charles", "Francis", "Samuel", "Mary", "Beatrice", "Grace", "Faith", "Ruth"
+      ],
+      [
+        "Mwangi", "Otieno", "Omondi", "Onyango", "Odhiambo", "Ochieng", "Okoth", "Kiprop", "Kipruto", "Kipkoech",
+        "Wafula", "Makokha", "Simiyu", "Wambua", "Musyoka", "Mutua", "Wanjiku", "Kamau", "Njoroge", "Ndwiga",
+        "Gicheru", "Maina", "Kariuki", "Nderitu", "Gichuru", "Kuria", "Muriithi", "Maina", "Waweru", "Karanja"
+      ]
+    )
+  },
+  uganda: {
+    name: "Uganda",
+    flag: "🇺🇬",
+    names: buildNames(
+      [
+        "Moses", "Florence", "Sarah", "Joseph", "John", "Grace", "Robert", "Charles", "Richard", "David",
+        "Patrick", "James", "Peter", "Mary", "Margaret", "Elizabeth", "Harriet", "Susan", "Joyce", "Isma",
+        "Stephen", "Ronald", "Denis", "Andrew", "William", "Arthur", "Nicholas", "Brian", "Paul", "Christopher"
+      ],
+      [
+        "Kigozi", "Kateregga", "Namubiru", "Nsubuga", "Mukasa", "Mugisha", "Kizza", "Byaruhanga", "Ochieng", "Okello",
+        "Oryem", "Ssewankambo", "Mayanja", "Nakintu", "Namaganda", "Nabakooza", "Nabosa", "Atim", "Acan", "Lule",
+        "Wasswa", "Kato", "Ssemwogerere", "Mwesigwa", "Kaboyo", "Musoke", "Ssenyonga", "Masembe", "Mugerwa", "Opio"
+      ]
+    )
+  },
+  tanzania: {
+    name: "Tanzania",
+    flag: "🇹🇿",
+    names: buildNames(
+      [
+        "Juma", "Halima", "Asha", "Said", "Salama", "Daudi", "Baraka", "Neema", "Rehema", "Mwajuma",
+        "Ali", "Anna", "Amina", "Ibrahim", "John", "Mwita", "Abdallah", "Ramadhani", "Hamisi", "Shabani",
+        "Selemani", "Yusufu", "Kassim", "Hussein", "Yahaya", "Bakari", "Fatuma", "Mariamu", "Khadija", "Mwanahamis"
+      ],
+      [
+        "Kikwete", "Hassan", "Kawawa", "Salim", "Sokoine", "Mrema", "Shibuda", "Zitto", "Lema", "Mkapa",
+        "Massanja", "Malecela", "Magufuli", "Kapama", "Nyerere", "Chacha", "Ally", "Salum", "Juma", "Bakari",
+        "Athumani", "Rashidi", "Shaban", "Omari", "Kibwana", "Makame", "Abeid", "Khalfan", "Khamis", "Seif"
+      ]
+    )
+  },
+  cameroon: {
+    name: "Cameroon",
+    flag: "🇨🇲",
+    names: buildNames(
+      [
+        "Samuel", "Roger", "Rigobert", "Vincent", "Eric", "Frank", "Toko", "Nicolas", "Christian", "Ambroise",
+        "Pierre", "Francois", "Patrick", "Geremi", "Jacques", "Clinton", "Georges", "Jean", "Alex", "Joel",
+        "Stephane", "Landry", "Aurelien", "Benoit", "Sebastien", "Idress", "Charles", "Guy", "Michael", "Adolo"
+      ],
+      [
+        "Eto", "Milla", "Song", "Aboubakar", "Choupo", "Anguissa", "Ekambi", "N'Koulou", "Bassogog", "Oyongo",
+        "Kunde", "Biyik", "Mboma", "Wome", "Njitap", "Songoo", "N'Jie", "Mandjeck", "Makoun", "Matip",
+        "Mbia", "N'Guemo", "Chedjou", "Assou", "Bassong", "Kameni", "Itandje", "Assembe", "Ngadeu", "Teikeu"
+      ]
+    )
+  },
+  egypt: {
+    name: "Egypt",
+    flag: "🇪🇬",
+    names: buildNames(
+      [
+        "Mohamed", "Ahmed", "Mahmoud", "Ali", "Mustafa", "Osama", "Ibrahim", "Amr", "Omar", "Khaled",
+        "Tarek", "Sherif", "Yasser", "Hany", "Adel", "Wael", "Essam", "Hosny", "Emad", "Sayed"
+      ],
+      [
+        "Salah", "Hegazi", "Trezeguet", "Shenawy", "Gabal", "Hamdy", "Fatouh", "Elneny", "Sulaya", "Marmoush",
+        "Hamed", "Ashour", "Ramzy", "Emam", "Gomaa", "Hadary", "Hassan", "Zaki", "Kamel", "Meteb"
+      ]
+    )
+  },
+  singapore: {
+    name: "Singapore",
+    flag: "🇸🇬",
+    names: buildNames(
+      [
+        "Ryan", "Rachel", "Amanda", "Kenneth", "Adrian", "Marcus", "Cheryl", "Michelle", "Benjamin", "David",
+        "Farhan", "Syazwan", "Hariss", "Safuwan", "Shakir", "Shahril", "Khairul", "Baihakki", "Karthik", "Vignesh"
+      ],
+      [
+        "Tan", "Lim", "Wong", "Goh", "Teo", "Seah", "Neo", "Low", "Kheng", "Cheong",
+        "Buhari", "Harun", "Baharudin", "Hamzah", "Ishak", "Amri", "Khaizan", "Raj", "Ravichandran", "Sunny"
+      ]
+    )
+  },
+  netherlands: {
+    name: "Netherlands",
+    flag: "🇳🇱",
+    names: buildNames(
+      [
+        "Jan", "Willem", "Johannes", "Cornelis", "Hendrik", "Pieter", "Gerrit", "Dirk", "Thomas", "Martijn",
+        "Sander", "Bas", "Daan", "Luuk", "Sem", "Milan", "Levi", "Lucas", "Thijs", "Bram"
+      ],
+      [
+        "de Jong", "de Vries", "van de Berg", "van Dijk", "Bakker", "Janssen", "Visser", "Smit", "Meijer", "de Graaf",
+        "de Cock", "van Dongen", "Mulder", "Peters", "de Wilde", "Bos", "Dekker", "Vos", "Brouwer", "de Ruiter"
+      ]
+    )
+  },
+  sweden: {
+    name: "Sweden",
+    flag: "🇸🇪",
+    names: buildNames(
+      [
+        "Lars", "Anders", "Mikael", "Johan", "Per", "Erik", "Jan", "Peter", "Karl", "Thomas",
+        "Olof", "Sven", "Nils", "Bo", "Bengt", "Victor", "Emil", "Alexander", "Robin", "Ludwig"
+      ],
+      [
+        "Andersson", "Johansson", "Karlsson", "Nilsson", "Eriksson", "Larsson", "Olsson", "Persson", "Svensson", "Gustafsson",
+        "Hansson", "Jönsson", "Pettersson", "Petersson", "Magnusson", "Lindelöf", "Forsberg", "Isak", "Olsen", "Augustinsson"
+      ]
+    )
+  },
+  switzerland: {
+    name: "Switzerland",
+    flag: "🇨🇭",
+    names: buildNames(
+      [
+        "Beat", "Urs", "Reto", "Christian", "Daniel", "Thomas", "Stefan", "Markus", "Martin", "Andreas",
+        "Peter", "Michael", "Werner", "Hans", "Jean", "Pierre", "Francois", "Philippe", "Laurent", "Stephane"
+      ],
+      [
+        "Müller", "Meier", "Schmid", "Keller", "Weber", "Berger", "Huber", "Gerber", "Baumann", "Fischer",
+        "Frei", "Suter", "Wenger", "Staub", "Egger", "Luthy", "Giger", "Glarner", "Kolly", "Riesen"
+      ]
+    )
   }
 };
 

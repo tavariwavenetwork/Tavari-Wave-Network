@@ -997,7 +997,7 @@ export default function Layout() {
         isDark 
           ? "bg-[#0b0d14]/75 border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
           : "bg-white/85 border-[#a855f7]/15",
-        (isDistractionFree || location.pathname === '/token' || location.pathname.startsWith('/token/')) && "hidden"
+        (isDistractionFree || location.pathname === '/token' || location.pathname.startsWith('/token/') || location.pathname === '/rewards' || location.pathname.startsWith('/rewards/')) && "hidden"
       )}>
         {/* SVG definitions for realistic icon linear gradients */}
         <svg className="absolute w-0 h-0" width="0" height="0">

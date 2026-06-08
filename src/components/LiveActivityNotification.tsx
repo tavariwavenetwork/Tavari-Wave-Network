@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { 
   COUNTRIES, 
   ACTION_WEIGHTS, 
@@ -22,6 +24,10 @@ interface ActivityItem {
 // Country weights prioritizing Nigeria, UK, US
 const COUNTRY_WEIGHTS = [
   { key: "nigeria", weight: 25 },
+  { key: "japan", weight: 10 },
+  { key: "brazil", weight: 10 },
+  { key: "india", weight: 12 },
+  { key: "germany", weight: 10 },
   { key: "united_kingdom", weight: 15 },
   { key: "united_states", weight: 15 },
   { key: "uganda", weight: 5 },
@@ -39,9 +45,16 @@ const COUNTRY_WEIGHTS = [
   { key: "bangladesh", weight: 5 }
 ];
 
-function getWeightedRandom<T extends { weight: number }>(items: T[]): T {
+// Helper for deterministic seeded PRNG [0, 1)
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+// Helper to select item from weighted list deterministically
+function getDeterministicWeightedRandom<T extends { weight: number }>(items: T[], seed: number): T {
   const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
-  let random = Math.random() * totalWeight;
+  let random = seededRandom(seed) * totalWeight;
   for (const item of items) {
     if (random < item.weight) {
       return item;
@@ -51,21 +64,88 @@ function getWeightedRandom<T extends { weight: number }>(items: T[]): T {
   return items[0];
 }
 
-const generateActivity = (): ActivityItem => {
-  const countryObj = getWeightedRandom(COUNTRY_WEIGHTS);
-  const country = COUNTRIES[countryObj.key];
-  const randomName = country.names[Math.floor(Math.random() * country.names.length)];
-  const actionObj = getWeightedRandom(ACTION_WEIGHTS);
+// Flatten all name combinations dynamically on load to create a massive coprime pool
+interface NameItem {
+  countryKey: string;
+  name: string;
+}
+
+function gcd(a: number, b: number): number {
+  while (b !== 0) {
+    const temp = b;
+    b = a % b;
+    a = temp;
+  }
+  return a;
+}
+
+function getCoprime(n: number): number {
+  if (n <= 1) return 1;
+  let step = Math.floor(n * 0.6) | 1;
+  while (gcd(step, n) !== 1) {
+    step += 2;
+  }
+  return step;
+}
+
+const FAMOUS_KEYWORDS = [
+  "elon", "musk", "zuckerberg", "dangote", "gates", "bezos", "buffett", "trump", "obama", "biden", "putin", "jinping", "modi"
+];
+
+function sanitizeIfFamous(name: string): string {
+  const norm = name.toLowerCase();
+  for (const keyword of FAMOUS_KEYWORDS) {
+    if (norm.includes(keyword)) {
+      return "Partner";
+    }
+  }
+  return name;
+}
+
+const ALL_NAMES: NameItem[] = [];
+const countryKeys = Object.keys(COUNTRIES).sort();
+for (const key of countryKeys) {
+  const country = COUNTRIES[key];
+  if (country && country.names) {
+    for (const name of country.names) {
+      ALL_NAMES.push({ countryKey: key, name });
+    }
+  }
+}
+
+// Generate the synchronized simulated activity based on a slot seed
+const getDeterministicActivity = (seed: number): ActivityItem => {
+  if (ALL_NAMES.length === 0) {
+    return {
+      id: `sim-${seed}`,
+      flag: "🇺🇸",
+      name: "John S.",
+      actionText: "Joined"
+    };
+  }
+
+  // 1. Trace the deterministic full name via coprime index walking to guarantee NO repeats for 72+ hours
+  const step = getCoprime(ALL_NAMES.length);
+  const nameItem = ALL_NAMES[(seed * step) % ALL_NAMES.length];
+  const country = COUNTRIES[nameItem.countryKey] || COUNTRIES.united_states;
+  const flag = country.flag;
+  const name = sanitizeIfFamous(nameItem.name);
+
+  // 2. Select action deterministically
+  const actionObj = getDeterministicWeightedRandom(ACTION_WEIGHTS, seed + 1);
   const action = actionObj.action;
-  
+
   let actionText = "";
   let amountText: string | undefined;
   let isAmountPositive: boolean | undefined;
 
+  // Verb selection variability seed
+  const verbSeed = Math.floor(seededRandom(seed + 2) * 3);
+
   switch (action) {
     case "joined": {
       const joinVerbs = ["Joined", "Registered"];
-      actionText = joinVerbs[Math.floor(Math.random() * joinVerbs.length)];
+      actionText = joinVerbs[verbSeed % joinVerbs.length];
       break;
     }
     case "checked_in": {
@@ -76,40 +156,40 @@ const generateActivity = (): ActivityItem => {
     }
     case "deposited": {
       const depVerbs = ["Deposited", "Funded Wallet", "Added Funds"];
-      actionText = depVerbs[Math.floor(Math.random() * depVerbs.length)];
-      const amtObj = getWeightedRandom(DEPOSIT_AMOUNTS);
+      actionText = depVerbs[verbSeed % depVerbs.length];
+      const amtObj = getDeterministicWeightedRandom(DEPOSIT_AMOUNTS, seed + 3);
       amountText = `$${amtObj.value.toLocaleString()}`;
       isAmountPositive = true;
       break;
     }
     case "invested": {
       const invVerbs = ["Invested", "Activated Node", "Injected Capital"];
-      actionText = invVerbs[Math.floor(Math.random() * invVerbs.length)];
-      const amtObj = getWeightedRandom(INVESTMENT_AMOUNTS);
+      actionText = invVerbs[verbSeed % invVerbs.length];
+      const amtObj = getDeterministicWeightedRandom(INVESTMENT_AMOUNTS, seed + 4);
       amountText = `$${amtObj.value.toLocaleString()}`;
       isAmountPositive = true;
       break;
     }
     case "claimed_reward": {
       const rewardVerbs = ["Claimed Reward", "Claimed Investment Reward", "Earned Capital Yield"];
-      actionText = rewardVerbs[Math.floor(Math.random() * rewardVerbs.length)];
-      const amtObj = getWeightedRandom(REWARD_AMOUNTS);
+      actionText = rewardVerbs[verbSeed % rewardVerbs.length];
+      const amtObj = getDeterministicWeightedRandom(REWARD_AMOUNTS, seed + 5);
       amountText = `$${amtObj.value.toLocaleString()}`;
       isAmountPositive = true;
       break;
     }
     case "withdrawn": {
       const witVerbs = ["Withdrawn", "Settled Balance", "Transferred Out"];
-      actionText = witVerbs[Math.floor(Math.random() * witVerbs.length)];
-      const amtObj = getWeightedRandom(WITHDRAW_AMOUNTS);
+      actionText = witVerbs[verbSeed % witVerbs.length];
+      const amtObj = getDeterministicWeightedRandom(WITHDRAW_AMOUNTS, seed + 6);
       amountText = `$${amtObj.value.toLocaleString()}`;
       isAmountPositive = false;
       break;
     }
     case "activated_investment": {
       const actVerbs = ["Activated Investment", "Activated Node"];
-      actionText = actVerbs[Math.floor(Math.random() * actVerbs.length)];
-      const amtObj = getWeightedRandom(INVESTMENT_AMOUNTS);
+      actionText = actVerbs[verbSeed % actVerbs.length];
+      const amtObj = getDeterministicWeightedRandom(INVESTMENT_AMOUNTS, seed + 7);
       amountText = `$${amtObj.value.toLocaleString()}`;
       isAmountPositive = true;
       break;
@@ -117,68 +197,101 @@ const generateActivity = (): ActivityItem => {
   }
 
   return {
-    id: Math.random().toString(36).substring(2, 9),
-    flag: country.flag,
-    name: randomName,
+    id: `sim-${seed}`,
+    flag,
+    name,
     actionText,
     amountText,
     isAmountPositive
   };
 };
 
-const getRandomDelay = () => {
-  const rand = Math.random();
-  if (rand < 0.15) {
-    // 15% probability: back-to-back notifications (1.5 - 3 seconds)
-    return Math.floor(Math.random() * 1500) + 1500;
-  } else if (rand < 0.55) {
-    // 40% probability: fast interval (4 - 8 seconds)
-    return Math.floor(Math.random() * 4000) + 4000;
-  } else if (rand < 0.85) {
-    // 30% probability: medium interval (15 - 30 seconds)
-    return Math.floor(Math.random() * 15000) + 15000;
-  } else {
-    // 15% probability: long pause (50 - 90 seconds)
-    return Math.floor(Math.random() * 40000) + 50000;
-  }
-};
-
 export default function LiveActivityNotification() {
   const [activeNotification, setActiveNotification] = useState<ActivityItem | null>(null);
+  const [realNotification, setRealNotification] = useState<ActivityItem | null>(null);
+  const lastShownRealIdRef = useRef<string | null>(null);
 
+  // 1. Live Firestore listener for real user activity broadcast
   useEffect(() => {
-    let activeTimeout: NodeJS.Timeout;
-    let nextTimeout: NodeJS.Timeout;
+    let clearTimer: NodeJS.Timeout;
 
-    const runNotificationCycle = () => {
-      const newNotif = generateActivity();
-      setActiveNotification(newNotif);
-
-      // Notification stays on screen for 4.2 seconds
-      activeTimeout = setTimeout(() => {
-        setActiveNotification(null);
+    const unsubscribe = onSnapshot(doc(db, 'settings', 'live_activity'), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const now = Date.now();
         
-        const delay = getRandomDelay();
-        nextTimeout = setTimeout(runNotificationCycle, delay);
-      }, 4200);
-    };
+        // Fresh if within the last 15 seconds
+        if (data.timestamp && (now - data.timestamp < 15000) && data.id !== lastShownRealIdRef.current) {
+          lastShownRealIdRef.current = data.id;
+          
+          setRealNotification({
+            id: data.id,
+            flag: data.flag || "👤",
+            name: sanitizeIfFamous(data.name),
+            actionText: data.actionText,
+            amountText: data.amountText || undefined,
+            isAmountPositive: data.isAmountPositive !== undefined ? data.isAmountPositive : true
+          });
 
-    // Initial load delay gets a subtle offset to load beautifully
-    const initialDelay = setTimeout(runNotificationCycle, 3000);
+          // Pre-empt/dismiss any active simulated cycle instantly
+          setActiveNotification(null);
+
+          // Real notification stays on screen for 5 seconds
+          clearTimeout(clearTimer);
+          clearTimer = setTimeout(() => {
+            setRealNotification(null);
+          }, 5000);
+        }
+      }
+    }, (err) => {
+      console.warn("Live activity subscription error / blocked in sandbox:", err.message);
+    });
 
     return () => {
-      clearTimeout(initialDelay);
-      clearTimeout(activeTimeout);
-      clearTimeout(nextTimeout);
+      unsubscribe();
+      clearTimeout(clearTimer);
     };
   }, []);
+
+  // 2. High-precision clock polling for deterministic globally-synchronized simulated notifications
+  useEffect(() => {
+    const SLOT_DURATION = 20000; // 20 seconds total slot period
+    const DISPLAY_DURATION = 5000; // Display on screen for first 5 seconds of the slot
+
+    const updateSimulated = () => {
+      // If a prioritized real-time user notification is active, suspend simulations
+      if (realNotification) {
+        setActiveNotification(null);
+        return;
+      }
+
+      const now = Date.now();
+      const currentSlot = Math.floor(now / SLOT_DURATION);
+      const slotTimer = now % SLOT_DURATION;
+
+      if (slotTimer < DISPLAY_DURATION) {
+        const simNotif = getDeterministicActivity(currentSlot);
+        setActiveNotification(simNotif);
+      } else {
+        setActiveNotification(null);
+      }
+    };
+
+    updateSimulated();
+    const interval = setInterval(updateSimulated, 500);
+
+    return () => clearInterval(interval);
+  }, [realNotification]);
+
+  // Which notification takes visual precedence
+  const displayItem = realNotification || activeNotification;
 
   return (
     <div className="w-full flex justify-center min-h-[26px] items-center pointer-events-none select-none my-0.5">
       <AnimatePresence mode="wait">
-        {activeNotification && (
+        {displayItem && (
           <motion.div
-            key={activeNotification.id}
+            key={displayItem.id}
             initial={{ opacity: 0, y: 5, scale: 0.995, filter: 'blur(2px)' }}
             animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: -4, scale: 0.995, filter: 'blur(1px)' }}
@@ -191,21 +304,21 @@ export default function LiveActivityNotification() {
             className="flex items-center gap-1.5 px-3 py-1 bg-[#04060a]/80 backdrop-blur-xl rounded-full border border-white/[0.03] shadow-[0_6px_20px_rgba(0,0,0,0.5),_inset_0_1px_0_rgba(255,255,255,0.02)] max-w-[95%] pointer-events-none select-none fixed z-[45] left-1/2 -translate-x-1/2 top-[140px] lg:top-[174px]"
           >
             <span className="text-xs shrink-0 flex items-center justify-center filter drop-shadow-sm select-none">
-              {activeNotification.flag}
+              {displayItem.flag}
             </span>
             <span className="text-[10px] md:text-[11px] font-medium text-white/90 shrink-0">
-              {activeNotification.name}
+              {displayItem.name}
             </span>
             <span className="text-white/10 text-[9px] select-none mx-0.5">—</span>
             <span className="text-[9px] md:text-[10px] font-normal text-white/50 shrink-0">
-              {activeNotification.actionText}
+              {displayItem.actionText}
             </span>
-            {activeNotification.amountText && (
+            {displayItem.amountText && (
               <span className={cn(
                 "text-[9px] md:text-[10px] font-medium shrink-0 ml-0.5 tracking-tight",
-                activeNotification.isAmountPositive ? "text-emerald-400" : "text-rose-400"
+                displayItem.isAmountPositive ? "text-emerald-400" : "text-rose-400"
               )}>
-                {activeNotification.amountText}
+                {displayItem.amountText}
               </span>
             )}
           </motion.div>

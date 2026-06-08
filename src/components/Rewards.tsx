@@ -37,6 +37,7 @@ import { useUIConfig } from '../contexts/UIConfigContext';
 import { useUI } from '../contexts/UIContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
+import { broadcastActivity } from '../lib/activity_logger';
 import { 
   collection, 
   doc, 
@@ -929,6 +930,14 @@ export default function Rewards() {
       });
 
       toast.success("Successfully checked-in today! +1 Point credited.");
+      
+      broadcastActivity(
+        profile?.name || "Client",
+        "Checked In",
+        "+1 Point",
+        true,
+        "✔️"
+      );
     } catch (err: any) {
       toast.error(err.message || "Something went wrong.");
     } finally {
@@ -1083,6 +1092,14 @@ export default function Rewards() {
       });
 
       toast.success("Bonus successfully claimed to your balance!");
+      
+      broadcastActivity(
+        profile?.name || "Client",
+        "Claimed Referral Reward",
+        `$${claim.amount.toFixed(2)}`,
+        true,
+        "🎁"
+      );
     } catch (err: any) {
       toast.error(err.message || "Claim failed.");
     } finally {
@@ -1136,6 +1153,14 @@ export default function Rewards() {
       });
 
       toast.success(`Claimed $${rewardAmt.toFixed(2)} Cashback Reward successfully!`);
+      
+      broadcastActivity(
+        profile?.name || "Client",
+        "Claimed Cash Reward",
+        `$${rewardAmt.toFixed(2)}`,
+        true,
+        "💎"
+      );
     } catch (err: any) {
       toast.error(err.message || "Claim failed.");
     } finally {
@@ -1211,6 +1236,14 @@ export default function Rewards() {
       });
 
       toast.success(`Successfully claimed $${amount.toFixed(2)} USD milestone reward!`);
+      
+      broadcastActivity(
+        profile?.name || "Client",
+        "Claimed Milestone Reward",
+        `$${amount.toFixed(2)}`,
+        true,
+        "🎖️"
+      );
     } catch (err: any) {
       toast.error(err.message || "Failed to claim milestone.");
     } finally {
@@ -1434,7 +1467,7 @@ export default function Rewards() {
                     </div>
                   </div>
                   <div 
-                    onClick={() => navigate('/token')}
+                    onClick={() => navigate('/daily-points')}
                     className="flex items-center gap-1.5 sm:gap-3 cursor-pointer group select-none self-start"
                   >
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
@@ -1451,10 +1484,10 @@ export default function Rewards() {
             </div>
 
             {/* Grid of 4 Premium Navigation Cards */}
-            <div className="grid grid-cols-4 gap-1.5 xs:gap-2 sm:gap-4 md:gap-6">
+            <div className="hidden lg:grid grid-cols-4 gap-1.5 xs:gap-2 sm:gap-4 md:gap-6">
               {/* Card 1: Daily Point */}
               <div 
-                onClick={() => navigate('/token')}
+                onClick={() => navigate('/daily-points')}
                 className="relative p-2.5 xs:p-4 sm:p-6 rounded-[16px] xs:rounded-[20px] sm:rounded-[28px] bg-gradient-to-b from-[#16222a]/80 to-[#0c1217]/90 hover:from-[#1d2d37]/90 hover:to-[#111920] border border-white/10 hover:border-emerald-500/40 hover:-translate-y-1.5 hover:scale-[1.03] active:scale-[0.96] transition-all duration-300 flex flex-col items-center justify-center gap-1 sm:gap-2 cursor-pointer text-center group shadow-xl hover:shadow-[0_12px_24px_rgba(16,185,129,0.15),_inset_0_1px_0_rgba(255,255,255,0.05)] active:duration-75 select-none overflow-hidden"
               >
                 <div className="absolute top-2 right-2 sm:top-3.5 sm:right-3.5 w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-500/20 group-hover:border-emerald-500/30 group-hover:scale-110 group-hover:translate-x-0.5 transition-all duration-300 text-gray-400 group-hover:text-emerald-400 shadow-sm">
@@ -3031,6 +3064,100 @@ export default function Rewards() {
         onSelect={(bank) => setBankName(bank)}
         selectedBank={bankName}
       />
+
+      {/* PREMIUM FLOATING BOTTOM NAVIGATION FOR MOBILE ONLY */}
+      <div className="lg:hidden fixed bottom-5 left-1/2 -translate-x-1/2 w-[94%] max-w-md z-[110] bg-[#07090e]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-1.5 xs:p-2 shadow-[0_20px_50px_rgba(0,0,0,0.85),_inset_0_1px_0_rgba(255,255,255,0.05)] flex items-center justify-between gap-0.5 select-none pointer-events-auto">
+        {/* 1. Daily Points */}
+        <button 
+          onClick={() => navigate('/daily-points')}
+          className="flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all relative overflow-hidden active:scale-95 group"
+        >
+          <div className="h-9 w-9 flex items-center justify-center scale-50 group-hover:scale-55 transition-transform duration-300 select-none pointer-events-none">
+            <Icon3DDailyPoints />
+          </div>
+          <span className="text-[7.5px] xs:text-[9.5px] md:text-sm font-black text-white/50 group-hover:text-amber-400 mt-0.5 tracking-tight truncate w-full px-0.5 text-center">Daily Points</span>
+        </button>
+
+        {/* 2. Refer Friends */}
+        <button 
+          onClick={() => {
+            setRewardView('refer');
+          }}
+          className={cn(
+            "flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all relative overflow-hidden active:scale-95 group",
+            rewardView === 'refer' ? "bg-white/5" : ""
+          )}
+        >
+          <div className={cn(
+            "h-9 w-9 flex items-center justify-center scale-50 transition-transform duration-300 select-none pointer-events-none",
+            rewardView === 'refer' ? "scale-55" : "group-hover:scale-55"
+          )}>
+            <Icon3DReferFriends />
+          </div>
+          <span className={cn(
+            "text-[7.5px] xs:text-[9.5px] md:text-sm font-black mt-0.5 tracking-tight truncate w-full px-0.5 text-center",
+            rewardView === 'refer' ? "text-purple-400" : "text-white/50 group-hover:text-purple-400"
+          )}>Refer Friends</span>
+        </button>
+
+        {/* 3. Node Rewards */}
+        <button 
+          onClick={() => {
+            setRewardView('nodes');
+          }}
+          className={cn(
+            "flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all relative overflow-hidden active:scale-95 group",
+            rewardView === 'nodes' ? "bg-white/5" : ""
+          )}
+        >
+          <div className={cn(
+            "h-9 w-9 flex items-center justify-center scale-50 transition-transform duration-300 select-none pointer-events-none",
+            rewardView === 'nodes' ? "scale-55" : "group-hover:scale-55"
+          )}>
+            <Icon3DNodeRewards />
+          </div>
+          <span className={cn(
+            "text-[7.5px] xs:text-[9.5px] md:text-sm font-black mt-0.5 tracking-tight truncate w-full px-0.5 text-center",
+            rewardView === 'nodes' ? "text-yellow-400" : "text-white/50 group-hover:text-yellow-400"
+          )}>Node Rewards</span>
+        </button>
+
+        {/* 4. Ranking */}
+        <button 
+          onClick={() => {
+            setRewardView('ranking');
+          }}
+          className={cn(
+            "flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all relative overflow-hidden active:scale-95 group",
+            rewardView === 'ranking' ? "bg-white/5" : ""
+          )}
+        >
+          <div className={cn(
+            "h-9 w-9 flex items-center justify-center scale-50 transition-transform duration-300 select-none pointer-events-none",
+            rewardView === 'ranking' ? "scale-55" : "group-hover:scale-55"
+          )}>
+            <Icon3DRanking />
+          </div>
+          <span className={cn(
+            "text-[7.5px] xs:text-[9.5px] md:text-sm font-black mt-0.5 tracking-tight truncate w-full px-0.5 text-center",
+            rewardView === 'ranking' ? "text-cyan-400" : "text-white/50 group-hover:text-cyan-400"
+          )}>Ranking</span>
+        </button>
+
+        {/* 5. Independent Exit (X) */}
+        <button 
+          onClick={() => {
+            if (window.history.state && window.history.state.idx > 0) {
+              navigate(-1);
+            } else {
+              navigate('/home');
+            }
+          }}
+          className="w-8 h-8 xs:w-9 xs:h-9 flex items-center justify-center rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 active:scale-90 transition-all text-gray-400 hover:text-white shrink-0 ml-1 xs:ml-2"
+        >
+          <X size={14} />
+        </button>
+      </div>
     </div>
   );
 }

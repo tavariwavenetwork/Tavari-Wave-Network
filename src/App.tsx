@@ -37,6 +37,7 @@ import CookiePolicy from './components/FooterPages/CookiePolicy';
 import AMLPolicy from './components/FooterPages/AMLPolicy';
 import CertificationCompliance from './components/FooterPages/CertificationCompliance';
 import TWNTokenPortal from './components/TWNTokenPortal';
+import DailyPointsHub from './components/DailyPointsHub';
 import JoinUs from './components/JoinUs';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -145,6 +146,7 @@ export default function App() {
                 <Route path="/home" element={<Homepage />} />
                 <Route path="/guide" element={<Guide />} />
                 <Route path="/token" element={<TWNTokenPortal />} />
+                <Route path="/daily-points" element={<DailyPointsHub />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/invest" element={<Invest />} />
                 <Route path="/fund" element={<Fund />} />

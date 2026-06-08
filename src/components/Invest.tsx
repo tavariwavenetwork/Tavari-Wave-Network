@@ -45,6 +45,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
+import { broadcastActivity } from '../lib/activity_logger';
 
 // --- CONSTANTS ---
 const CRYPTO_ADDRESSES = {
@@ -499,6 +500,14 @@ export default function Invest() {
       setAmounts({});
       setTransactionId('');
       toast.success(paymentMethod === 'wallet' ? "Investment initialized successfully." : "Investment request submitted. Awaiting network confirmation.");
+      
+      broadcastActivity(
+        profile.name || "Client",
+        "Activated Node",
+        `$${confirmedAmount.toLocaleString()}`,
+        true,
+        "⚙️"
+      );
     } catch (error: any) {
       console.error("Investment Error:", error);
       toast.error(error.message || "Process failed. Please try again.");

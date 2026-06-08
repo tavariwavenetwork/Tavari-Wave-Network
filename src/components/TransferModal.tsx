@@ -40,6 +40,7 @@ import {
 import { db, auth } from '../lib/firebase';
 import { toast } from 'sonner';
 import { logAudit } from '../lib/auth_security';
+import { broadcastActivity } from '../lib/activity_logger';
 
 type TransferType = 'internal' | 'user';
 type WalletType = 'funding_balance' | 'available_balance' | 'referral_earnings' | 'reward_dollar_balance';
@@ -368,6 +369,15 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
       });
 
       setStep('success');
+      if (type === 'user') {
+        broadcastActivity(
+          profile?.name || "Client",
+          "Transferred Assets",
+          `$${amountNum.toLocaleString()}`,
+          true,
+          "💸"
+        );
+      }
     } catch (e: any) {
       console.error("Critical Transfer Error:", e);
       // Detailed logging for diagnosis as per instructions

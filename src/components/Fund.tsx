@@ -43,6 +43,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
+import { broadcastActivity } from '../lib/activity_logger';
 
 import SuccessModal from './SuccessModal';
 import PinProtocolModal from './PinProtocolModal';
@@ -500,6 +501,14 @@ export default function Fund() {
       await addDoc(collection(db, 'deposits'), newDeposit);
       setShowDepositSuccess(true);
       toast.success("Deposit request logged");
+      
+      broadcastActivity(
+        profile.name || "Client",
+        "Initiated Deposit",
+        `$${amount.toLocaleString()}`,
+        true,
+        "💳"
+      );
     } catch (error) {
        toast.error("Failed to submit request");
     } finally {
@@ -603,6 +612,14 @@ export default function Fund() {
       setShowPinModal(false);
       setShowWithdrawSuccess(true);
       toast.success("Withdrawal request logged successfully");
+      
+      broadcastActivity(
+        profile.name || "Client",
+        "Initiated Withdrawal",
+        `$${deductionAmount.toLocaleString()}`,
+        false,
+        "📤"
+      );
     } catch (error: any) {
        console.error("WITHDRAWAL BATCH ERROR:", error);
        toast.error(`Failed to submit withdrawal: ${error?.message || 'Operation Denied'}`);
