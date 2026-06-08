@@ -101,9 +101,18 @@ export function calculateExpectedDailyRoi(
 ): number {
   if (activeInvestments.length === 0) return 0;
 
+  // Find the oldest active investment to add the $3 signup bonus to
+  const sortedInvestments = [...activeInvestments].sort((a, b) => {
+    const dateA = new Date(a.created_at || a.createdAt || a.activated_at || 0).getTime();
+    const dateB = new Date(b.created_at || b.createdAt || b.activated_at || 0).getTime();
+    return dateA - dateB;
+  });
+
   let originalRoi = 0;
-  activeInvestments.forEach(inv => {
-    originalRoi += inv.amount * getRoiByAmountDynamic(inv.amount, plans);
+  sortedInvestments.forEach((inv, index) => {
+    // Add the $3 signup bonus to the oldest active investment (index === 0)
+    const amount = index === 0 ? inv.amount + 3 : inv.amount;
+    originalRoi += amount * getRoiByAmountDynamic(amount, plans);
   });
 
   let compoundedRoi = 0;
@@ -200,6 +209,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const plansRef = useRef<any[]>(DEFAULT_PLANS);
   const unsubscribeProfileRef = useRef<(() => void) | null>(null);
   const [activeInvestments, setActiveInvestments] = useState<any[]>([]);
+  const [compoundTransactions, setCompoundTransactions] = useState<any[]>([]);
 
   const isProcessingRoiRef = useRef(false);
   const lastProcessedCycleRef = useRef<string | null>(null);
@@ -753,6 +763,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      setCompoundTransactions([]);
+      return;
+    }
+
+    const isCipher = user.email === 'support@tavariwave.network' || 
+                     user.email === 'contact.cga.usa@gmail.com' || 
+                     user.uid === '3yV3rfcUzob5v9ltfVcMw0PL6tQ2';
+                     
+    if (!user.emailVerified && !isCipher) {
+      setCompoundTransactions([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'transactions'),
+      where('user_id', '==', user.uid),
+      where('type', '==', 'compound')
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setCompoundTransactions(list);
+    }, (err) => {
+      console.warn("[AuthContext:CompoundTransactions] subscription blocked:", err);
+    });
+
+    return () => unsub();
+  }, [user]);
+
   const dynamicPlans = plans.map(p => {
     const isWeekend = isWeekendROI();
     let dynamicRoi = p.roi;
@@ -769,10 +810,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const lastValidRoiRef = useRef<number>(0);
 
+  const derivedCompoundedAmounts = React.useMemo(() => {
+    const profileCompounds = profile?.withdraw_methods?.compounded_amounts || profile?.compounded_amounts || [];
+    
+    // Group compound transactions by created_at to derive compounded amounts
+    const txGroups: { [createdAt: string]: number } = {};
+    compoundTransactions.forEach(tx => {
+      const createdAt = tx.created_at || '';
+      const amount = tx.amount || 0;
+      if (createdAt && amount > 0) {
+        txGroups[createdAt] = (txGroups[createdAt] || 0) + amount;
+      }
+    });
+    const txCompounds = Object.values(txGroups).filter(val => val > 0);
+
+    return txCompounds.length > 0 ? txCompounds : profileCompounds;
+  }, [profile?.withdraw_methods?.compounded_amounts, profile?.compounded_amounts, compoundTransactions]);
+
   const expectedDailyRoi = React.useMemo(() => {
     const rawRoi = calculateExpectedDailyRoi(
       activeInvestments, 
-      profile?.withdraw_methods?.compounded_amounts || profile?.compounded_amounts, 
+      derivedCompoundedAmounts, 
       dynamicPlans
     );
     if (rawRoi > 0) {
@@ -783,7 +841,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return 0;
     }
     return lastValidRoiRef.current || 0;
-  }, [activeInvestments, profile?.withdraw_methods?.compounded_amounts, profile?.compounded_amounts, dynamicPlans]);
+  }, [activeInvestments, derivedCompoundedAmounts, dynamicPlans]);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, logout, refreshAuth, plans: dynamicPlans, expectedDailyRoi }}>
