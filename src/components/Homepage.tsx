@@ -311,9 +311,13 @@ export default function Homepage() {
 
         updates.total_invested = increment(totalToCompound);
 
+        const existingCompounds = userData.withdraw_methods?.compounded_amounts || userData.compounded_amounts || [];
+        const newCompounds = [...existingCompounds, totalToCompound];
+
         const existingWithdrawMethods = updates.withdraw_methods || userData.withdraw_methods || {};
         updates.withdraw_methods = {
           ...existingWithdrawMethods,
+          compounded_amounts: newCompounds,
           last_compound_popup_date: todayDateStr
         };
 

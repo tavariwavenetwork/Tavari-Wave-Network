@@ -67,7 +67,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { useAuth, getRoiByAmountDynamic } from '../../contexts/AuthContext';
+import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { logAudit } from '../../lib/auth_security';
 
@@ -111,9 +111,23 @@ interface AdminROIEngineCardProps {
 
 function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngineCardProps) {
   const activeCount = userInvestments.length;
-  const yieldSum = useMemo(() => 
-    userInvestments.reduce((acc, curr: any) => acc + (curr.amount * getRoiByAmountDynamic(curr.amount, plans || [])), 0),
-  [userInvestments, plans]);
+  const lastValidRoiRef = React.useRef<number>(0);
+
+  const yieldSum = useMemo(() => {
+    const rawRoi = calculateExpectedDailyRoi(
+      userInvestments,
+      userValue?.withdraw_methods?.compounded_amounts || userValue?.compounded_amounts,
+      plans || []
+    );
+    if (rawRoi > 0) {
+      lastValidRoiRef.current = rawRoi;
+      return rawRoi;
+    }
+    if (activeCount === 0) {
+      return 0;
+    }
+    return lastValidRoiRef.current || 0;
+  }, [userInvestments, userValue?.withdraw_methods?.compounded_amounts, userValue?.compounded_amounts, plans, activeCount]);
 
   const [progress, setProgress] = useState(0);
   const [timeLeft, setTimeLeft] = useState("24:00:00");

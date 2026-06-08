@@ -25,7 +25,7 @@ import {
   Gift
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, getDocs, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -66,17 +66,18 @@ const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, hi
 });
 
 export default function Dashboard() {
-  const { user, profile } = useAuth();
+  const { user, profile, plans, expectedDailyRoi } = useAuth();
   const { isTransferModalOpen, openTransferModal, closeTransferModal, setMrBActivationPopup } = useUI();
   const navigate = useNavigate();
   const [recentTx, setRecentTx] = useState<any[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
-  const [dailyYield, setDailyYield] = useState(0);
   const [showActiveModal, setShowActiveModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
   const [isActivating, setIsActivating] = useState<string | null>(null);
 
   const [referralStats, setReferralStats] = useState({ total: 0, active: 0 });
+
+  const dailyYield = expectedDailyRoi;
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -91,11 +92,6 @@ export default function Dashboard() {
     const unsubInvestmentsList = onSnapshot(qInv, (snap) => {
       const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setInvestments(list);
-      
-      const yieldSum = list
-        .filter((inv: any) => inv.status === 'active')
-        .reduce((acc, curr: any) => acc + (curr.amount * (curr.dailyRoi || 0)), 0);
-      setDailyYield(yieldSum);
     }, (error) => {
       console.warn("Investments list listener blocked:", error.message);
     });

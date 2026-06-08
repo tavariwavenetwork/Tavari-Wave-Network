@@ -94,6 +94,29 @@ export function getRoiByAmountDynamic(amount: number, livePlans: any[]): number 
   return getRoiByAmount(amount); // fallback
 }
 
+export function calculateExpectedDailyRoi(
+  activeInvestments: any[],
+  compoundedAmounts: number[] | undefined,
+  plans: any[]
+): number {
+  if (activeInvestments.length === 0) return 0;
+
+  let originalRoi = 0;
+  activeInvestments.forEach(inv => {
+    originalRoi += inv.amount * getRoiByAmountDynamic(inv.amount, plans);
+  });
+
+  let compoundedRoi = 0;
+  const compounds = compoundedAmounts || [];
+  compounds.forEach(compAmount => {
+    if (compAmount > 0) {
+      compoundedRoi += compAmount * getRoiByAmountDynamic(compAmount, plans);
+    }
+  });
+
+  return originalRoi + compoundedRoi;
+}
+
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -164,6 +187,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   plans: any[];
+  expectedDailyRoi: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -175,6 +199,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [plans, setPlans] = useState<any[]>(DEFAULT_PLANS);
   const plansRef = useRef<any[]>(DEFAULT_PLANS);
   const unsubscribeProfileRef = useRef<(() => void) | null>(null);
+  const [activeInvestments, setActiveInvestments] = useState<any[]>([]);
+
+  const isProcessingRoiRef = useRef(false);
+  const lastProcessedCycleRef = useRef<string | null>(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'investment_plans'), async (snapshot) => {
@@ -206,6 +234,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cycleStartStr = profileData.roi_cycle_start;
     if (!cycleStartStr) return;
 
+    if (isProcessingRoiRef.current) return;
+    if (lastProcessedCycleRef.current === cycleStartStr) return;
+
     const now = new Date().getTime();
     const cycleStart = new Date(cycleStartStr).getTime();
     const totalDuration = 24 * 60 * 60 * 1000;
@@ -213,12 +244,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const completedCycles = Math.floor(elapsed / totalDuration);
 
     if (completedCycles > 0) {
+      isProcessingRoiRef.current = true;
       try {
         const q = query(collection(db, 'investments'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'active'));
         const invSnap = await getDocs(q);
         
         if (invSnap.empty) {
           const newCycleStart = new Date(cycleStart + (completedCycles * totalDuration)).toISOString();
+          lastProcessedCycleRef.current = cycleStartStr;
           await updateDoc(docRef, { roi_cycle_start: newCycleStart });
           return;
         }
@@ -260,25 +293,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           }
 
+          const compounds = currentProfile.withdraw_methods?.compounded_amounts || currentProfile.compounded_amounts || [];
+          let compoundsProfitPerCycle = 0;
+          compounds.forEach((compAmount: number) => {
+            if (compAmount > 0) {
+              const roiRate = getRoiByAmountDynamic(compAmount, plansRef.current);
+              compoundsProfitPerCycle += compAmount * roiRate;
+            }
+          });
+          const totalCompoundsProfit = currentCompletedCycles * compoundsProfitPerCycle;
+          totalCredit += totalCompoundsProfit;
+
           if (totalCredit > 0) {
             const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();
             
             const oldAvailableBalance = currentProfile.available_balance || 0;
             const newAvailableBalance = oldAvailableBalance + totalCredit;
 
-            // Update User Profile
             transaction.update(docRef, {
               available_balance: newAvailableBalance,
               total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
               roi_cycle_start: newCycleStart
             });
 
-            // Update individual investments
             investmentUpdates.forEach(update => {
               transaction.update(update.docRef, update.data);
             });
 
-            // Add Transaction Record (with idempotent unique ID to prevent duplicate tickets)
             const txId = `roi-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
             const txRef = doc(db, 'transactions', txId);
             transaction.set(txRef, {
@@ -297,8 +338,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             });
           }
         });
+        lastProcessedCycleRef.current = cycleStartStr;
       } catch (err) {
         console.error("[ROI Engine] Sync transaction failed:", err);
+      } finally {
+        isProcessingRoiRef.current = false;
       }
     }
   }, []);
@@ -309,14 +353,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const docRef = doc(db, 'users', firebaseUser.uid);
     try {
-      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'approved'));
+      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid));
       const txSnap = await getDocs(txQuery);
 
       let totalReferralClaims = 0;
 
       txSnap.docs.forEach(docSnap => {
         const tx = docSnap.data();
-        if (tx.type === 'referral_reward') {
+        if (tx.status === 'approved' && tx.type === 'referral_reward') {
           totalReferralClaims += tx.amount || 0;
         }
       });
@@ -366,14 +410,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const docRef = doc(db, 'users', firebaseUser.uid);
     try {
-      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'approved'));
+      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid));
       const txSnap = await getDocs(txQuery);
 
       let totalRoiHarvest = 0;
 
       txSnap.docs.forEach(docSnap => {
         const tx = docSnap.data();
-        if (tx.type === 'roi_harvest') {
+        if (tx.status === 'approved' && tx.type === 'roi_harvest') {
           totalRoiHarvest += tx.amount || 0;
         }
       });
@@ -432,6 +476,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const runCompoundingMigrationCorrection = useCallback(async (firebaseUser: FirebaseUser, profileData: UserProfile) => {
+    const docRef = doc(db, 'users', firebaseUser.uid);
+    try {
+      // 1. Fetch all transactions for this user with error isolation
+      let txSnap;
+      try {
+        const txQuery = query(
+          collection(db, 'transactions'),
+          where('user_id', '==', firebaseUser.uid)
+        );
+        txSnap = await getDocs(txQuery);
+      } catch (txErr: any) {
+        console.error("[ROI Compound Fix] getDocs(transactions) failed:", txErr.message || txErr);
+        throw txErr;
+      }
+
+      // 2. Group compound transactions by their exact created_at timestamp
+      const groups: { [createdAt: string]: number } = {};
+      txSnap.docs.forEach(docSnap => {
+        const tx = docSnap.data();
+        if (tx.type === 'compound') {
+          const createdAt = tx.created_at || '';
+          const amount = tx.amount || 0;
+          if (createdAt && amount > 0) {
+            groups[createdAt] = (groups[createdAt] || 0) + amount;
+          }
+        }
+      });
+
+      // 3. Extract the summed compounded amounts per compounding operation
+      const compoundedAmounts = Object.values(groups).filter(val => val > 0);
+
+      // 4. Update inside withdraw_methods to respect Firestore security rules on permitted keys
+      try {
+        const currentWithdrawMethods = profileData.withdraw_methods || {};
+        await updateDoc(docRef, {
+          withdraw_methods: {
+            ...currentWithdrawMethods,
+            compounded_amounts: compoundedAmounts,
+            compounded_amounts_migrated_v1: true
+          }
+        });
+        console.log(`[ROI Compound Fix] Successfully migrated ${compoundedAmounts.length} compound amounts nested in withdraw_methods for user: ${firebaseUser.uid}`, compoundedAmounts);
+      } catch (updateErr: any) {
+        console.error("[ROI Compound Fix] updateDoc on users failed:", updateErr.message || updateErr);
+        throw updateErr;
+      }
+    } catch (err: any) {
+      console.error("[ROI Compound Fix] Migration correction failed:", err.message || err);
+    }
+  }, []);
+
   const fetchProfileWithRetry = useCallback(async (firebaseUser: FirebaseUser, retryCount = 0): Promise<void> => {
     const isCipher = firebaseUser.email === 'support@tavariwave.network' || 
                      firebaseUser.email === 'contact.cga.usa@gmail.com' || 
@@ -482,6 +578,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Trigger relocation of ROI profits to Available Balance
           if (!profileData.withdraw_methods?.roi_relocated_v3) {
             runRoiRelocationCorrection(firebaseUser, profileData);
+          }
+
+          // Trigger reconstruction of compounding amounts for compounding ROI threshold fix
+          const isMigrated = profileData.withdraw_methods?.compounded_amounts_migrated_v1 || profileData.compounded_amounts_migrated_v1;
+          if (!isMigrated) {
+            runCompoundingMigrationCorrection(firebaseUser, profileData);
           }
 
           // ROI Background Sync
@@ -620,6 +722,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await auth.signOut();
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      setActiveInvestments([]);
+      return;
+    }
+
+    const isCipher = user.email === 'support@tavariwave.network' || 
+                     user.email === 'contact.cga.usa@gmail.com' || 
+                     user.uid === '3yV3rfcUzob5v9ltfVcMw0PL6tQ2';
+                     
+    if (!user.emailVerified && !isCipher) {
+      setActiveInvestments([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'investments'),
+      where('user_id', '==', user.uid),
+      where('status', '==', 'active')
+    );
+
+    const unsub = onSnapshot(q, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setActiveInvestments(list);
+    }, (err) => {
+      console.warn("[AuthContext:ActiveInvestments] subscription blocked:", err);
+    });
+
+    return () => unsub();
+  }, [user]);
+
   const dynamicPlans = plans.map(p => {
     const isWeekend = isWeekendROI();
     let dynamicRoi = p.roi;
@@ -634,8 +767,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ...p, roi: dynamicRoi };
   });
 
+  const lastValidRoiRef = useRef<number>(0);
+
+  const expectedDailyRoi = React.useMemo(() => {
+    const rawRoi = calculateExpectedDailyRoi(
+      activeInvestments, 
+      profile?.withdraw_methods?.compounded_amounts || profile?.compounded_amounts, 
+      dynamicPlans
+    );
+    if (rawRoi > 0) {
+      lastValidRoiRef.current = rawRoi;
+      return rawRoi;
+    }
+    if (activeInvestments.length === 0) {
+      return 0;
+    }
+    return lastValidRoiRef.current || 0;
+  }, [activeInvestments, profile?.withdraw_methods?.compounded_amounts, profile?.compounded_amounts, dynamicPlans]);
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, logout, refreshAuth, plans: dynamicPlans }}>
+    <AuthContext.Provider value={{ user, profile, loading, logout, refreshAuth, plans: dynamicPlans, expectedDailyRoi }}>
       {loading ? <PremiumLoader /> : children}
     </AuthContext.Provider>
   );
