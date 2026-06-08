@@ -22,7 +22,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useUI } from '../contexts/UIContext';
 import { DynamicBalance } from './DynamicBalance';
 import { RotatingButtonText } from './RotatingButtonText';
-import { collection, query, where, onSnapshot, doc, updateDoc, runTransaction } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 
@@ -37,18 +37,90 @@ const MemoizedWhyChooseSection = React.memo(WhyChooseSection);
 export default function Homepage() {
   const { user, profile } = useAuth();
   const { t } = useLanguage();
-  const { requestPopup, closePopup } = useUI();
+  const { requestPopup, closePopup, activePopupId } = useUI();
   const navigate = useNavigate();
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const [showCheckInPopup, setShowCheckInPopup] = useState(false);
-  const [claimStatus, setClaimStatus] = useState<'idle' | 'claiming' | 'claimed'>('idle');
+  const [investments, setInvestments] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user || !profile) return;
     
+    const isCipher = profile.role === 'cipher';
+    const isVerified = user.emailVerified || isCipher;
+
+    if (!isVerified) return;
+
+    // Listen to investments to determine state
+    const qInv = query(collection(db, 'investments'), where('user_id', '==', user.uid));
+    const unsubInvestments = onSnapshot(qInv, (snap) => {
+      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInvestments(list);
+      setInvestmentsLoaded(true);
+    }, (error) => {
+        console.error("Error fetching investments:", error);
+        setInvestmentsLoaded(true);
+    });
+
+    return () => unsubInvestments();
+  }, [user]);
+
+  const [showCheckInPopup, setShowCheckInPopup] = useState(false);
+  const [claimStatus, setClaimStatus] = useState<'idle' | 'claiming' | 'claimed'>('idle');
+
+  // Compound popup states
+  const [investmentsLoaded, setInvestmentsLoaded] = useState(false);
+  const [showCompoundPopup, setShowCompoundPopup] = useState(false);
+  const [showCompoundSuccess, setShowCompoundSuccess] = useState(false);
+  const [isConfirmingSkip, setIsConfirmingSkip] = useState(false);
+  const [isCompounding, setIsCompounding] = useState(false);
+
+  const localNow = new Date();
+  const todayDateStr = [localNow.getFullYear(), String(localNow.getMonth() + 1).padStart(2, '0'), String(localNow.getDate()).padStart(2, '0')].join('-');
+
+  const lastCompoundDate = profile?.withdraw_methods?.last_compound_popup_date || 
+                           (user ? localStorage.getItem(`last_compound_popup_date_${user.uid}`) : '') || '';
+  
+  const hasActiveInvestment = investments.some(i => i.status === 'active');
+  const availableBalance = profile?.available_balance || 0;
+  const rewardBalance = profile?.withdraw_methods?.reward_dollar_balance ?? profile?.reward_dollar_balance ?? 0;
+  const hasEligibleBalance = availableBalance >= 7 || rewardBalance >= 7;
+
+  const shouldShowCompoundToday = !lastCompoundDate || lastCompoundDate !== todayDateStr;
+  const isCompoundPopupEligible = user && profile && investmentsLoaded && hasActiveInvestment && shouldShowCompoundToday && hasEligibleBalance;
+
+  // Trigger Compound Popup
+  useEffect(() => {
+    if (!user || !profile || !investmentsLoaded) return;
+
+    if (isCompoundPopupEligible && !showCompoundPopup && activePopupId !== 'compound-profits') {
+      const timer = setTimeout(() => {
+        requestPopup(
+          'compound-profits', 
+          () => {
+            setShowCompoundPopup(true);
+            setIsConfirmingSkip(false);
+          }, 
+          () => {
+            setShowCompoundPopup(false);
+          }
+        );
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [user, profile, investmentsLoaded, isCompoundPopupEligible, showCompoundPopup, activePopupId, requestPopup]);
+
+  // Handle other popups conditional suspension
+  useEffect(() => {
+    if (!user || !profile || !investmentsLoaded) return;
+    
+    // SUSPEND daily check-in popup if compound popup is eligible, showing, or compound success popup is showing !
+    if (isCompoundPopupEligible || showCompoundPopup || showCompoundSuccess) {
+      return;
+    }
+
     // Check if yesterday or today claimed in profile record
     const claimedDates = profile?.withdraw_methods?.claimed_dates || profile?.claimed_dates || [];
     const localNow = new Date();
@@ -62,7 +134,7 @@ export default function Homepage() {
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [user, profile, requestPopup]);
+  }, [user, profile, investmentsLoaded, isCompoundPopupEligible, showCompoundPopup, requestPopup]);
 
   const handleDailyClaim = async () => {
     if (!user || claimStatus !== 'idle') return;
@@ -169,28 +241,163 @@ export default function Homepage() {
     }
   };
 
-  const [investments, setInvestments] = useState<any[]>([]);
+  const handleCompoundClick = async () => {
+    const walletsToCompound: ('available' | 'reward')[] = [];
+    if (availableBalance >= 7) {
+      walletsToCompound.push('available');
+    }
+    if (rewardBalance >= 7) {
+      walletsToCompound.push('reward');
+    }
 
-  useEffect(() => {
-    if (!user || !profile) return;
-    
-    const isCipher = profile.role === 'cipher';
-    const isVerified = user.emailVerified || isCipher;
+    if (walletsToCompound.length > 0) {
+      await executeCompounding(walletsToCompound);
+    } else {
+      toast.error("No eligible balances to compound (minimum $7.00 required).");
+    }
+  };
 
-    if (!isVerified) return;
+  const executeCompounding = async (walletsToCompound: ('available' | 'reward')[]) => {
+    if (!user || isCompounding) return;
+    setIsCompounding(true);
+    const toastId = toast.loading("Processing atomic compounding protocol...");
 
-    // Listen to investments to determine state
-    const qInv = query(collection(db, 'investments'), where('user_id', '==', user.uid));
-    const unsubInvestments = onSnapshot(qInv, (snap) => {
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setInvestments(list);
+    try {
+      const userRef = doc(db, 'users', user.uid);
       
-    }, (error) => {
-        console.error("Error fetching investments:", error);
-    });
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("User profile not found.");
+        }
+        
+        const userData = userSnap.data();
+        let availableDeduction = 0;
+        let rewardDeduction = 0;
 
-    return () => unsubInvestments();
-  }, [user]);
+        if (walletsToCompound.includes('available')) {
+          availableDeduction = userData.available_balance || 0;
+          if (availableDeduction < 7) {
+            throw new Error("Available Balance is below the compounding limit of $7.00.");
+          }
+        }
+
+        if (walletsToCompound.includes('reward')) {
+          rewardDeduction = userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
+          if (rewardDeduction < 7) {
+            throw new Error("Reward Balance is below the compounding limit of $7.00.");
+          }
+        }
+
+        const totalToCompound = availableDeduction + rewardDeduction;
+        if (totalToCompound <= 0) {
+          throw new Error("Selected balance amount is 0.");
+        }
+
+        const updates: any = {};
+
+        if (availableDeduction > 0) {
+          updates.available_balance = increment(-availableDeduction);
+        }
+
+        if (rewardDeduction > 0) {
+          const existingWithdrawMethods = userData.withdraw_methods || {};
+          const oldReward = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
+          updates.withdraw_methods = {
+            ...existingWithdrawMethods,
+            reward_dollar_balance: oldReward - rewardDeduction
+          };
+        }
+
+        updates.total_invested = increment(totalToCompound);
+
+        const existingWithdrawMethods = updates.withdraw_methods || userData.withdraw_methods || {};
+        updates.withdraw_methods = {
+          ...existingWithdrawMethods,
+          last_compound_popup_date: todayDateStr
+        };
+
+        transaction.update(userRef, updates);
+
+        const nowIso = new Date().toISOString();
+        if (availableDeduction > 0) {
+          const txRef1 = doc(collection(db, 'transactions'));
+          transaction.set(txRef1, {
+            user_id: user.uid,
+            type: 'compound',
+            type_detail: 'compound_available_balance',
+            amount: availableDeduction,
+            status: 'approved',
+            created_at: nowIso,
+            description: 'Compounded Available Balance to active investment asset'
+          });
+        }
+        if (rewardDeduction > 0) {
+          const txRef2 = doc(collection(db, 'transactions'));
+          transaction.set(txRef2, {
+            user_id: user.uid,
+            type: 'compound',
+            type_detail: 'compound_reward_balance',
+            amount: rewardDeduction,
+            status: 'approved',
+            created_at: nowIso,
+            description: 'Compounded Reward Balance to active investment asset'
+          });
+        }
+
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: user.uid,
+          type: 'success',
+          title: 'Earnings Reinvested',
+          message: `Successfully compounded ${formatCurrency(totalToCompound)} into your active investment node.`,
+          read: false,
+          created_at: nowIso
+        });
+      });
+
+      localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
+      toast.success("Successfully compounded earnings! Assets updated.", { id: toastId });
+      
+      closePopup('compound-profits');
+      setShowCompoundSuccess(true);
+    } catch (err: any) {
+      console.error("Compounding failed:", err);
+      toast.error(err.message || "Failed to compound profits.", { id: toastId });
+    } finally {
+      setIsCompounding(false);
+    }
+  };
+
+  const handleCancelClick = () => {
+    setIsConfirmingSkip(true);
+  };
+
+  const handleSkipConfirmYes = async () => {
+    try {
+      if (user) {
+        const userRef = doc(db, 'users', user.uid);
+        const existingWithdrawMethods = profile?.withdraw_methods || {};
+        await updateDoc(userRef, {
+          withdraw_methods: {
+            ...existingWithdrawMethods,
+            last_compound_popup_date: todayDateStr
+          }
+        });
+        localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
+      }
+    } catch (e) {
+      console.error("Failed to update skip tracker in DB:", e);
+      if (user) localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
+    } finally {
+      setIsConfirmingSkip(false);
+      closePopup('compound-profits');
+    }
+  };
+
+  const handleSkipConfirmNo = () => {
+    setIsConfirmingSkip(false);
+  };
 
   const activeCount = investments.filter(i => i.status === 'active').length;
 
@@ -400,6 +607,175 @@ export default function Homepage() {
                 {claimStatus === 'idle' && "Claim"}
                 {claimStatus === 'claiming' && "Signing..."}
                 {claimStatus === 'claimed' && "Claimed"}
+              </motion.button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Compound Your Profits Popup */}
+      <AnimatePresence>
+        {showCompoundPopup && (
+          <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+              // Backdrop clicks don't close so they must proceed or skip explicitly
+            />
+            
+            {/* Flex column container keeping Card at top and buttons below, matching Daily Reward layout */}
+            <div className="flex flex-col items-center gap-5 max-w-[260px] w-full relative z-10 select-none">
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ type: 'spring', duration: 0.4 }}
+                className="w-full bg-[#050608]/80 border border-white/10 hover:border-white/20 backdrop-blur-md rounded-2xl px-6 py-10 text-center shadow-[0_15px_35px_rgba(0,0,0,0.5)] relative overflow-hidden"
+              >
+                {/* Decorative Glow */}
+                <div className={cn(
+                  "absolute top-0 left-1/2 -translate-x-1/2 w-28 h-28 rounded-full blur-xl pointer-events-none",
+                  isConfirmingSkip ? "bg-red-500/5" : "bg-[#10B981]/5"
+                )} />
+                
+                {/* Confirmation Dialogue or Normal view */}
+                {isConfirmingSkip ? (
+                  <div>
+                    <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-red-400 shadow-inner">
+                      <Clock size={22} className="animate-pulse" />
+                    </div>
+                    
+                    <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
+                      Skip Compounding?
+                    </h3>
+                    
+                    <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
+                      Are you sure you don't want to compound your profits? Reinvesting maximizes your daily ROI potentials.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    {/* Visual Icon Badge */}
+                    <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-[#10B981] shadow-inner">
+                      <TrendingUp size={22} className="animate-bounce" />
+                    </div>
+                    
+                    <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
+                      ROI/Profit Compounding
+                    </h3>
+                    
+                    <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
+                      Increase your earning potential by reinvesting your accumulated earnings into your active investment.
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+
+              {/* Standalone action buttons below the Card, matching Daily Reward layout pattern */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ delay: 0.1 }}
+                className="flex gap-3 w-full justify-center"
+              >
+                {isConfirmingSkip ? (
+                  <>
+                    <button
+                      onClick={handleSkipConfirmYes}
+                      className="flex-1 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-red-400 transition-all duration-200 cursor-pointer italic text-center"
+                    >
+                      Yes
+                    </button>
+                    <button
+                      onClick={handleSkipConfirmNo}
+                      className="flex-1 py-3 bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg"
+                    >
+                      No
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleCancelClick}
+                      className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-white transition-all duration-200 cursor-pointer italic text-center"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCompoundClick}
+                      disabled={isCompounding}
+                      className={cn(
+                        "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg",
+                        isCompounding
+                          ? "bg-[#1F1D2B]/50 border border-white/5 opacity-80 cursor-wait text-gray-400"
+                          : "bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white"
+                      )}
+                    >
+                      {isCompounding ? "Signing..." : "Accept"}
+                    </button>
+                  </>
+                )}
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Popup */}
+      <AnimatePresence>
+        {showCompoundSuccess && (
+          <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+            />
+            
+            {/* Flex column container keeping Card at top and OK button below, matching Daily Reward layout exactly */}
+            <div className="flex flex-col items-center gap-5 max-w-[260px] w-full relative z-10 select-none">
+              
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ type: 'spring', duration: 0.4 }}
+                className="w-full bg-[#050608]/80 border border-white/10 hover:border-white/20 backdrop-blur-md rounded-2xl px-6 py-10 text-center shadow-[0_15px_35px_rgba(0,0,0,0.5)] relative overflow-hidden"
+              >
+                {/* Decorative Accent Glow */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-28 bg-[#10B981]/5 rounded-full blur-xl pointer-events-none" />
+                
+                {/* Visual Icon Badge */}
+                <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-[#10B981] shadow-inner">
+                  <TrendingUp size={22} className="animate-bounce" />
+                </div>
+                
+                <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
+                  Successfully Compounded!
+                </h3>
+                
+                <div className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto font-sans font-medium space-y-1 text-center">
+                  <p>Keep Compounding.</p>
+                  <p>Keep Earning.</p>
+                  <p>Keep Referring.</p>
+                  <p>Keep Growing with Wave.</p>
+                </div>
+              </motion.div>
+              
+              {/* Standalone centered OK button separated below */}
+              <motion.button
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+                transition={{ delay: 0.1 }}
+                onClick={() => setShowCompoundSuccess(false)}
+                className="px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-white shadow-lg transition-all italic duration-200 cursor-pointer w-auto min-w-[150px] text-center bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)]"
+              >
+                OK
               </motion.button>
             </div>
           </div>
