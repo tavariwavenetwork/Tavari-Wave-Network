@@ -447,21 +447,25 @@ async function startServer() {
       }
 
       if (adminDb) {
-        await adminDb.collection("settings").doc("live_activity").set({
-          id: Math.random().toString(36).substring(2, 9),
-          name: safeName,
-          flag: flag || "👤",
-          actionText,
-          amountText: amountText || null,
-          isAmountPositive: isAmountPositive !== undefined ? isAmountPositive : true,
-          timestamp: Date.now()
-        }, { merge: true });
+        try {
+          await adminDb.collection("settings").doc("live_activity").set({
+            id: Math.random().toString(36).substring(2, 9),
+            name: safeName,
+            flag: flag || "👤",
+            actionText,
+            amountText: amountText || null,
+            isAmountPositive: isAmountPositive !== undefined ? isAmountPositive : true,
+            timestamp: Date.now()
+          }, { merge: true });
+        } catch (dbErr: any) {
+          console.warn("Could not write live activity settings:", dbErr.message);
+        }
       }
 
       res.json({ success: true });
     } catch (err: any) {
-      console.error("Broadcast activity error:", err.message);
-      res.status(500).json({ error: "Internal server error" });
+      console.warn("Broadcast activity error:", err.message);
+      res.json({ success: true, error: err.message });
     }
   });
 

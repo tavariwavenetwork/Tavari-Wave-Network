@@ -101,17 +101,9 @@ export function calculateExpectedDailyRoi(
 ): number {
   if (activeInvestments.length === 0) return 0;
 
-  // Find the oldest active investment to add the $3 signup bonus to
-  const sortedInvestments = [...activeInvestments].sort((a, b) => {
-    const dateA = new Date(a.created_at || a.createdAt || a.activated_at || 0).getTime();
-    const dateB = new Date(b.created_at || b.createdAt || b.activated_at || 0).getTime();
-    return dateA - dateB;
-  });
-
   let originalRoi = 0;
-  sortedInvestments.forEach((inv, index) => {
-    // Add the $3 signup bonus to the oldest active investment (index === 0)
-    const amount = index === 0 ? inv.amount + 3 : inv.amount;
+  activeInvestments.forEach((inv) => {
+    const amount = inv.amount;
     originalRoi += amount * getRoiByAmountDynamic(amount, plans);
   });
 
@@ -123,7 +115,8 @@ export function calculateExpectedDailyRoi(
     }
   });
 
-  return originalRoi + compoundedRoi;
+  // Truncate to exactly two decimal places, never round upward
+  return Math.floor((originalRoi + compoundedRoi) * 100) / 100;
 }
 
 export enum OperationType {
@@ -287,14 +280,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (invData.status === 'active') {
                 const roiRate = getRoiByAmountDynamic(invData.amount, plansRef.current);
                 const profitPerCycle = invData.amount * roiRate;
-                const cycleProfit = currentCompletedCycles * profitPerCycle;
+                const rawCycleProfit = currentCompletedCycles * profitPerCycle;
+                const cycleProfit = Math.floor(rawCycleProfit * 100) / 100;
                 totalCredit += cycleProfit;
 
                 investmentUpdates.push({
                   id: invDoc.id,
                   docRef: invRef,
                   data: {
-                    total_earned: (invData.total_earned || 0) + cycleProfit,
+                    total_earned: Math.floor(((invData.total_earned || 0) + cycleProfit) * 100) / 100,
                     last_sync: new Date().toISOString(),
                     dailyRoi: roiRate
                   }
@@ -304,15 +298,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           const compounds = currentProfile.withdraw_methods?.compounded_amounts || currentProfile.compounded_amounts || [];
-          let compoundsProfitPerCycle = 0;
+          let compoundsProfit = 0;
           compounds.forEach((compAmount: number) => {
             if (compAmount > 0) {
               const roiRate = getRoiByAmountDynamic(compAmount, plansRef.current);
-              compoundsProfitPerCycle += compAmount * roiRate;
+              const profitPerCycle = compAmount * roiRate;
+              const rawCompProfit = currentCompletedCycles * profitPerCycle;
+              compoundsProfit += Math.floor(rawCompProfit * 100) / 100;
             }
           });
-          const totalCompoundsProfit = currentCompletedCycles * compoundsProfitPerCycle;
-          totalCredit += totalCompoundsProfit;
+          totalCredit += compoundsProfit;
+          // Clamp totalCredit itself to exactly two decimal places
+          totalCredit = Math.floor(totalCredit * 100) / 100;
 
           if (totalCredit > 0) {
             const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();

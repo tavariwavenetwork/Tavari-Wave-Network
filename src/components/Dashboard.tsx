@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { collection, query, where, orderBy, limit, onSnapshot, doc, updateDoc, getDocs, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
@@ -67,9 +67,19 @@ const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, hi
 
 export default function Dashboard() {
   const { user, profile, plans, expectedDailyRoi } = useAuth();
-  const { isTransferModalOpen, openTransferModal, closeTransferModal, setMrBActivationPopup } = useUI();
+  const { isTransferModalOpen, openTransferModal, closeTransferModal, setMrBActivationPopup, setIsWelcomeBonusDeductedPopupOpen } = useUI();
   const navigate = useNavigate();
+  const location = useLocation();
   const [recentTx, setRecentTx] = useState<any[]>([]);
+
+  // Automatically open the inactive modal when navigated here via an activation trigger
+  useEffect(() => {
+    if (location.state?.showInactive || location.hash === '#inactive') {
+      setShowInactiveModal(true);
+      // Clear navigation state to prevent annoying re-triggers upon tab-refresh
+      navigate(location.pathname + (location.hash === '#inactive' ? '' : location.hash), { replace: true, state: {} });
+    }
+  }, [location, navigate]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [showActiveModal, setShowActiveModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
@@ -264,12 +274,20 @@ export default function Dashboard() {
         }
       });
 
-      // Trigger Mr B's activation reward popup
-      if (setMrBActivationPopup) {
-        setMrBActivationPopup({
+      // Trigger the $3 welcome bonus deduction popup if it was first activation
+      if (isFirstActivation && !profile.welcome_bonus_deducted) {
+        setIsWelcomeBonusDeductedPopupOpen({
           planName: activatedPlanName,
           amount: activatedAmount
         });
+      } else {
+        // Trigger Mr B's activation reward popup directly
+        if (setMrBActivationPopup) {
+          setMrBActivationPopup({
+            planName: activatedPlanName,
+            amount: activatedAmount
+          });
+        }
       }
 
       toast.success("Investment Activated Successfully! ROI Engine Started.");

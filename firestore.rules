@@ -30,11 +30,11 @@ service cloud.firestore {
     }
 
     function isSuspended(data) {
-      return data.get('suspended', false) == true;
+      return 'suspended' in data && data.suspended == true;
     }
 
     function isBanned(data) {
-      return data.get('banned', false) == true;
+      return 'banned' in data && data.banned == true;
     }
 
     function isStatusActive(uid) {
@@ -92,8 +92,10 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isSignedIn() && (incoming().get('role', 'user') == 'user' || isCipher()); 
       allow update: if (isCipher() || 
                        (isOwner(userId) && 
-                        !isSuspended(incoming()) && !isSuspended(existing()) && 
-                        !isBanned(incoming()) && !isBanned(existing()) && 
+                        !isSuspended(incoming()) && 
+                        !isSuspended(existing()) && 
+                        !isBanned(incoming()) && 
+                        !isBanned(existing()) && 
                         incoming().diff(existing()).affectedKeys().hasOnly([
                           'name', 'username', 'email', 'phone', 'photoURL', 'transfer_pin', 'transaction_pin', 
                           'push_notifications', 'available_balance', 'funding_balance', 'total_earnings', 
@@ -101,7 +103,7 @@ service cloud.firestore {
                           'referrals_count', 'withdraw_methods', 'last_rebook', 'roi_disabled', 
                           'withdrawals_frozen', 'transfers_frozen', 'email_verified', 'public_id',
                           'referral_code', 'referral_link', 'referred_by', 'created_at', 'last_active_at',
-                          'twn_balance', 'points_balance', 'profile_edited'
+                          'twn_balance', 'points_balance', 'profile_edited', 'welcome_bonus_deducted'
                         ])) ||
                        (isSignedIn() && existing().get('referred_by', '') == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
                        (isSignedIn() && !isOwner(userId) && 
@@ -122,6 +124,7 @@ service cloud.firestore {
       allow create: if isSignedIn() && (
         isCipher() || 
         incoming().user_id == request.auth.uid || 
+        incoming().get('user_id', '') == request.auth.uid ||
         (incoming().keys().hasAny(['sender_id']) && incoming().sender_id == request.auth.uid)
       );
       allow update, delete: if isCipher();

@@ -77,6 +77,8 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
     displayType = 'PTS → USD Conversion';
   } else if (tx.type === 'signup_bonus') {
     displayType = 'Signup Welcome Bonus';
+  } else if (tx.type === 'fee') {
+    displayType = tx.description || 'System Protocol Fee';
   }
 
   // Determine status display and behavior
@@ -145,6 +147,9 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
   } else if (tx.type === 'rewards_conversion') {
     iconComponent = <RefreshCw size={18} />;
     iconBg = 'bg-purple-500/10 text-purple-400';
+  } else if (tx.type === 'fee') {
+    iconComponent = <MinusCircle size={18} />;
+    iconBg = 'bg-red-500/10 text-red-500';
   }
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -152,9 +157,9 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
   };
 
   const isPointsGain = tx.type === 'points_gain';
-  const isWithType = tx.type === 'withdrawal';
+  const isWithType = tx.type === 'withdrawal' || tx.type === 'fee';
   const displaySign = isWithType ? '-' : '+';
-  const displayAmount = isPointsGain ? `${tx.amount} PTS` : formatCurrency(tx.amount);
+  const displayAmount = isPointsGain ? `${tx.amount} PTS` : formatCurrency(Math.abs(tx.amount));
 
   return (
     <div 

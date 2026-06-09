@@ -19,6 +19,16 @@ interface UIContextType {
   requestPopup: (id: string, onShow: () => void, onClose: () => void) => void;
   closePopup: (id: string) => void;
   activePopupId: string | null;
+
+  // New states for investment processing & popups
+  isViewingProcessingScreen: boolean;
+  setIsViewingProcessingScreen: (val: boolean) => void;
+  processingInvestmentId: string | null;
+  setProcessingInvestmentId: (val: string | null) => void;
+  approvedNotificationPopup: { id: string; planName: string; amount: number } | null;
+  setApprovedNotificationPopup: (val: { id: string; planName: string; amount: number } | null) => void;
+  isWelcomeBonusDeductedPopupOpen: { planName: string; amount: number } | null;
+  setIsWelcomeBonusDeductedPopupOpen: (val: { planName: string; amount: number } | null) => void;
 }
 
 const UIContext = createContext<UIContextType | undefined>(undefined);
@@ -36,6 +46,12 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   
   // Real active state of mrB activation popup
   const [mrBActivationValue, setMrBActivationValue] = useState<{ planName: string; amount: number } | null>(null);
+
+  // New states for investment processing & popups
+  const [isViewingProcessingScreen, setIsViewingProcessingScreen] = useState(false);
+  const [processingInvestmentId, setProcessingInvestmentId] = useState<string | null>(null);
+  const [approvedNotificationPopup, setApprovedNotificationPopup] = useState<{ id: string; planName: string; amount: number } | null>(null);
+  const [isWelcomeBonusDeductedPopupOpen, setIsWelcomeBonusDeductedPopupOpen] = useState<{ planName: string; amount: number } | null>(null);
 
   // Keep a table/registry of actual callbacks to support multi-component onClose correctly
   const popupRegistryRef = useRef<Map<string, PopupRequest>>(new Map());
@@ -182,7 +198,15 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       setMrBActivationPopup,
       requestPopup,
       closePopup,
-      activePopupId
+      activePopupId,
+      isViewingProcessingScreen,
+      setIsViewingProcessingScreen,
+      processingInvestmentId,
+      setProcessingInvestmentId,
+      approvedNotificationPopup,
+      setApprovedNotificationPopup,
+      isWelcomeBonusDeductedPopupOpen,
+      setIsWelcomeBonusDeductedPopupOpen
     }}>
       {children}
     </UIContext.Provider>

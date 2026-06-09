@@ -34,17 +34,19 @@ import {
   Headset,
   Share2,
   Copy,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useLocation, useNavigate, Outlet, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, handleFirestoreError, OperationType } from '../contexts/AuthContext';
 import { useLanguage, LANGUAGES } from '../contexts/LanguageContext';
 import { useUI } from '../contexts/UIContext';
 import TransferModal from './TransferModal';
 import { db } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot, limit, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, limit, doc, updateDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import MarketTicker from './MarketTicker';
@@ -228,8 +230,95 @@ interface Notification {
 export default function Layout() {
   const { user, profile, logout } = useAuth();
   const { language, setLanguage, t } = useLanguage();
-  const { isTransferModalOpen, openTransferModal, closeTransferModal, isDistractionFree, mrBActivationPopup, setMrBActivationPopup, requestPopup, closePopup } = useUI();
+  const { 
+    isTransferModalOpen, 
+    openTransferModal, 
+    closeTransferModal, 
+    isDistractionFree, 
+    mrBActivationPopup, 
+    setMrBActivationPopup, 
+    requestPopup, 
+    closePopup,
+    isViewingProcessingScreen,
+    processingInvestmentId,
+    approvedNotificationPopup,
+    setApprovedNotificationPopup,
+    isWelcomeBonusDeductedPopupOpen,
+    setIsWelcomeBonusDeductedPopupOpen
+  } = useUI();
   const location = useLocation();
+
+  const dismissedAlertsRef = useRef<Set<string>>(
+    (() => {
+      try {
+        const saved = sessionStorage.getItem('dismissed_approved_notifications');
+        return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
+      } catch {
+        return new Set<string>();
+      }
+    })()
+  );
+
+  // Listen for newly approved investments to show activation popups
+  useEffect(() => {
+    if (!user) return;
+    
+    // Listen to investments of status: 'inactive'
+    const qApproved = query(
+      collection(db, 'investments'),
+      where('user_id', '==', user.uid),
+      where('status', '==', 'inactive')
+    );
+    
+    const unsubscribe = onSnapshot(qApproved, (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added' || change.type === 'modified') {
+          const data = change.doc.data();
+          const invId = change.doc.id;
+          
+          // DO NOT display the 'Activate Investment' popup while users remain on the payment processing screen
+          if (isViewingProcessingScreen) {
+            return;
+          }
+
+          // Check if this investment popup has already been dismissed/handled in this session
+          const savedStr = sessionStorage.getItem('dismissed_approved_notifications');
+          let sessionSet = new Set<string>();
+          try {
+            if (savedStr) {
+              sessionSet = new Set<string>(JSON.parse(savedStr));
+            }
+          } catch (e) {}
+
+          if (dismissedAlertsRef.current.has(invId) || sessionSet.has(invId)) {
+            return;
+          }
+          
+          // Check if it was created recently (e.g., within last 2 days) to avoid historic alerts on initial load
+          const createdAtStr = data.created_at || '';
+          if (createdAtStr) {
+            const ageMs = Date.now() - new Date(createdAtStr).getTime();
+            if (ageMs > 2 * 24 * 60 * 60 * 1000) {
+              return; // Too old, ignore historic investment records
+            }
+          }
+          
+          // Show the premium approved in-app popup for this approved investment!
+          if (setApprovedNotificationPopup && (!approvedNotificationPopup || approvedNotificationPopup.id !== invId)) {
+            setApprovedNotificationPopup({
+              id: invId,
+              planName: data.plan_name || 'Node Plan',
+              amount: data.amount || 0
+            });
+          }
+        }
+      });
+    }, (error) => {
+      console.warn("Approved investment listener blocked:", error.message);
+    });
+    
+    return () => unsubscribe();
+  }, [user, isViewingProcessingScreen, approvedNotificationPopup, setApprovedNotificationPopup]);
   const navigate = useNavigate();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const isDark = true;
@@ -245,6 +334,59 @@ export default function Layout() {
   const [activeLayoutAd, setActiveLayoutAd] = useState<any | null>(null);
 
   const [showTelegramPopup, setShowTelegramPopup] = useState(false);
+
+  const [isDeductingBotFee, setIsDeductingBotFee] = useState(false);
+
+  const handleBotFeeAcknowledge = async () => {
+    if (!user || isDeductingBotFee || !isWelcomeBonusDeductedPopupOpen) return;
+    setIsDeductingBotFee(true);
+    const metadata = isWelcomeBonusDeductedPopupOpen;
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const now = new Date().toISOString();
+
+      await runTransaction(db, async (transaction) => {
+        const uSnap = await transaction.get(userRef);
+        if (!uSnap.exists()) throw new Error("Awaiting user profile sync.");
+
+        transaction.update(userRef, {
+          total_invested: increment(-3),
+          welcome_bonus_deducted: true
+        });
+
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: user.uid,
+          type: 'fee',
+          amount: -3.00,
+          status: 'AI Active',
+          description: 'AI Bot Activation',
+          created_at: now
+        });
+      });
+
+      setIsWelcomeBonusDeductedPopupOpen(null);
+
+      if (setMrBActivationPopup) {
+        setMrBActivationPopup({
+          planName: metadata.planName,
+          amount: metadata.amount
+        });
+      }
+      toast.success("AI Bot Activation fee deducted. Setup finalized.");
+    } catch (err: any) {
+      console.error("Deducting bot fee failed:", err);
+      try {
+        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}/bot-fee-transaction`);
+      } catch (logErr: any) {
+        const cleanMessage = err.message || "Missing or insufficient permissions";
+        toast.error(`Verification failed: ${cleanMessage}`);
+      }
+    } finally {
+      setIsDeductingBotFee(false);
+    }
+  };
 
   // Referral Invite & Real-time Claim Popups State
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -1972,6 +2114,147 @@ export default function Layout() {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 4. WELCOME BONUS DEDUCTION POPUP */}
+      <AnimatePresence>
+        {isWelcomeBonusDeductedPopupOpen && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 30 }}
+            transition={{ type: "spring", damping: 25, stiffness: 350 }}
+            className="fixed bottom-6 right-4 md:right-6 max-w-[380px] w-[calc(100vw-32px)] z-[1200] rounded-2xl bg-[#090b10]/95 backdrop-blur-xl border border-primary/20 shadow-[0_25px_60px_-15px_rgba(59,130,246,0.3)] p-5 select-none text-left overflow-hidden border-l-4 border-l-primary"
+          >
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-indigo-500 to-purple-500 opacity-80" />
+            <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 blur-2xl rounded-full pointer-events-none" />
+
+            <div className="flex gap-4 items-start relative z-10">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                <img 
+                  src="https://i.imgur.com/swuDIvl.png" 
+                  alt="Premium AI Bot Active" 
+                  referrerPolicy="no-referrer"
+                  className="w-10 h-10 object-contain"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[9px] uppercase font-semibold text-primary tracking-wider">Protocol Activation</span>
+                </div>
+                <h4 className="text-sm font-bold text-white tracking-tight leading-snug">
+                  AI Trading Bot Activated
+                </h4>
+                <p className="text-[11px] text-gray-300 mt-2 leading-relaxed font-sans">
+                  $3 AI Trading Bot Activation Fee has been deducted from your account.
+                </p>
+                <div className="mt-3.5">
+                  <button 
+                    disabled={isDeductingBotFee}
+                    onClick={handleBotFeeAcknowledge}
+                    className="w-full py-2 bg-gradient-to-r from-primary to-indigo-500 hover:from-primary/95 hover:to-indigo-600 text-white text-[10px] uppercase font-semibold tracking-widest rounded-xl transition-all shadow-lg active:scale-95 text-center cursor-pointer block disabled:opacity-50"
+                  >
+                    {isDeductingBotFee ? "Processing..." : "OK"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 3. DEPOSIT APPROVED INVESTMENT ACTIVATION POPUP */}
+      <AnimatePresence>
+        {approvedNotificationPopup && (
+          <>
+            {/* Backdrop Overlay only on mobile */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.6 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-[1199] md:hidden backdrop-blur-xs"
+              onClick={() => {
+                if (approvedNotificationPopup) {
+                  dismissedAlertsRef.current.add(approvedNotificationPopup.id);
+                  try {
+                    sessionStorage.setItem('dismissed_approved_notifications', JSON.stringify(Array.from(dismissedAlertsRef.current)));
+                  } catch (e) {}
+                }
+                setApprovedNotificationPopup(null);
+              }}
+            />
+
+            {/* Centering wrapper on mobile */}
+            <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 pointer-events-none md:inset-auto md:bottom-6 md:right-6 md:p-0 md:block">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                transition={{ type: "spring", damping: 25, stiffness: 350 }}
+                className="relative w-full max-w-[380px] rounded-2xl bg-[#090b10]/95 backdrop-blur-xl border border-primary/20 shadow-[0_25px_60px_-15px_rgba(59,130,246,0.3)] p-5 select-none text-left overflow-hidden border-l-4 border-l-primary pointer-events-auto md:fixed md:bottom-6 md:right-6 md:w-[380px]"
+              >
+                <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-blue-500 to-indigo-500 opacity-80" />
+                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 blur-2xl rounded-full pointer-events-none" />
+
+                <div className="flex gap-4 items-start relative z-10">
+                  <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center text-primary flex-shrink-0 animate-pulse">
+                    <ShieldCheck size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[9px] uppercase font-semibold text-primary tracking-wider">Approved & Ready</span>
+                      <button 
+                        onClick={() => {
+                          if (approvedNotificationPopup) {
+                            dismissedAlertsRef.current.add(approvedNotificationPopup.id);
+                            try {
+                              sessionStorage.setItem('dismissed_approved_notifications', JSON.stringify(Array.from(dismissedAlertsRef.current)));
+                            } catch (e) {}
+                          }
+                          setApprovedNotificationPopup(null);
+                        }}
+                        className="text-gray-400 hover:text-white transition-colors cursor-pointer"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <h4 className="text-sm font-bold text-white tracking-tight leading-snug">
+                      Investment Approved
+                    </h4>
+                    <div className="mt-1.5 p-2 bg-primary/5 border border-primary/10 rounded-lg">
+                      <p className="text-[10px] text-gray-400">
+                        Plan: <span className="text-white font-semibold uppercase">{approvedNotificationPopup.planName}</span>
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        Amount: <span className="text-primary font-bold font-mono">${approvedNotificationPopup.amount.toLocaleString()}</span>
+                      </p>
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+                      Your submitted investment has been verified and approved by administration. Activate it now to start compiling your ROI yield.
+                    </p>
+                    <div className="mt-3.5">
+                      <button 
+                        onClick={() => {
+                          if (approvedNotificationPopup) {
+                            dismissedAlertsRef.current.add(approvedNotificationPopup.id);
+                            try {
+                              sessionStorage.setItem('dismissed_approved_notifications', JSON.stringify(Array.from(dismissedAlertsRef.current)));
+                            } catch (e) {}
+                          }
+                          setApprovedNotificationPopup(null);
+                          navigate('/dashboard', { state: { showInactive: true } });
+                        }}
+                        className="w-full py-2 bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-700 text-white text-[10px] uppercase font-semibold tracking-widest rounded-xl transition-all shadow-lg active:scale-95 text-center cursor-pointer block"
+                      >
+                        Activate Investment
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
     </div>

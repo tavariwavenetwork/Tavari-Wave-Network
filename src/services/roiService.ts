@@ -28,9 +28,9 @@ export class ROIEngine {
       let processedCount = 0;
 
       for (const node of eligibleNodes.rows) {
-        // Calculation: amount * ROI %
+        // Calculation: amount * ROI % (truncated to exactly two decimal places, never round upward)
         const dailyRate = parseFloat(node.daily_roi_rate) / 100;
-        const profit = parseFloat(node.amount) * dailyRate;
+        const profit = Math.floor((parseFloat(node.amount) * dailyRate) * 100) / 100;
 
         // Perform atomic updates
         // In a high-scale environment, these would be wrapped in a START TRANSACTION

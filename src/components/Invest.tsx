@@ -46,6 +46,7 @@ import {
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
 import { broadcastActivity } from '../lib/activity_logger';
+import InvestProcessingView from './InvestProcessingView';
 
 // --- CONSTANTS ---
 const CRYPTO_ADDRESSES = {
@@ -225,7 +226,16 @@ const RealisticCardIcon = () => (
 
 export default function Invest() {
   const { user, profile, plans } = useAuth();
-  const { setDistractionFree, setMrBActivationPopup } = useUI();
+  const { 
+    setDistractionFree, 
+    setMrBActivationPopup,
+    isViewingProcessingScreen,
+    setIsViewingProcessingScreen,
+    processingInvestmentId,
+    setProcessingInvestmentId,
+    isWelcomeBonusDeductedPopupOpen,
+    setIsWelcomeBonusDeductedPopupOpen
+  } = useUI();
   const { config: uiConfig } = useUIConfig();
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
@@ -233,7 +243,7 @@ export default function Invest() {
   const walletBalanceToShow = selectedWallet === 'reward_dollar_balance'
     ? (profile?.withdraw_methods?.reward_dollar_balance ?? profile?.reward_dollar_balance ?? 0)
     : (profile?.[selectedWallet] || 0);
-  const [view, setView] = useState<'plans' | 'summary' | 'payment'>('plans');
+  const [view, setView] = useState<'plans' | 'summary' | 'payment' | 'processing'>('plans');
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [confirmedAmount, setConfirmedAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'crypto' | 'bank' | 'card' | null>(null);
@@ -277,11 +287,16 @@ export default function Invest() {
       setDistractionFree(false);
     }
 
+    if (view !== 'processing') {
+      setIsViewingProcessingScreen(false);
+    }
+
     return () => {
       // Ensure it's disabled when leaving the page entirely
       setDistractionFree(false);
+      setIsViewingProcessingScreen(false);
     };
-  }, [view, setDistractionFree]);
+  }, [view, setDistractionFree, setIsViewingProcessingScreen]);
 
   const handleCopy = (text: string, field: string) => {
     navigator.clipboard.writeText(text);
@@ -374,12 +389,20 @@ export default function Invest() {
         }
       });
 
-      // Trigger the 2% activation bonus popup for Mr. B
-      if (setMrBActivationPopup) {
-        setMrBActivationPopup({
+      // Trigger the $3 welcome bonus deduction popup if it was first activation
+      if (isFirstActivation && !profile.welcome_bonus_deducted) {
+        setIsWelcomeBonusDeductedPopupOpen({
           planName: inv.plan_name,
           amount: inv.amount
         });
+      } else {
+        // Trigger the 2% activation bonus popup for Mr. B directly
+        if (setMrBActivationPopup) {
+          setMrBActivationPopup({
+            planName: inv.plan_name,
+            amount: inv.amount
+          });
+        }
       }
 
       toast.success("Node Pulse Detected. Core Cycle Initiated + Referral Bonuses Dispersed.");
@@ -425,7 +448,32 @@ export default function Invest() {
     }
 
     setIsSubmitting(true);
+
     try {
+      // 1.1 DUPLICATE PENDING INVESTMENT PREVENTION
+      const qDup = query(
+        collection(db, 'investments'),
+        where('user_id', '==', user.uid),
+        where('plan_name', '==', selectedPlan.name),
+        where('amount', '==', confirmedAmount)
+      );
+      const dupSnap = await getDocs(qDup);
+      const hasPendingMatch = dupSnap.docs.some(docRecord => {
+        const d = docRecord.data();
+        const s = (d.status || '').toLowerCase();
+        return s === 'pending' || s === 'awaiting_payment' || s === 'under_review' || s === 'awaiting_approval' || s === 'awaiting-payment' || s === 'under-review' || s === 'awaiting_payment_verification';
+      });
+
+      if (hasPendingMatch) {
+        toast.error(`A duplicate request for ${formatCurrency(confirmedAmount)} on the ${selectedPlan.name} Plan is already pending review.`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Pre-declare reference to capture generated ID for tracking on success
+      const invRef = doc(collection(db, 'investments'));
+      const newInvestmentId = invRef.id;
+
       await runTransaction(db, async (transaction) => {
         const userRef = doc(db, 'users', user.uid);
         const userSnap = await transaction.get(userRef);
@@ -446,7 +494,6 @@ export default function Invest() {
         }
 
         // 3. LOG INVESTMENT
-        const invRef = doc(collection(db, 'investments'));
         transaction.set(invRef, {
           user_id: user.uid,
           user_name: userData.name,
@@ -496,7 +543,6 @@ export default function Invest() {
         });
       });
 
-      setShowSuccessModal(true);
       setAmounts({});
       setTransactionId('');
       toast.success(paymentMethod === 'wallet' ? "Investment initialized successfully." : "Investment request submitted. Awaiting network confirmation.");
@@ -508,6 +554,11 @@ export default function Invest() {
         true,
         "⚙️"
       );
+
+      // Trigger the premium processing screen layout transition
+      setProcessingInvestmentId(newInvestmentId);
+      setIsViewingProcessingScreen(true);
+      setView('processing');
     } catch (error: any) {
       console.error("Investment Error:", error);
       toast.error(error.message || "Process failed. Please try again.");
@@ -751,6 +802,18 @@ export default function Invest() {
              </div>
             </div>
           </motion.div>
+        )}
+
+        {view === 'processing' && selectedPlan && (
+          <InvestProcessingView 
+            investmentId={processingInvestmentId}
+            planName={selectedPlan.name}
+            amount={confirmedAmount}
+            onClose={() => {
+              setView('plans');
+              setSelectedPlan(null);
+            }}
+          />
         )}
 
         {view === 'payment' && selectedPlan && (
