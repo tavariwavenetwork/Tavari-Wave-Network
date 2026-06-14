@@ -30,7 +30,13 @@
         "roi_cycle_start": { "type": "string", "format": "date-time" },
         "created_at": { "type": "string", "format": "date-time" },
         "twn_balance": { "type": "number" },
-        "points_balance": { "type": "number" }
+        "points_balance": { "type": "number" },
+        "auto_compound_enabled": { "type": "boolean" },
+        "auto_compound_duration": { "type": "number" },
+        "auto_compound_start_date": { "type": "string", "format": "date-time" },
+        "auto_compound_end_date": { "type": "string", "format": "date-time" },
+        "auto_compound_expired": { "type": "boolean" },
+        "compounded_amounts": { "type": "array" }
       },
       "required": ["uid", "name", "username", "email", "funding_balance", "available_balance", "total_earnings", "total_invested"]
     },

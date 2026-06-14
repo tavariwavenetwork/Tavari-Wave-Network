@@ -314,34 +314,133 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (totalCredit > 0) {
             const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();
             
+            // Check automatic compounding state
+            let autoCompoundEnabled = currentProfile.auto_compound_enabled || false;
+            let isCompoundingActiveNow = false;
+            const nowMs = new Date().getTime();
+
+            if (autoCompoundEnabled && currentProfile.auto_compound_end_date) {
+              const endMs = new Date(currentProfile.auto_compound_end_date).getTime();
+              if (nowMs >= endMs) {
+                autoCompoundEnabled = false;
+              } else {
+                isCompoundingActiveNow = true;
+              }
+            }
+
             const oldAvailableBalance = currentProfile.available_balance || 0;
-            const newAvailableBalance = oldAvailableBalance + totalCredit;
 
-            transaction.update(docRef, {
-              available_balance: newAvailableBalance,
-              total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
-              roi_cycle_start: newCycleStart
-            });
+            if (isCompoundingActiveNow) {
+              // Automated Daily Compounding behavior
+              // 1. Deduct target amount from balance (net effect is 0 change in available balance)
+              // 2. Increase total assets (total_invested) and append to compounded_amounts
+              const existingCompounds = currentProfile.withdraw_methods?.compounded_amounts || currentProfile.compounded_amounts || [];
+              const newCompounds = [...existingCompounds, totalCredit];
+              const existingWithdrawMethods = currentProfile.withdraw_methods || {};
+              const withdrawMethodsUpdate = {
+                ...existingWithdrawMethods,
+                compounded_amounts: newCompounds,
+                last_compound_popup_date: new Date().toISOString().split('T')[0]
+              };
 
-            investmentUpdates.forEach(update => {
-              transaction.update(update.docRef, update.data);
-            });
+              const userUpdates: any = {
+                total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
+                total_invested: (currentProfile.total_invested || 0) + totalCredit,
+                roi_cycle_start: newCycleStart,
+                withdraw_methods: withdrawMethodsUpdate,
+                auto_compound_enabled: autoCompoundEnabled
+              };
 
-            const txId = `roi-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
-            const txRef = doc(db, 'transactions', txId);
-            transaction.set(txRef, {
-              user_id: firebaseUser.uid,
-              type: 'roi_harvest',
-              amount: totalCredit,
-              plan_name: 'Auto-Yield Cycle',
-              created_at: new Date().toISOString(),
-              status: 'approved',
-              description: `Automatic credit for ${currentCompletedCycles} cycle(s)`
-            });
+              if (currentProfile.compounded_amounts) {
+                userUpdates.compounded_amounts = newCompounds;
+              }
+
+              transaction.update(docRef, userUpdates);
+
+              // Standard Investment items are updated normally
+              investmentUpdates.forEach(update => {
+                transaction.update(update.docRef, update.data);
+              });
+
+              // Write ROI harvest transaction
+              const harvestTxId = `roi-auto-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
+              const harvestTxRef = doc(db, 'transactions', harvestTxId);
+              transaction.set(harvestTxRef, {
+                user_id: firebaseUser.uid,
+                type: 'roi_harvest',
+                amount: totalCredit,
+                plan_name: 'Auto-Yield Cycle',
+                created_at: new Date().toISOString(),
+                status: 'approved',
+                description: `Automatic credit for ${currentCompletedCycles} cycle(s)`
+              });
+
+              // Write automatic compound transaction
+              const compoundTxId = `roi-comp-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
+              const compoundTxRef = doc(db, 'transactions', compoundTxId);
+              transaction.set(compoundTxRef, {
+                user_id: firebaseUser.uid,
+                type: 'compound',
+                type_detail: 'compound_available_balance',
+                amount: totalCredit,
+                status: 'approved',
+                created_at: new Date().toISOString(),
+                description: `Automated Daily Reinvestment of ROI earnings`
+              });
+
+              // Write Notification
+              const notifRef = doc(collection(db, 'notifications'));
+              transaction.set(notifRef, {
+                user_id: firebaseUser.uid,
+                type: 'success',
+                title: 'Auto-Compound Executed',
+                message: `Automated compounding protocol reinvested ${totalCredit.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} into your assets.`,
+                read: false,
+                created_at: new Date().toISOString()
+              });
+            } else {
+              // Standard manual earning behaviour
+              const newAvailableBalance = oldAvailableBalance + totalCredit;
+
+              transaction.update(docRef, {
+                available_balance: newAvailableBalance,
+                total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
+                roi_cycle_start: newCycleStart,
+                auto_compound_enabled: autoCompoundEnabled
+              });
+
+              investmentUpdates.forEach(update => {
+                transaction.update(update.docRef, update.data);
+              });
+
+              const txId = `roi-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
+              const txRef = doc(db, 'transactions', txId);
+              transaction.set(txRef, {
+                user_id: firebaseUser.uid,
+                type: 'roi_harvest',
+                amount: totalCredit,
+                plan_name: 'Auto-Yield Cycle',
+                created_at: new Date().toISOString(),
+                status: 'approved',
+                description: `Automatic credit for ${currentCompletedCycles} cycle(s)`
+              });
+            }
           } else {
             const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();
+            
+            // Check automatic compounding state for expiration even when credit is 0
+            let autoCompoundEnabled = currentProfile.auto_compound_enabled || false;
+            if (autoCompoundEnabled && currentProfile.auto_compound_end_date) {
+              const nowMs = new Date().getTime();
+              const endMs = new Date(currentProfile.auto_compound_end_date).getTime();
+              if (nowMs >= endMs) {
+                autoCompoundEnabled = false;
+              }
+            }
+
             transaction.update(docRef, {
-              roi_cycle_start: newCycleStart
+              roi_cycle_start: newCycleStart,
+              auto_compound_enabled: autoCompoundEnabled
             });
           }
         });

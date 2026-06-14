@@ -12,7 +12,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   TrendingUp,
-  BookOpen
+  BookOpen,
+  Cpu
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -77,6 +78,7 @@ export default function Homepage() {
   const [showCompoundSuccess, setShowCompoundSuccess] = useState(false);
   const [isConfirmingSkip, setIsConfirmingSkip] = useState(false);
   const [isCompounding, setIsCompounding] = useState(false);
+  const [showDurationSelector, setShowDurationSelector] = useState(false);
 
   const localNow = new Date();
   const todayDateStr = [localNow.getFullYear(), String(localNow.getMonth() + 1).padStart(2, '0'), String(localNow.getDate()).padStart(2, '0')].join('-');
@@ -243,30 +245,40 @@ export default function Homepage() {
   };
 
   const handleCompoundClick = async () => {
-    const walletsToCompound: ('available' | 'reward')[] = [];
-    if (availableBalance >= 7) {
-      walletsToCompound.push('available');
-    }
-    if (rewardBalance >= 7) {
-      walletsToCompound.push('reward');
-    }
+    const isAutoCompoundActive = !!(
+      profile?.auto_compound_enabled &&
+      profile?.auto_compound_end_date &&
+      new Date(profile.auto_compound_end_date).getTime() > new Date().getTime()
+    );
 
-    if (walletsToCompound.length > 0) {
-      await executeCompounding(walletsToCompound);
+    if (isAutoCompoundActive) {
+      setShowDurationSelector(false);
     } else {
-      toast.error("No eligible balances to compound (minimum $7.00 required).");
+      setShowDurationSelector(true);
     }
   };
 
-  const executeCompounding = async (walletsToCompound: ('available' | 'reward')[]) => {
+  const selectCompoundingDuration = async (days: number) => {
     if (!user || isCompounding) return;
     setIsCompounding(true);
-    const toastId = toast.loading("Processing atomic compounding protocol...");
+    const toastId = toast.loading("Activating automated daily compounding...");
     let compoundedAmountCalculated = 0;
 
     try {
+      const startDate = new Date();
+      const endDate = new Date();
+      endDate.setDate(startDate.getDate() + days);
+
       const userRef = doc(db, 'users', user.uid);
       
+      const walletsToCompound: ('available' | 'reward')[] = [];
+      if (availableBalance >= 7) {
+        walletsToCompound.push('available');
+      }
+      if (rewardBalance >= 7) {
+        walletsToCompound.push('reward');
+      }
+
       await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
         if (!userSnap.exists()) {
@@ -279,107 +291,125 @@ export default function Homepage() {
 
         if (walletsToCompound.includes('available')) {
           availableDeduction = userData.available_balance || 0;
-          if (availableDeduction < 7) {
-            throw new Error("Available Balance is below the compounding limit of $7.00.");
-          }
         }
 
         if (walletsToCompound.includes('reward')) {
           rewardDeduction = userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
-          if (rewardDeduction < 7) {
-            throw new Error("Reward Balance is below the compounding limit of $7.00.");
-          }
         }
 
         const totalToCompound = availableDeduction + rewardDeduction;
-        if (totalToCompound <= 0) {
-          throw new Error("Selected balance amount is 0.");
-        }
 
-        compoundedAmountCalculated = totalToCompound;
-
-        const updates: any = {};
-
-        if (availableDeduction > 0) {
-          updates.available_balance = increment(-availableDeduction);
-        }
-
-        if (rewardDeduction > 0) {
-          const existingWithdrawMethods = userData.withdraw_methods || {};
-          const oldReward = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
-          updates.withdraw_methods = {
-            ...existingWithdrawMethods,
-            reward_dollar_balance: oldReward - rewardDeduction
-          };
-        }
-
-        updates.total_invested = increment(totalToCompound);
-
-        const existingCompounds = userData.withdraw_methods?.compounded_amounts || userData.compounded_amounts || [];
-        const newCompounds = [...existingCompounds, totalToCompound];
-
-        const existingWithdrawMethods = updates.withdraw_methods || userData.withdraw_methods || {};
-        updates.withdraw_methods = {
-          ...existingWithdrawMethods,
-          compounded_amounts: newCompounds,
-          last_compound_popup_date: todayDateStr
+        const updates: any = {
+          auto_compound_enabled: true,
+          auto_compound_duration: days,
+          auto_compound_start_date: startDate.toISOString(),
+          auto_compound_end_date: endDate.toISOString(),
+          auto_compound_expired: false
         };
 
+        if (totalToCompound > 0) {
+          compoundedAmountCalculated = totalToCompound;
+
+          if (availableDeduction > 0) {
+            updates.available_balance = increment(-availableDeduction);
+          }
+
+          if (rewardDeduction > 0) {
+            const existingWithdrawMethods = userData.withdraw_methods || {};
+            const oldReward = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
+            updates.withdraw_methods = {
+              ...existingWithdrawMethods,
+              reward_dollar_balance: oldReward - rewardDeduction
+            };
+          }
+
+          updates.total_invested = increment(totalToCompound);
+
+          const existingCompounds = userData.withdraw_methods?.compounded_amounts || userData.compounded_amounts || [];
+          const newCompounds = [...existingCompounds, totalToCompound];
+
+          const existingWithdrawMethodsUpdate = updates.withdraw_methods || userData.withdraw_methods || {};
+          updates.withdraw_methods = {
+            ...existingWithdrawMethodsUpdate,
+            compounded_amounts: newCompounds,
+            last_compound_popup_date: todayDateStr
+          };
+
+          const nowIso = new Date().toISOString();
+          if (availableDeduction > 0) {
+            const txRef1 = doc(collection(db, 'transactions'));
+            transaction.set(txRef1, {
+              user_id: user.uid,
+              type: 'compound',
+              type_detail: 'compound_available_balance',
+              amount: availableDeduction,
+              status: 'approved',
+              created_at: nowIso,
+              description: 'Compounded Available Balance to active investment asset'
+            });
+          }
+          if (rewardDeduction > 0) {
+            const txRef2 = doc(collection(db, 'transactions'));
+            transaction.set(txRef2, {
+              user_id: user.uid,
+              type: 'compound',
+              type_detail: 'compound_reward_balance',
+              amount: rewardDeduction,
+              status: 'approved',
+              created_at: nowIso,
+              description: 'Compounded Reward Balance to active investment asset'
+            });
+          }
+
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: user.uid,
+            type: 'success',
+            title: 'Automated Compounding Active',
+            message: `Successfully set up ${days}-day automated compounding and reinvested ${formatCurrency(totalToCompound)}.`,
+            read: false,
+            created_at: nowIso
+          });
+        } else {
+          const nowIso = new Date().toISOString();
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: user.uid,
+            type: 'success',
+            title: 'Automated Compounding Active',
+            message: `Successfully set up ${days}-day automated compounding protocol. Daily ROI will be reinvested automatically.`,
+            read: false,
+            created_at: nowIso
+          });
+        }
+
+        if (userData.compounded_amounts) {
+          const existingCompoundsStd = userData.compounded_amounts || [];
+          updates.compounded_amounts = totalToCompound > 0 ? [...existingCompoundsStd, totalToCompound] : existingCompoundsStd;
+        }
+
         transaction.update(userRef, updates);
-
-        const nowIso = new Date().toISOString();
-        if (availableDeduction > 0) {
-          const txRef1 = doc(collection(db, 'transactions'));
-          transaction.set(txRef1, {
-            user_id: user.uid,
-            type: 'compound',
-            type_detail: 'compound_available_balance',
-            amount: availableDeduction,
-            status: 'approved',
-            created_at: nowIso,
-            description: 'Compounded Available Balance to active investment asset'
-          });
-        }
-        if (rewardDeduction > 0) {
-          const txRef2 = doc(collection(db, 'transactions'));
-          transaction.set(txRef2, {
-            user_id: user.uid,
-            type: 'compound',
-            type_detail: 'compound_reward_balance',
-            amount: rewardDeduction,
-            status: 'approved',
-            created_at: nowIso,
-            description: 'Compounded Reward Balance to active investment asset'
-          });
-        }
-
-        const notifRef = doc(collection(db, 'notifications'));
-        transaction.set(notifRef, {
-          user_id: user.uid,
-          type: 'success',
-          title: 'Earnings Reinvested',
-          message: `Successfully compounded ${formatCurrency(totalToCompound)} into your active investment node.`,
-          read: false,
-          created_at: nowIso
-        });
       });
 
       localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
-      toast.success("Successfully compounded earnings! Assets updated.", { id: toastId });
+      toast.success(`Automated compounding protocol (${days} days) active!`, { id: toastId });
       
-      broadcastActivity(
-        profile?.name || "Client",
-        "Compounded Profit",
-        `$${compoundedAmountCalculated.toFixed(2)}`,
-        true,
-        "🔁"
-      );
+      if (compoundedAmountCalculated > 0) {
+        broadcastActivity(
+          profile?.name || "Client",
+          "Activated Auto-Compound",
+          `$${compoundedAmountCalculated.toFixed(2)}`,
+          true,
+          "🔁"
+        );
+      }
       
       closePopup('compound-profits');
+      setShowDurationSelector(false);
       setShowCompoundSuccess(true);
     } catch (err: any) {
-      console.error("Compounding failed:", err);
-      toast.error(err.message || "Failed to compound profits.", { id: toastId });
+      console.error("Compounding setup failed:", err);
+      toast.error(err.message || "Failed to start automated compounding.", { id: toastId });
     } finally {
       setIsCompounding(false);
     }
@@ -560,6 +590,37 @@ export default function Homepage() {
         </div>
       </div>
 
+      {/* TWN Token Mining Portal Premium Card */}
+      <div className="w-full max-w-5xl mx-auto px-1 mt-6">
+        <div className="bg-gradient-to-r from-[#11141b]/60 via-[#161310]/75 to-[#0b0c16]/90 border border-amber-500/15 hover:border-amber-400/40 rounded-[32px] p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-xl shadow-2xl transition-all duration-500 group">
+          {/* Glowing particle lights matching the high-end ASIC miner theme */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/[0.03] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-orange-500/[0.02] rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
+          <div className="space-y-3.5 text-center md:text-left">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 border border-amber-500/20 rounded-full text-amber-400">
+              <Cpu size={12} className="animate-spin" style={{ animationDuration: '6s' }} />
+              <span className="text-[8px] font-black uppercase tracking-wider">LIVE HARVEST RIGS</span>
+            </div>
+            
+            <h3 className="text-xl font-bold tracking-tight text-white uppercase italic leading-none">
+              TWN Token <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">Mining Arrays</span>
+            </h3>
+            
+            <p className="text-xs text-[#8E8A9E] leading-relaxed max-w-2xl uppercase font-semibold">
+              Boot up decentralized harvesters to generate TWN directly in real-time. Power on free-tier hourly nodes, or subscribe to ultra-high intensity Antminer S23 & Avalon ASIC units to claim premium, certified blocks daily.
+            </p>
+          </div>
+
+          <button 
+            onClick={() => navigate('/mining')}
+            className="px-6 py-3.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-orange-500 rounded-2xl text-[10px] font-black uppercase tracking-widest text-[#07090e] shadow-[0_5px_20px_rgba(245,158,11,0.25)] hover:scale-[1.03] active:scale-95 transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-2"
+          >
+            Power On Miners <Zap size={14} className="text-[#07090e]" />
+          </button>
+        </div>
+      </div>
+
       <MemoizedTopInvestorsSection />
       <MemoizedWhyChooseSection />
       </div>
@@ -631,114 +692,209 @@ export default function Homepage() {
 
       {/* Compound Your Profits Popup */}
       <AnimatePresence>
-        {showCompoundPopup && (
-          <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
-              // Backdrop clicks don't close so they must proceed or skip explicitly
-            />
-            
-            {/* Flex column container keeping Card at top and buttons below, matching Daily Reward layout */}
-            <div className="flex flex-col items-center gap-5 max-w-[260px] w-full relative z-10 select-none">
-              
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 15 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 15 }}
-                transition={{ type: 'spring', duration: 0.4 }}
-                className="w-full bg-[#050608]/80 border border-white/10 hover:border-white/20 backdrop-blur-md rounded-2xl px-6 py-10 text-center shadow-[0_15px_35px_rgba(0,0,0,0.5)] relative overflow-hidden"
-              >
-                {/* Decorative Glow */}
-                <div className={cn(
-                  "absolute top-0 left-1/2 -translate-x-1/2 w-28 h-28 rounded-full blur-xl pointer-events-none",
-                  isConfirmingSkip ? "bg-red-500/5" : "bg-[#10B981]/5"
-                )} />
-                
-                {/* Confirmation Dialogue or Normal view */}
-                {isConfirmingSkip ? (
-                  <div>
-                    <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-red-400 shadow-inner">
-                      <Clock size={22} className="animate-pulse" />
-                    </div>
-                    
-                    <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
-                      Skip Compounding?
-                    </h3>
-                    
-                    <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
-                      Are you sure you don't want to compound your profits? Reinvesting maximizes your daily ROI potentials.
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    {/* Visual Icon Badge */}
-                    <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-[#10B981] shadow-inner">
-                      <TrendingUp size={22} className="animate-bounce" />
-                    </div>
-                    
-                    <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
-                      ROI/Profit Compounding
-                    </h3>
-                    
-                    <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
-                      Increase your earning potential by reinvesting your accumulated earnings into your active investment.
-                    </p>
-                  </div>
-                )}
-              </motion.div>
+        {showCompoundPopup && (() => {
+          const isAutoCompoundActive = !!(
+            profile?.auto_compound_enabled &&
+            profile?.auto_compound_end_date &&
+            new Date(profile.auto_compound_end_date).getTime() > new Date().getTime()
+          );
 
-              {/* Standalone action buttons below the Card, matching Daily Reward layout pattern */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                transition={{ delay: 0.1 }}
-                className="flex gap-3 w-full justify-center"
-              >
-                {isConfirmingSkip ? (
-                  <>
+          return (
+            <div className="fixed inset-0 z-[1000] flex flex-col items-center justify-center p-4">
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+                // Backdrop clicks don't close so they must proceed or skip explicitly
+              />
+              
+              {/* Flex column container keeping Card at top and buttons below, matching Daily Reward layout */}
+              <div className={cn(
+                "flex flex-col items-center gap-5 w-full relative z-10 select-none transition-all duration-300",
+                showDurationSelector && !isAutoCompoundActive ? "max-w-[340px]" : "max-w-[260px]"
+              )}>
+                
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ type: 'spring', duration: 0.4 }}
+                  className="w-full bg-[#050608]/80 border border-white/10 hover:border-white/20 backdrop-blur-md rounded-2xl px-6 py-10 text-center shadow-[0_15px_35px_rgba(0,0,0,0.5)] relative overflow-hidden"
+                >
+                  {/* Decorative Glow */}
+                  <div className={cn(
+                    "absolute top-0 left-1/2 -translate-x-1/2 w-28 h-28 rounded-full blur-xl pointer-events-none",
+                    isConfirmingSkip ? "bg-red-500/5" : "bg-[#10B981]/5"
+                  )} />
+                  
+                  {/* Confirmation Dialogue, Active plan view, selection grid or Intro view */}
+                  {isConfirmingSkip ? (
+                    <div>
+                      <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-red-400 shadow-inner">
+                        <Clock size={22} className="animate-pulse" />
+                      </div>
+                      
+                      <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
+                        Skip Compounding?
+                      </h3>
+                      
+                      <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
+                        Are you sure you don't want to compound your profits? Reinvesting maximizes your daily ROI potentials.
+                      </p>
+                    </div>
+                  ) : isAutoCompoundActive ? (
+                    <div>
+                      <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-[#10B981]/15 border border-[#10B981]/30 items-center justify-center text-[#10B981] shadow-inner">
+                        <Bot size={22} className="animate-pulse" />
+                      </div>
+                      
+                      <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-2 font-sans">
+                        Auto-Compound Active
+                      </h3>
+                      
+                      <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto mb-4 font-sans">
+                        Your high-yield quant node is configured for <span className="text-[#10B981] font-black">{profile?.auto_compound_duration} Days</span> automated reinvestment.
+                      </p>
+
+                      <div className="bg-white/[0.02] border border-white/5 rounded-xl p-3 text-left space-y-2 mb-1">
+                        <div className="flex justify-between text-[9px] font-sans">
+                          <span className="text-white/40">Duration:</span>
+                          <span className="text-white/80 font-bold">{profile?.auto_compound_duration} Days</span>
+                        </div>
+                        <div className="flex justify-between text-[9px] font-sans">
+                          <span className="text-white/40">Start Date:</span>
+                          <span className="text-white/80 font-mono text-[8px]">
+                            {profile?.auto_compound_start_date ? new Date(profile.auto_compound_start_date).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-[9px] font-sans">
+                          <span className="text-white/40">End Date:</span>
+                          <span className="text-white/80 font-mono text-emerald-400 font-bold text-[8px]">
+                            {profile?.auto_compound_end_date ? new Date(profile.auto_compound_end_date).toLocaleDateString() : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : showDurationSelector ? (
+                    <div className="w-full">
+                      <div className="mb-4 inline-flex w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 items-center justify-center text-purple-400 shadow-inner">
+                        <Clock size={22} className="animate-pulse" />
+                      </div>
+                      
+                      <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-2 font-sans">
+                        Select Duration
+                      </h3>
+                      
+                      <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[240px] mx-auto mb-5 font-sans">
+                        Choose a duration for automatic daily reinvesting of your ROI earnings.
+                      </p>
+
+                      {/* Elegant premium cards list for duration options */}
+                      <div className="space-y-2 w-full">
+                        {[15, 30, 90, 180, 365].map((days) => (
+                          <button
+                            key={days}
+                            onClick={() => selectCompoundingDuration(days)}
+                            disabled={isCompounding}
+                            className="w-full flex items-center justify-between p-3 bg-white/[0.015] hover:bg-white/[0.04] border border-white/5 hover:border-[#10B981]/30 rounded-xl transition-all duration-200 group text-left cursor-pointer active:scale-[0.99] select-none"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] opacity-60 group-hover:opacity-100 transition-opacity" />
+                              <div>
+                                <span className="text-xs font-black text-white">{days} Days</span>
+                                <p className="text-[8px] text-white/35 mt-0.5 font-sans">Continuous reinvesting protocol</p>
+                              </div>
+                            </div>
+                            <span className="text-[9px] font-black text-emerald-400 group-hover:translate-x-0.5 transition-transform">
+                              SET &rarr;
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      {/* Visual Icon Badge */}
+                      <div className="mb-5 inline-flex w-12 h-12 rounded-xl bg-white/5 border border-white/10 items-center justify-center text-[#10B981] shadow-inner">
+                        <TrendingUp size={22} className="animate-bounce" />
+                      </div>
+                      
+                      <h3 className="text-sm font-black italic uppercase tracking-wider text-white mb-3 font-sans">
+                        ROI/Profit Compounding
+                      </h3>
+                      
+                      <p className="text-[10px] text-[#8E8A9E] leading-relaxed max-w-[200px] mx-auto">
+                        Increase your earning potential by reinvesting your accumulated earnings into your active investment.
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+
+                {/* Standalone action buttons below the Card, matching Daily Reward layout pattern */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ delay: 0.1 }}
+                  className="flex gap-3 w-full justify-center"
+                >
+                  {isConfirmingSkip ? (
+                    <>
+                      <button
+                        onClick={handleSkipConfirmYes}
+                        className="flex-1 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-red-400 transition-all duration-200 cursor-pointer italic text-center"
+                      >
+                        Yes
+                      </button>
+                      <button
+                        onClick={handleSkipConfirmNo}
+                        className="flex-1 py-3 bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg"
+                      >
+                        No
+                      </button>
+                    </>
+                  ) : isAutoCompoundActive ? (
                     <button
-                      onClick={handleSkipConfirmYes}
-                      className="flex-1 py-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-red-400 transition-all duration-200 cursor-pointer italic text-center"
+                      onClick={() => closePopup('compound-profits')}
+                      className="w-full py-3 bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg"
                     >
-                      Yes
+                      Got It
                     </button>
+                  ) : showDurationSelector ? (
                     <button
-                      onClick={handleSkipConfirmNo}
-                      className="flex-1 py-3 bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg"
+                      onClick={() => setShowDurationSelector(false)}
+                      className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-white transition-all duration-200 cursor-pointer italic text-center"
                     >
-                      No
+                      Back
                     </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleCancelClick}
-                      className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-white transition-all duration-200 cursor-pointer italic text-center"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleCompoundClick}
-                      disabled={isCompounding}
-                      className={cn(
-                        "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg",
-                        isCompounding
-                          ? "bg-[#1F1D2B]/50 border border-white/5 opacity-80 cursor-wait text-gray-400"
-                          : "bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white"
-                      )}
-                    >
-                      {isCompounding ? "Signing..." : "Accept"}
-                    </button>
-                  </>
-                )}
-              </motion.div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={handleCancelClick}
+                        className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-white transition-all duration-200 cursor-pointer italic text-center"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCompoundClick}
+                        disabled={isCompounding}
+                        className={cn(
+                          "flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] transition-all duration-200 cursor-pointer italic text-center shadow-lg",
+                          isCompounding
+                            ? "bg-[#1F1D2B]/50 border border-white/5 opacity-80 cursor-wait text-gray-400"
+                            : "bg-gradient-to-r from-[#10B981] to-[#059669] hover:brightness-110 active:scale-95 shadow-[0_8px_20px_rgba(16,185,129,0.2)] text-white"
+                        )}
+                      >
+                        {isCompounding ? "Signing..." : "Accept"}
+                      </button>
+                    </>
+                  )}
+                </motion.div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* Success Popup */}

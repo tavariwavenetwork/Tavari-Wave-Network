@@ -26,7 +26,8 @@ import {
   DollarSign,
   Rocket,
   ArrowUpRight,
-  ArrowLeft
+  ArrowLeft,
+  Cpu
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -939,6 +940,14 @@ export default function TWNTokenPortal() {
                     📤 Send
                   </button>
                 </div>
+
+                {/* TWN Mining Portal shortcut */}
+                <button
+                  onClick={() => navigate('/mining')}
+                  className="w-full mt-2.5 py-3 bg-gradient-to-r from-amber-500/10 to-[#CCFF00]/10 hover:from-amber-500/20 hover:to-[#CCFF00]/20 border border-amber-500/20 hover:border-[#CCFF00]/40 text-[#CCFF00] font-black text-[9px] uppercase tracking-[0.15em] rounded-xl duration-200 active:scale-95 transition-all cursor-pointer font-sans text-center flex items-center justify-center gap-1.5"
+                >
+                  <Cpu size={11} className="text-amber-400 animate-pulse" /> Enter Mining Portal
+                </button>
 
                 <div className="flex items-center justify-around gap-2 pt-4 border-t border-white/5 mt-5 text-[8px] font-black text-[#8E8A9E] select-none">
                   <span>⚡ Real-Time Asset Index</span>

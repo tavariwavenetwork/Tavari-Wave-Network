@@ -46,7 +46,8 @@ import {
   Image as ImageIcon,
   Eye,
   Trash2,
-  Plus
+  Plus,
+  Cpu
 } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
@@ -259,12 +260,13 @@ function StatCard({ label, value, icon: Icon, color, onClick }: { label: string,
 export default function CipherAdmin() {
   const { user, profile, logout, plans } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings' | 'cadverts' | 'ctwn_token' | 'csupport_tickets'>('canalytics');
+  const [activeTab, setActiveTab] = useState<'canalytics' | 'cdeposits' | 'cwithdrawals' | 'cinvestments' | 'cuser' | 'cinactiveusers' | 'ckycs' | 'csecurity' | 'cplans' | 'cui_editor' | 'cnewsletter' | 'cnotifications' | 'ctransactions' | 'csettings' | 'cadverts' | 'ctwn_token' | 'csupport_tickets' | 'cmining'>('canalytics');
   const [isMobileAdminMenuOpen, setIsMobileAdminMenuOpen] = useState(false);
   const [initialUsersCount, setInitialUsersCount] = useState<number | null>(null);
   const [initialSubscribersCount, setInitialSubscribersCount] = useState<number | null>(null);
   const [investFilter, setInvestFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [depositFilter, setDepositFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [miningFilter, setMiningFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
   const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [selectedSupportTicket, setSelectedSupportTicket] = useState<any>(null);
@@ -562,8 +564,12 @@ export default function CipherAdmin() {
   }, [subscribers, initialSubscribersCount]);
 
   const pendingDepositsUnseenCount = useMemo(() => {
-    return deposits.filter((dep: any) => dep.status === 'pending' && !seenDepositIds.includes(dep.id)).length;
+    return deposits.filter((dep: any) => !dep.is_mining_subscription && dep.status === 'pending' && !seenDepositIds.includes(dep.id)).length;
   }, [deposits, seenDepositIds]);
+
+  const pendingMiningCount = useMemo(() => {
+    return deposits.filter((dep: any) => dep.is_mining_subscription && dep.status === 'pending').length;
+  }, [deposits]);
 
   const pendingWithdrawalsUnseenCount = useMemo(() => {
     return withdrawals.filter((wit: any) => wit.status === 'pending' && !seenWithdrawalIds.includes(wit.id)).length;
@@ -1141,6 +1147,18 @@ export default function CipherAdmin() {
           transaction.update(userRef, { 
             twn_balance: increment(twnCredited)
           });
+        } else if (depositData.is_mining_subscription) {
+          // For mining subscriptions we don't credit regular funding balance.
+          // Instead, we trigger user notification and allow the device slot to unlock.
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: deposit.user_id,
+            title: 'ASIC Miner Unlocked! 🔌',
+            message: `Your subscription of $${depositAmountValue} for the ${depositData.machine_name || 'Premium ASIC Machine'} has been verified. Core activation slot is now unlocked.`,
+            type: 'success',
+            read: false,
+            created_at: new Date().toISOString()
+          });
         } else {
           transaction.update(userRef, { 
             funding_balance: increment(depositAmountValue)
@@ -1555,6 +1573,24 @@ export default function CipherAdmin() {
                 </button>
 
                 <button
+                  onClick={() => { handleTabChange('cmining'); setIsMobileAdminMenuOpen(false); }}
+                  className={cn(
+                    "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
+                    activeTab === 'cmining' ? "bg-aura-lime text-aura-black font-black" : "text-aura-muted hover:text-white hover:bg-white/5 font-bold"
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <Cpu size={18} />
+                    <span className="text-[10px] uppercase tracking-widest">Mining</span>
+                  </div>
+                  {pendingMiningCount > 0 && (
+                    <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[9px] font-black">
+                      {pendingMiningCount}
+                    </span>
+                  )}
+                </button>
+
+                <button
                   onClick={() => { handleTabChange('cuser'); setIsMobileAdminMenuOpen(false); }}
                   className={cn(
                     "flex items-center justify-between w-full p-4 rounded-xl transition-all duration-300",
@@ -1746,6 +1782,7 @@ export default function CipherAdmin() {
           <SidebarItem icon={<CreditCard size={18} />} label="Deposits" active={activeTab === 'cdeposits'} onClick={() => handleTabChange('cdeposits')} badge={pendingDepositsUnseenCount} />
           <SidebarItem icon={<ArrowDownLeft size={18} />} label="Withdrawals" active={activeTab === 'cwithdrawals'} onClick={() => handleTabChange('cwithdrawals')} badge={pendingWithdrawalsUnseenCount} />
           <SidebarItem icon={<Zap size={18} />} label="Investments" active={activeTab === 'cinvestments'} onClick={() => handleTabChange('cinvestments')} badge={pendingInvestmentsUnseenCount} />
+          <SidebarItem icon={<Cpu size={18} />} label="Mining" active={activeTab === 'cmining'} onClick={() => handleTabChange('cmining')} badge={pendingMiningCount} />
           <SidebarItem icon={<Users size={18} />} label="Users Control Panel" active={activeTab === 'cuser'} onClick={() => handleTabChange('cuser')} />
           <SidebarItem icon={<UserMinus size={18} />} label="Inactive" active={activeTab === 'cinactiveusers'} onClick={() => handleTabChange('cinactiveusers')} />
           <SidebarItem icon={<IdCard size={18} />} label="KYC Control" active={activeTab === 'ckycs'} onClick={() => handleTabChange('ckycs')} />
@@ -1996,6 +2033,7 @@ export default function CipherAdmin() {
                 </thead>
                 <tbody className="divide-y divide-white/[0.02]">
                   {deposits
+                    .filter((dep: any) => !dep.is_mining_subscription)
                     .filter((dep: any) => {
                       if (depositFilter === 'all') return true;
                       if (depositFilter === 'pending') return dep.status === 'pending';
@@ -2030,6 +2068,94 @@ export default function CipherAdmin() {
                             {dep.created_at ? new Date(dep.created_at).toLocaleString() : 'N/A'}
                           </td>
                           <td className="px-6 py-4 text-xs uppercase font-black tracking-wider text-aura-muted">{dep.method || 'Standard'}</td>
+                          <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                            {dep.status === 'pending' ? (
+                              <div className="flex gap-2 justify-end">
+                                <button onClick={() => declineDeposit(dep.id)} className="p-2 bg-red-400/10 text-red-400 hover:bg-red-400 hover:text-white rounded-lg transition-all" title="Decline"><XCircle size={16} /></button>
+                                <button onClick={() => approveDeposit(dep)} className="p-2 bg-aura-lime/10 text-aura-lime hover:bg-aura-lime hover:text-aura-black rounded-lg transition-all" title="Approve"><CheckCircle size={16} /></button>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-500 uppercase">Processed</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'cmining' && (
+          <div className="space-y-8 animate-fade-in">
+            <div className="flex bg-white/5 p-1 rounded-2xl w-fit border border-white/5">
+               {['all', 'pending', 'approved', 'rejected'].map((f) => (
+                 <button 
+                   key={f}
+                   onClick={() => setMiningFilter(f as any)}
+                   className={cn(
+                     "px-6 py-2 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all",
+                     miningFilter === f ? "bg-white/10 text-white" : "text-aura-muted hover:text-white"
+                   )}
+                 >
+                   {f}
+                 </button>
+               ))}
+            </div>
+
+            <div className="bg-white/5 border border-white/5 rounded-[40px] overflow-hidden overflow-x-auto">
+              <table className="w-full text-left min-w-[1000px] border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/[0.01]">
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">User ID</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Full Name</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Username</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Email</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Requested Miner</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Upgrade Amount</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Date/Time</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Status</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/[0.02]">
+                  {deposits
+                    .filter((dep: any) => dep.is_mining_subscription)
+                    .filter((dep: any) => {
+                      if (miningFilter === 'all') return true;
+                      if (miningFilter === 'pending') return dep.status === 'pending';
+                      if (miningFilter === 'approved') return dep.status === 'approved';
+                      if (miningFilter === 'rejected') return dep.status === 'declined' || dep.status === 'rejected';
+                      return true;
+                    })
+                    .map((dep: any) => {
+                      const u = getUserDetails(dep.user_id, dep.user_name);
+                      const matchedUser = users.find((usr: any) => usr?.id === dep.user_id);
+                      const usernameVal = matchedUser?.username || 'n/a';
+                      return (
+                        <tr 
+                          key={dep.id} 
+                          className="group hover:bg-white/[0.02] transition-colors cursor-pointer text-white"
+                          onClick={() => { setSelectedTicket(dep); setTicketType('deposit'); }}
+                        >
+                          <td className="px-6 py-4 font-mono text-[10px] text-gray-400">
+                            <span className="truncate max-w-[80px] block" title={dep.user_id}>{dep.user_id}</span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-bold uppercase truncate max-w-[120px]">{u.name}</td>
+                          <td className="px-6 py-4 text-xs text-aura-lime font-mono truncate max-w-[100px]">@{usernameVal}</td>
+                          <td className="px-6 py-4 text-xs text-aura-muted truncate max-w-[150px]">{u.email}</td>
+                          <td className="px-6 py-4 text-xs font-black uppercase tracking-wider text-white truncate max-w-[180px]">{dep.machine_name || 'ASIC Miner'}</td>
+                          <td className="px-6 py-4 text-sm font-black font-serif italic">{formatCurrency(dep.amount || 0)}</td>
+                          <td className="px-6 py-4 text-[10px] text-gray-400">
+                            {dep.created_at ? new Date(dep.created_at).toLocaleString() : 'N/A'}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded", 
+                              dep.status === 'pending' ? "bg-yellow-400/10 text-yellow-500" :
+                              dep.status === 'approved' ? "bg-aura-lime/10 text-aura-lime" : "bg-red-400/10 text-red-100"
+                            )}>{dep.status}</span>
+                          </td>
                           <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             {dep.status === 'pending' ? (
                               <div className="flex gap-2 justify-end">

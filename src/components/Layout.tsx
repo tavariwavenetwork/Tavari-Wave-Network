@@ -36,7 +36,8 @@ import {
   Copy,
   ExternalLink,
   ShieldCheck,
-  Bot
+  Bot,
+  Cpu
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -80,7 +81,7 @@ function SidebarItem({ icon, label, active, onClick, children, isExpanded }: Sid
           <div className={cn("transition-transform group-hover:scale-110", active ? "text-aura-black" : "text-aura-muted group-hover:text-aura-lime")}>
             {icon}
           </div>
-          <span className="text-sm font-semibold uppercase tracking-wider">{label}</span>
+          <span className="text-sm font-semibold tracking-wide">{label}</span>
         </div>
         {children && (
           <ChevronDown 
@@ -111,7 +112,7 @@ function SidebarSubItem({ label, active, onClick }: { label: string, active?: bo
     <button 
       onClick={onClick}
       className={cn(
-        "flex items-center gap-3 w-full p-3 lg:p-2 rounded-lg text-xs font-medium uppercase tracking-widest transition-all",
+        "flex items-center gap-3 w-full p-3 lg:p-2 rounded-lg text-xs font-medium tracking-wide transition-all",
         active ? "text-aura-lime" : "text-aura-muted hover:text-white"
       )}
     >
@@ -247,6 +248,7 @@ export default function Layout() {
     setIsWelcomeBonusDeductedPopupOpen
   } = useUI();
   const location = useLocation();
+  const [isSpinMineOpen, setIsSpinMineOpen] = useState(false);
 
   const dismissedAlertsRef = useRef<Set<string>>(
     (() => {
@@ -626,6 +628,9 @@ export default function Layout() {
   const [isExploreOpen, setIsExploreOpen] = useState(false);
   const exploreRef = useRef<HTMLDivElement>(null);
 
+  const [isHelpDropdownOpen, setIsHelpDropdownOpen] = useState(false);
+  const helpDropdownRef = useRef<HTMLDivElement>(null);
+
   // Scroll detection for compact header
   useEffect(() => {
     const handleScroll = () => {
@@ -652,7 +657,7 @@ export default function Layout() {
 
   // Determine if we should show a back button
   const showBackButton = !['/home', '/dashboard'].includes(location.pathname) && !(isMobile && location.pathname === '/token');
-  const isFullBleedPage = ['/about', '/how-it-works', '/faq', '/rewards', '/token'].includes(location.pathname);
+  const isFullBleedPage = ['/about', '/how-it-works', '/faq', '/rewards', '/token', '/mining'].includes(location.pathname);
 
   // Real-time notifications
   useEffect(() => {
@@ -714,6 +719,9 @@ export default function Layout() {
       if (exploreRef.current && !exploreRef.current.contains(target)) {
         setIsExploreOpen(false);
       }
+      if (helpDropdownRef.current && !helpDropdownRef.current.contains(target)) {
+        setIsHelpDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -725,6 +733,7 @@ export default function Layout() {
     setIsProfileOpen(false);
     setIsNotificationsOpen(false);
     setIsLanguageOpen(false);
+    setIsHelpDropdownOpen(false);
   };
 
   const isCipher = profile?.role === 'cipher';
@@ -830,12 +839,9 @@ export default function Layout() {
           {[
             { label: 'Home', path: '/home' },
             { label: 'Invest', path: '/invest' },
-            { label: 'Deposit', path: '/fund' },
-            { label: 'TWN Token', path: '/token' },
+            { label: 'Fund', path: '/fund' },
+            { label: 'Wave Token', path: '/token' },
             { label: 'How It Works', path: '/how-it-works' },
-            { label: 'About', path: '/about' },
-            { label: 'FAQ', path: '/faq' },
-            { label: 'Help', path: '/help' },
           ].map((item) => {
             const isActive = location.pathname.startsWith(item.path);
             return (
@@ -843,13 +849,13 @@ export default function Layout() {
                 key={item.path}
                 onClick={() => handleNavigation(item.path)}
                 className={cn(
-                  "relative px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all whitespace-nowrap group",
+                  "relative px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 whitespace-nowrap group",
                   isActive 
-                    ? "text-aura-lime shadow-[0_0_15px_rgba(204,255,0,0.1)]" 
-                    : "text-aura-muted hover:text-white"
+                    ? "text-aura-lime bg-white/5 border border-white/10 shadow-[0_0_20px_rgba(204,255,0,0.05)]" 
+                    : "text-aura-muted hover:text-white hover:bg-white/[0.02]"
                 )}
               >
-                <span className="relative z-10 transition-all group-hover:tracking-[0.3em]">{t(item.label)}</span>
+                <span className="relative z-10 transition-colors duration-300 group-hover:text-aura-lime">{t(item.label)}</span>
                 {isActive && (
                   <motion.div 
                     layoutId="top-nav-active"
@@ -867,11 +873,11 @@ export default function Layout() {
             <button
               onClick={() => setIsExploreOpen(!isExploreOpen)}
               className={cn(
-                "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-1.5 group",
-                isExploreOpen ? "text-white bg-white/5 border border-white/10" : "text-aura-muted hover:text-white"
+                "px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 group text-aura-muted hover:text-white hover:bg-white/[0.02] border border-transparent",
+                isExploreOpen && "text-white bg-white/5 border-white/10"
               )}
             >
-              <span className="group-hover:tracking-[0.3em] transition-all">Explore</span>
+              <span className="group-hover:text-aura-lime transition-all">Explore</span>
               <ChevronDown size={14} className={cn("transition-transform duration-300", isExploreOpen && "rotate-180")} />
             </button>
 
@@ -883,7 +889,7 @@ export default function Layout() {
                   exit={{ opacity: 0, scale: 0.95, y: 10 }}
                   className={cn(
                     "absolute top-full right-0 mt-4 w-52 rounded-[24px] border shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[110] overflow-hidden backdrop-blur-3xl p-2",
-                    isDark ? "bg-[#0a0d1f]/90 border-white/10" : "bg-white/90 border-aura-line"
+                    isDark ? "bg-[#0b1029]/90 border-white/10" : "bg-white/90 border-aura-line"
                   )}
                 >
                   <div className="space-y-1">
@@ -894,6 +900,7 @@ export default function Layout() {
                       { label: 'Reward', path: '/rewards', icon: <Gift size={14} /> },
                       { label: 'Guide', path: '/guide', icon: <HelpCircle size={14} /> },
                       { label: 'Join Us', path: '/join-us', icon: <Share2 size={14} /> },
+                      { label: 'Mining', path: '/mining', icon: <Cpu size={14} /> },
                     ].map((subItem) => (
                       <button
                         key={subItem.path}
@@ -902,14 +909,67 @@ export default function Layout() {
                           setIsExploreOpen(false);
                         }}
                         className={cn(
-                          "w-full flex items-center gap-3 p-4 rounded-[16px] text-[10px] font-black uppercase tracking-[0.2em] transition-all group",
+                          "w-full flex items-center gap-3 p-3 rounded-[16px] text-xs font-semibold transition-all group",
                           location.pathname === subItem.path 
-                            ? "bg-aura-lime text-aura-black shadow-lg shadow-aura-lime/20" 
+                            ? "bg-aura-lime text-slate-950 shadow-lg shadow-aura-lime/20" 
                             : "text-aura-muted hover:text-white hover:bg-white/5"
                         )}
                       >
                         <span className="group-hover:scale-110 transition-transform">{subItem.icon}</span>
-                        {subItem.label}
+                        {t(subItem.label)}
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Help Dropdown */}
+          <div className="relative" ref={helpDropdownRef}>
+            <button
+              onClick={() => setIsHelpDropdownOpen(!isHelpDropdownOpen)}
+              className={cn(
+                "px-4 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 group text-aura-muted hover:text-white hover:bg-white/[0.02] border border-transparent",
+                isHelpDropdownOpen && "text-white bg-white/5 border-white/10"
+              )}
+            >
+              <span className="group-hover:text-aura-lime transition-all">Help</span>
+              <ChevronDown size={14} className={cn("transition-transform duration-300", isHelpDropdownOpen && "rotate-180")} />
+            </button>
+
+            <AnimatePresence>
+              {isHelpDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                  className={cn(
+                    "absolute top-full right-0 mt-4 w-52 rounded-[24px] border shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[110] overflow-hidden backdrop-blur-3xl p-2",
+                    isDark ? "bg-[#0b1029]/90 border-white/10" : "bg-white/90 border-aura-line"
+                  )}
+                >
+                  <div className="space-y-1">
+                    {[
+                      { label: 'Help', path: '/help', icon: <Headset size={14} /> },
+                      { label: 'FAQ', path: '/faq', icon: <MessageCircleQuestion size={14} /> },
+                      { label: 'About', path: '/about', icon: <Info size={14} /> },
+                    ].map((subItem) => (
+                      <button
+                        key={subItem.path}
+                        onClick={() => {
+                          handleNavigation(subItem.path);
+                          setIsHelpDropdownOpen(false);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-3 rounded-[16px] text-xs font-semibold transition-all group",
+                          location.pathname === subItem.path 
+                            ? "bg-aura-lime text-slate-950 shadow-lg shadow-aura-lime/20" 
+                            : "text-aura-muted hover:text-white hover:bg-white/5"
+                        )}
+                      >
+                        <span className="group-hover:scale-110 transition-transform">{subItem.icon}</span>
+                        {t(subItem.label)}
                       </button>
                     ))}
                   </div>
@@ -969,6 +1029,23 @@ export default function Layout() {
               )}
             </AnimatePresence>
           </div>
+
+          <a
+            href="https://chat.whatsapp.com/CoNzUZBmDsDC8bV8nB7uIH?s=cl&p=i&ilr=4"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 transition-all flex items-center justify-center cursor-pointer hover:scale-110 active:scale-95"
+            title="Join WhatsApp Group"
+          >
+            <svg 
+              viewBox="0 0 24 24" 
+              className="w-5.5 h-5.5 flex-shrink-0 filter drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.3)]"
+            >
+              <path fill="#FFF" d="M12 .01c-6.627 0-12 5.373-12 12 0 2.112.546 4.16 1.587 5.964L0 24l6.173-1.618A11.96 11.96 0 0 0 12 24c6.627 0 12-5.373 12-12s-5.373-12-12-12z" />
+              <path fill="#25D366" d="M12.004 1.1c-6.023 0-10.92 4.897-10.92 10.92 0 1.914.494 3.776 1.434 5.41L1.134 22.8l5.54-1.455c1.58.86 3.35 1.31 5.32 1.31 6.02 0 10.92-4.9 10.92-10.92s-4.9-10.92-10.92-10.92z" />
+              <path fill="#FFF" d="M17.15 14c-.284-.142-1.68-.828-1.94-.923-.26-.095-.45-.142-.64.142-.19.285-.736.924-.902 1.114-.167.19-.333.213-.617.071-.284-.142-1.2-.442-2.285-1.41-1.014-.905-1.57-1.785-1.722-1.975-.152-.19-.016-.292.126-.433.127-.127.284-.333.426-.5.143-.166.19-.285.285-.475.094-.19.047-.356-.024-.5-.071-.142-.64-1.542-.877-2.115-.23-.556-.465-.48-.64-.49-.166-.01-.356-.01-.546-.01s-.5.07-.762.356c-.26.285-1 .978-1 2.387s1.023 2.774 1.166 2.964c.142.19 2.012 3.073 4.876 4.308.68.293 1.213.468 1.628.6 1.1-.35 2.1-.969 2.768-1.638.665-.668 1.16-1.544 1.16-2.503 0-.083-.005-.156-.014-.216z" />
+            </svg>
+          </a>
 
           <button 
             onClick={() => handleNavigation('/help')}
@@ -1139,7 +1216,7 @@ export default function Layout() {
         isDark 
           ? "bg-[#0b0d14]/75 border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
           : "bg-white/85 border-[#a855f7]/15",
-        (isDistractionFree || location.pathname === '/token' || location.pathname.startsWith('/token/') || location.pathname === '/rewards' || location.pathname.startsWith('/rewards/')) && "hidden"
+        (isDistractionFree || location.pathname === '/spin' || location.pathname === '/token' || location.pathname.startsWith('/token/') || location.pathname === '/rewards' || location.pathname.startsWith('/rewards/')) && "hidden"
       )}>
         {/* SVG definitions for realistic icon linear gradients */}
         <svg className="absolute w-0 h-0" width="0" height="0">
@@ -1198,7 +1275,7 @@ export default function Layout() {
           />
           <BottomNavItem 
             icon={<Coins />} 
-            label="Token" 
+            label="Wave Token" 
             active={activeTab === 'token'} 
             onClick={() => handleNavigation('/token')} 
             gradientId="tokenIconGrad"
@@ -1455,16 +1532,16 @@ export default function Layout() {
                   onClick={() => handleNavigation('/dashboard')}
                 />
                 <SidebarItem 
-                  icon={<PlusCircle size={20} />} 
-                  label={t('fund')} 
-                  active={activeTab.startsWith('fund')}
-                  onClick={() => handleNavigation('/fund')}
-                />
-                <SidebarItem 
                   icon={<BarChart3 size={20} />} 
                   label={t('invest')} 
                   active={activeTab === 'invest'}
                   onClick={() => handleNavigation('/invest')}
+                />
+                <SidebarItem 
+                  icon={<PlusCircle size={20} />} 
+                  label={t('fund')} 
+                  active={activeTab.startsWith('fund')}
+                  onClick={() => handleNavigation('/fund')}
                 />
                 <SidebarItem 
                   icon={<Gift size={20} />} 
@@ -1472,75 +1549,72 @@ export default function Layout() {
                   active={activeTab === 'rewards'}
                   onClick={() => handleNavigation('/rewards')}
                 />
-                
-                <div className="pt-4 mt-4 border-t border-white/5 space-y-1">
-                  <SidebarItem 
-                    icon={<Bell size={20} />} 
-                    label={t('notifications')} 
-                    active={activeTab === 'notifications'}
-                    onClick={() => handleNavigation('/notifications')}
-                  />
-                  <SidebarItem 
-                    icon={<MessageSquarePlus size={20} />} 
-                    label={t('reviews')} 
-                    active={activeTab === 'reviews'}
-                    onClick={() => handleNavigation('/reviews')}
-                  />
-                  <SidebarItem 
-                    icon={<Trophy size={20} />} 
-                    label={t('recent_investments')} 
-                    active={activeTab === 'top-investors'}
-                    onClick={() => handleNavigation('/top-investors')}
-                  />
-                  <SidebarItem 
-                    icon={<Users size={20} />} 
-                    label={t('about_us')} 
-                    active={activeTab === 'partners'}
-                    onClick={() => handleNavigation('/partners')}
-                  />
-                  <SidebarItem 
-                    icon={<HelpCircle size={20} />} 
-                    label={t('help')} 
-                    active={activeTab === 'help'}
-                    onClick={() => handleNavigation('/help')}
-                  />
-                  <SidebarItem 
-                    icon={<Zap size={20} className="text-emerald-400" />} 
-                    label="Guide" 
-                    active={activeTab === 'guide'}
-                    onClick={() => handleNavigation('/guide')}
-                  />
-                  <SidebarItem 
-                    icon={<Share2 size={20} className="text-[#00E5FF]" />} 
-                    label="Join Us" 
-                    active={activeTab === 'join-us'}
-                    onClick={() => handleNavigation('/join-us')}
-                  />
-                  <SidebarItem 
-                    icon={<Info size={20} />} 
-                    label="About" 
-                    active={activeTab === 'about'}
-                    onClick={() => handleNavigation('/about')}
-                  />
-                  <SidebarItem 
-                    icon={<Zap size={20} />} 
-                    label="How it Works" 
-                    active={activeTab === 'how-it-works'}
-                    onClick={() => handleNavigation('/how-it-works')}
-                  />
-                  <SidebarItem 
-                    icon={<MessageCircleQuestion size={20} />} 
-                    label="FAQ" 
-                    active={activeTab === 'faq'}
-                    onClick={() => handleNavigation('/faq')}
-                  />
-                  <SidebarItem 
-                    icon={<Zap size={20} className="text-purple-400 group-hover:text-purple-300" />} 
-                    label="TWN Portal" 
-                    active={activeTab === 'token'}
-                    onClick={() => handleNavigation('/token')}
-                  />
-                </div>
+                <SidebarItem 
+                  icon={<Bell size={20} />} 
+                  label={t('notifications')} 
+                  active={activeTab === 'notifications'}
+                  onClick={() => handleNavigation('/notifications')}
+                />
+                <SidebarItem 
+                  icon={<Coins size={20} className="text-amber-450" />} 
+                  label="Wave Token" 
+                  active={activeTab === 'token'}
+                  onClick={() => handleNavigation('/token')}
+                />
+                <SidebarItem 
+                  icon={<Cpu size={20} className="text-aura-lime" />} 
+                  label="Mining" 
+                  active={activeTab === 'mining'}
+                  onClick={() => handleNavigation('/mining')}
+                />
+                <SidebarItem 
+                  icon={<MessageSquarePlus size={20} />} 
+                  label={t('reviews')} 
+                  active={activeTab === 'reviews'}
+                  onClick={() => handleNavigation('/reviews')}
+                />
+                <SidebarItem 
+                  icon={<Users size={20} />} 
+                  label="Partners" 
+                  active={activeTab === 'partners'}
+                  onClick={() => handleNavigation('/partners')}
+                />
+                <SidebarItem 
+                  icon={<CheckCircle2 size={20} />} 
+                  label="How it Works" 
+                  active={activeTab === 'how-it-works'}
+                  onClick={() => handleNavigation('/how-it-works')}
+                />
+                <SidebarItem 
+                  icon={<Info size={20} />} 
+                  label="About" 
+                  active={activeTab === 'about'}
+                  onClick={() => handleNavigation('/about')}
+                />
+                <SidebarItem 
+                  icon={<Share2 size={20} className="text-[#00E5FF]" />} 
+                  label="Join Us" 
+                  active={activeTab === 'join-us'}
+                  onClick={() => handleNavigation('/join-us')}
+                />
+                <SidebarItem 
+                  icon={<Zap size={20} className="text-emerald-400" />} 
+                  label="Guide" 
+                  active={activeTab === 'guide'}
+                  onClick={() => handleNavigation('/guide')}
+                />
+                <SidebarItem 
+                  icon={<HelpCircle size={20} />} 
+                  label={t('help')} 
+                  active={activeTab === 'help'}
+                  onClick={() => handleNavigation('/help')}
+                />
+                <SidebarItem 
+                  icon={<MessageCircleQuestion size={20} />} 
+                  label="FAQ" 
+                  active={activeTab === 'faq'}
+                  onClick={() => handleNavigation('/faq')}
+                />
               </div>
             </motion.div>
           </>
@@ -2254,6 +2328,240 @@ export default function Layout() {
                 </div>
               </motion.div>
             </div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* 5. FLOATING CONTROLS ROW */}
+      <AnimatePresence>
+        {(location.pathname === '/home' || location.pathname === '/') && (
+          <>
+            {/* Desktop and Tablet layout row (preserved exactly) */}
+            <div className="hidden md:flex fixed left-0 right-0 top-[138px] lg:top-[171px] z-[110] pointer-events-none px-4 md:px-8 items-center justify-between">
+              {/* Left: Spin & Win button replaced with Spin & Mine */}
+              <motion.button
+                id="spin-win-floating-launcher"
+                onClick={() => setIsSpinMineOpen(true)}
+                initial={{ opacity: 0, x: -60, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: -60, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="pointer-events-auto flex items-center gap-2.5 p-2 pr-4 bg-[#090b10]/95 backdrop-blur-md border border-primary/25 rounded-full shadow-[0_8px_32px_rgba(59,130,246,0.25)] text-left cursor-pointer group hover:border-primary/50 transition-colors"
+              >
+                <div className="relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-primary/10 to-indigo-500/10 border border-primary/30">
+                  {/* Dynamic spinning wheel background */}
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ repeat: Infinity, duration: 2.8, ease: "linear" }}
+                    className="w-5 h-5 flex items-center justify-center text-primary"
+                  >
+                    <svg viewBox="0 0 100 100" className="w-full h-full">
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="14 14" />
+                      <circle cx="50" cy="50" r="25" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="8 8" />
+                      <circle cx="50" cy="50" r="10" fill="currentColor" />
+                      <line x1="50" y1="10" x2="50" y2="90" stroke="currentColor" strokeWidth="3" />
+                      <line x1="10" y1="50" x2="90" y2="50" stroke="currentColor" strokeWidth="3" />
+                    </svg>
+                  </motion.div>
+                  {/* Gold tiny arrow indicator */}
+                  <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-t-[5px] border-t-amber-400 z-10" />
+                </div>
+                
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-white/95 tracking-wide leading-none group-hover:text-primary transition-colors">Spin & Mine</span>
+                  <span className="text-[8px] font-bold text-primary font-mono tracking-widest leading-none mt-0.5 animate-pulse">CHOOSE PROTOCOL</span>
+                </div>
+              </motion.button>
+
+              {/* Right: Floating WhatsApp button */}
+              <motion.a
+                href="https://chat.whatsapp.com/CoNzUZBmDsDC8bV8nB7uIH?s=cl&p=i&ilr=4"
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, x: 60, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 60, scale: 0.9 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                className="pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-[0_4px_15px_rgba(37,211,102,0.4)] transition-colors cursor-pointer group"
+                title="Join WhatsApp Group"
+              >
+                {/* WhatsApp Premium Icon */}
+                <svg 
+                  viewBox="0 0 24 24" 
+                  className="w-5.5 h-5.5 fill-current filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+                >
+                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.528 2.017 14.077 1.01 11.45 1.01c-5.436 0-9.86 4.37-9.864 9.8 0 1.639.428 3.24 1.24 4.65l-.382 1.396 1.433-.376.126.075c1.619.982 3.251 1.498 4.654 1.498zM17.15 14c-.284-.142-1.68-.828-1.94-.923-.26-.095-.45-.142-.64.142-.19.285-.736.924-.902 1.114-.167.19-.333.213-.617.071-.284-.142-1.2-.442-2.285-1.41-1.014-.905-1.57-1.785-1.722-1.975-.152-.19-.016-.292.126-.433.127-.127.284-.333.426-.5.143-.166.19-.285.285-.475.094-.19.047-.356-.024-.5-.071-.142-.64-1.542-.877-2.115-.23-.556-.465-.48-.64-.49-.166-.01-.356-.01-.546-.01s-.5.07-.762.356c-.26.285-1 .978-1 2.387s1.023 2.774 1.166 2.964c.142.19 2.012 3.073 4.876 4.308.68.293 1.213.468 1.628.6 1.1-.35 2.1-.969 2.768-1.638.665-.668 1.16-1.544 1.16-2.503 0-.083-.005-.156-.014-.216z"/>
+                </svg>
+              </motion.a>
+            </div>
+
+            {/* Mobile Bottom Left: Spin & Win Replaced with Spin & Mine */}
+            <motion.button
+              id="spin-win-floating-launcher-mobile"
+              onClick={() => setIsSpinMineOpen(true)}
+              initial={{ opacity: 0, x: -60, scale: 0.9 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              exit={{ opacity: 0, x: -60, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="md:hidden fixed left-4 bottom-[92px] z-[110] pointer-events-auto flex items-center gap-2.5 p-2 pr-4 bg-[#090b10]/95 backdrop-blur-md border border-primary/25 rounded-full shadow-[0_8px_32px_rgba(59,130,246,0.25)] text-left cursor-pointer group hover:border-primary/50 transition-colors"
+            >
+              <div className="relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-primary/10 to-indigo-500/10 border border-primary/30">
+                {/* Dynamic spinning wheel background */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: 2.8, ease: "linear" }}
+                  className="w-5 h-5 flex items-center justify-center text-primary"
+                >
+                  <svg viewBox="0 0 100 100" className="w-full h-full">
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="14 14" />
+                    <circle cx="50" cy="50" r="25" fill="none" stroke="currentColor" strokeWidth="4" strokeDasharray="8 8" />
+                    <circle cx="50" cy="50" r="10" fill="currentColor" />
+                    <line x1="50" y1="10" x2="50" y2="90" stroke="currentColor" strokeWidth="3" />
+                    <line x1="10" y1="50" x2="90" y2="50" stroke="currentColor" strokeWidth="3" />
+                  </svg>
+                </motion.div>
+                {/* Gold tiny arrow indicator */}
+                <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[3px] border-l-transparent border-r-[3px] border-r-transparent border-t-[5px] border-t-amber-400 z-10" />
+              </div>
+              
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase text-white/95 tracking-wide leading-none group-hover:text-primary transition-colors">Spin & Mine</span>
+                <span className="text-[8px] font-bold text-primary font-mono tracking-widest leading-none mt-0.5 animate-pulse">CHOOSE</span>
+              </div>
+            </motion.button>
+
+            {/* Mobile Bottom Right: Floating WhatsApp Button (repositioned and enhanced with attention animation) */}
+            <motion.a
+              href="https://chat.whatsapp.com/CoNzUZBmDsDC8bV8nB7uIH?s=cl&p=i&ilr=4"
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ opacity: 0, x: 60, scale: 0.9 }}
+              animate={{ 
+                opacity: 1, 
+                scale: [1, 1.08, 0.95, 1.02, 1, 1, 1, 1, 1, 1],
+                rotate: [0, 0, 0, 0, -3, 3, -3, 3, 0, 0],
+                x: [0, 0, 0, 0, -2.5, 2.5, -2.5, 2.5, 0, 0]
+              }}
+              exit={{ opacity: 0, x: 60, scale: 0.9 }}
+              transition={{ 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 25,
+                scale: {
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
+                },
+                rotate: {
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
+                },
+                x: {
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
+                }
+              }}
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="md:hidden fixed right-4 bottom-[92px] z-[110] pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-[0_4px_15px_rgba(37,211,102,0.4)] transition-colors cursor-pointer group"
+              title="Join WhatsApp Group"
+            >
+              {/* WhatsApp Premium Icon */}
+              <svg 
+                viewBox="0 0 24 24" 
+                className="w-5.5 h-5.5 fill-current filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
+              >
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.528 2.017 14.077 1.01 11.45 1.01c-5.436 0-9.86 4.37-9.864 9.8 0 1.639.428 3.24 1.24 4.65l-.382 1.396 1.433-.376.126.075c1.619.982 3.251 1.498 4.654 1.498zM17.15 14c-.284-.142-1.68-.828-1.94-.923-.26-.095-.45-.142-.64.142-.19.285-.736.924-.902 1.114-.167.19-.333.213-.617.071-.284-.142-1.2-.442-2.285-1.41-1.014-.905-1.57-1.785-1.722-1.975-.152-.19-.016-.292.126-.433.127-.127.284-.333.426-.5.143-.166.19-.285.285-.475.094-.19.047-.356-.024-.5-.071-.142-.64-1.542-.877-2.115-.23-.556-.465-.48-.64-.49-.166-.01-.356-.01-.546-.01s-.5.07-.762.356c-.26.285-1 .978-1 2.387s1.023 2.774 1.166 2.964c.142.19 2.012 3.073 4.876 4.308.68.293 1.213.468 1.628.6 1.1-.35 2.1-.969 2.768-1.638.665-.668 1.16-1.544 1.16-2.503 0-.083-.005-.156-.014-.216z"/>
+              </svg>
+            </motion.a>
+
+            {/* Choice Modal for Spin & Mine */}
+            <AnimatePresence>
+              {isSpinMineOpen && (
+                <div 
+                  className="fixed inset-0 bg-black/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4 font-sans pointer-events-auto" 
+                  onClick={() => setIsSpinMineOpen(false)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                    className="bg-[#0b0e14]/98 border border-white/10 rounded-[36px] max-w-sm w-full p-6 relative overflow-hidden shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Close Button */}
+                    <button 
+                      onClick={() => setIsSpinMineOpen(false)}
+                      className="absolute top-5 right-5 p-2 bg-white/5 border border-white/10 rounded-full hover:text-red-400 transition-colors cursor-pointer"
+                    >
+                      <X size={15} />
+                    </button>
+
+                    <div className="space-y-3.5 mt-8">
+                      {/* Option 1: Spin & Win */}
+                      <button
+                        onClick={() => {
+                          setIsSpinMineOpen(false);
+                          navigate('/spin');
+                        }}
+                        className="w-full text-left p-4.5 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 hover:from-blue-500/15 hover:to-indigo-500/15 border border-primary/20 hover:border-primary/45 rounded-[24px] transition-all duration-300 group flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-primary/10 border border-primary/20 text-primary rounded-xl group-hover:scale-105 transition-transform">
+                            {/* SVG Mini Wheel */}
+                            <svg viewBox="0 0 100 100" className="w-5 h-5">
+                              <circle cx="50" cy="50" r="40" fill="none" stroke="currentColor" strokeWidth="8" strokeDasharray="14 14" />
+                              <line x1="50" y1="10" x2="50" y2="90" stroke="currentColor" strokeWidth="4" />
+                              <circle cx="50" cy="50" r="10" fill="currentColor" />
+                            </svg>
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-black uppercase text-white tracking-wide">Spin & Win Wheel</h4>
+                            <p className="text-[9px] text-slate-400 mt-0.5">Activate random outcome rewards</p>
+                          </div>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-500 group-hover:translate-x-1 transition-transform" />
+                      </button>
+
+                      {/* Option 2: TWN Mining */}
+                      <button
+                        onClick={() => {
+                          setIsSpinMineOpen(false);
+                          navigate('/mining');
+                        }}
+                        className="w-full text-left p-4.5 bg-gradient-to-r from-amber-500/10 to-emerald-500/10 hover:from-amber-500/15 hover:to-emerald-500/15 border border-amber-500/20 hover:border-emerald-500/30 rounded-[24px] transition-all duration-300 group flex items-center justify-between cursor-pointer"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl group-hover:scale-105 transition-transform">
+                            <Cpu size={18} className="text-amber-400 animate-bounce" />
+                          </div>
+                          <div>
+                            <h4 className="text-[11px] font-black uppercase text-white tracking-wide">TWN Mining Portal</h4>
+                            <p className="text-[9px] text-slate-400 mt-0.5">Operate high-end ASIC harvesters</p>
+                          </div>
+                        </div>
+                        <ChevronRight size={14} className="text-slate-500 group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+
+                    <div className="mt-5 text-center">
+                      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest font-mono">WAVE MAINNET SYSTEM SECURE</span>
+                    </div>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>
           </>
         )}
       </AnimatePresence>

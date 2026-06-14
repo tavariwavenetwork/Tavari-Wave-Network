@@ -37,7 +37,10 @@ import CookiePolicy from './components/FooterPages/CookiePolicy';
 import AMLPolicy from './components/FooterPages/AMLPolicy';
 import CertificationCompliance from './components/FooterPages/CertificationCompliance';
 import TWNTokenPortal from './components/TWNTokenPortal';
+import MiningPortal from './components/MiningPortal';
 import DailyPointsHub from './components/DailyPointsHub';
+import SpinAndWin from './components/SpinAndWin';
+import SpinAndWinGuidelines from './components/SpinAndWinGuidelines';
 import JoinUs from './components/JoinUs';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -146,7 +149,10 @@ export default function App() {
                 <Route path="/home" element={<Homepage />} />
                 <Route path="/guide" element={<Guide />} />
                 <Route path="/token" element={<TWNTokenPortal />} />
+                <Route path="/mining" element={<MiningPortal />} />
                 <Route path="/daily-points" element={<DailyPointsHub />} />
+                <Route path="/spin" element={<SpinAndWin />} />
+                <Route path="/spin-guidelines" element={<SpinAndWinGuidelines />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/invest" element={<Invest />} />
                 <Route path="/fund" element={<Fund />} />

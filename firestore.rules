@@ -103,7 +103,9 @@ service cloud.firestore {
                           'referrals_count', 'withdraw_methods', 'last_rebook', 'roi_disabled', 
                           'withdrawals_frozen', 'transfers_frozen', 'email_verified', 'public_id',
                           'referral_code', 'referral_link', 'referred_by', 'created_at', 'last_active_at',
-                          'twn_balance', 'points_balance', 'profile_edited', 'welcome_bonus_deducted'
+                          'twn_balance', 'points_balance', 'profile_edited', 'welcome_bonus_deducted',
+                          'auto_compound_enabled', 'auto_compound_duration', 'auto_compound_start_date',
+                          'auto_compound_end_date', 'auto_compound_expired', 'compounded_amounts'
                         ])) ||
                        (isSignedIn() && existing().get('referred_by', '') == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
                        (isSignedIn() && !isOwner(userId) && 
@@ -172,7 +174,7 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.get('referred_by', '') == request.auth.uid)
       ));
       allow create: if isSignedIn() && incoming().user_id == request.auth.uid && isValidInvestment(incoming()) && isStatusActive(request.auth.uid);
-      allow update: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid && incoming().user_id == resource.data.user_id && isStatusActive(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'last_sync', 'total_earned', 'referral_bonus_processed', 'dailyRoi']) && isValidInvestment(incoming()));
+      allow update: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid && incoming().user_id == resource.data.user_id && isStatusActive(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'last_sync', 'total_earned', 'referral_bonus_processed', 'dailyRoi']));
       allow delete: if isCipher();
     }
 
