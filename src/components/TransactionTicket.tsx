@@ -65,6 +65,8 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
     }
   } else if (tx.type === 'deposit') {
     displayType = 'Capital Deposit';
+  } else if (tx.type === 'mining_upgrade') {
+    displayType = tx.plan_name || tx.title || 'Mining Upgrade';
   } else if (tx.type === 'withdrawal') {
     displayType = 'Liquidity Withdrawal';
   } else if (tx.type === 'investment') {
@@ -129,6 +131,9 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
   if (tx.type === 'deposit') {
     iconComponent = <PlusCircle size={18} />;
     iconBg = 'bg-emerald-500/10 text-emerald-400';
+  } else if (tx.type === 'mining_upgrade') {
+    iconComponent = <Zap size={18} />;
+    iconBg = 'bg-cyan-500/10 text-cyan-400';
   } else if (tx.type === 'withdrawal') {
     iconComponent = <MinusCircle size={18} />;
     iconBg = 'bg-red-500/10 text-red-500';
@@ -233,6 +238,20 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
                 <div id={`tx-payment-method-group-${tx.id}`}>
                   <p className="text-[8px] font-black uppercase tracking-widest text-aura-muted flex items-center gap-1"><CreditCard size={8} /> Payment Method</p>
                   <p className="text-[11px] font-bold text-white uppercase mt-0.5">{tx.method || 'Direct'}</p>
+                </div>
+              </>
+            )}
+
+            {/* MINING UPGRADE DETAILS */}
+            {tx.type === 'mining_upgrade' && (
+              <>
+                <div id={`tx-mining-amount-group-${tx.id}`}>
+                  <p className="text-[8px] font-black uppercase tracking-widest text-aura-muted flex items-center gap-1"><DollarSign size={8} /> Machine Price</p>
+                  <p className="text-[11px] font-bold text-white mt-0.5">{displayAmount}</p>
+                </div>
+                <div id={`tx-mining-name-group-${tx.id}`}>
+                  <p className="text-[8px] font-black uppercase tracking-widest text-cyan-400 flex items-center gap-1"><Tag size={8} /> Machine Name</p>
+                  <p className="text-[11px] font-bold text-white uppercase mt-0.5">{tx.plan_name || tx.machine_name || 'ASIC Miner'}</p>
                 </div>
               </>
             )}

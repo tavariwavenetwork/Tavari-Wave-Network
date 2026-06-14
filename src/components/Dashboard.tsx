@@ -127,9 +127,10 @@ export default function Dashboard() {
     let currentDeposits: any[] = [];
     let currentWithdrawals: any[] = [];
     let currentTransfers: any[] = [];
+    let currentMiningUpgrades: any[] = [];
 
     const updateCombined = () => {
-      const all = [...currentDeposits, ...currentWithdrawals, ...currentTransfers];
+      const all = [...currentDeposits, ...currentWithdrawals, ...currentTransfers, ...currentMiningUpgrades];
       // Deduplicate by ID to prevent key collisions if the same event exists in multiple collections
       const seen = new Set();
       const unique = all.filter(item => {
@@ -152,6 +153,15 @@ export default function Dashboard() {
         updateCombined();
       },
       (error) => console.warn("Deposits listener blocked:", error.message)
+    );
+
+    const unsubMining = onSnapshot(
+      query(collection(db, 'mining_upgrades'), where('user_id', '==', user.uid), orderBy('created_at', 'desc'), limit(5)),
+      (snap) => {
+        currentMiningUpgrades = snap.docs.map(doc => ({ id: doc.id, type: 'mining_upgrade', ...doc.data() }));
+        updateCombined();
+      },
+      (error) => console.warn("Mining upgrades listener blocked:", error.message)
     );
 
     const unsubWithdrawals = onSnapshot(
@@ -178,6 +188,7 @@ export default function Dashboard() {
       unsubInvestmentsList();
       unsubReferrals();
       unsubDeposits();
+      unsubMining();
       unsubWithdrawals();
       unsubTransfers();
     };

@@ -386,10 +386,10 @@ export default function MiningPortal() {
       }
     });
 
-    // 2. Listen to user deposits to determine premium mining subscriptions
+    // 2. Listen to user mining upgrades to determine premium mining subscriptions
     const unsubDep = onSnapshot(
       query(
-        collection(db, 'deposits'),
+        collection(db, 'mining_upgrades'),
         where('user_id', '==', user.uid),
         where('is_mining_subscription', '==', true)
       ), 
@@ -611,8 +611,10 @@ export default function MiningPortal() {
     try {
       const payload = {
         user_id: user.uid,
+        username: profile?.username || user.email?.split('@')[0] || 'user',
         user_name: profile?.name || 'User',
         amount: selectedMachine.price,
+        machine_price: selectedMachine.price,
         method: payMethod,
         reference: txHash.trim(),
         status: 'pending',
@@ -621,21 +623,22 @@ export default function MiningPortal() {
         machine_name: selectedMachine.name,
         hourly_rate: selectedMachine.hourlyRate,
         created_at: new Date().toISOString(),
+        title: `${selectedMachine.name} ${premiumStates[selectedMachine.id] ? "Upgrade" : "Purchase"}`
       };
 
-      await addDoc(collection(db, 'deposits'), payload);
+      await addDoc(collection(db, 'mining_upgrades'), payload);
 
       // Create notification
       await addDoc(collection(db, 'notifications'), {
         user_id: user.uid,
-        title: 'Mining Subscription Submitted 🔌',
+        title: 'Mining Upgrade Requested 🔌',
         message: `Your payment of $${selectedMachine.price} for the ${selectedMachine.name} node has been recorded. Standby for Admin confirmation and slot unlocking.`,
         type: 'info',
         read: false,
         created_at: new Date().toISOString()
       });
 
-      toast.success("Subscription request logged! Waiting for Admin verification.", { id: toastId });
+      toast.success("Upgrade request logged! Waiting for Admin verification.", { id: toastId });
       setShowPayModal(false);
       setSelectedMachine(null);
       navigate('/fund/transactions');
@@ -672,22 +675,36 @@ export default function MiningPortal() {
       const now = new Date();
       const expires = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours
 
-      await setDoc(devRef, {
-        machine_id: mach.id,
-        status: 'active',
-        activated_at: now.toISOString(),
-        expires_at: expires.toISOString(),
-        claimed: false
-      });
+      await runTransaction(db, async (transaction) => {
+        // Try to update corresponding ticket status from 'inactive' to 'mining'
+        const sub = getSubRecord(mach.id);
+        if (sub) {
+          const subRef = doc(db, 'mining_upgrades', sub.id);
+          transaction.update(subRef, {
+            status: 'mining',
+            activated_at: now.toISOString(),
+            updated_at: now.toISOString()
+          });
+        }
 
-      // Post activity update
-      await addDoc(collection(db, 'notifications'), {
-        user_id: user.uid,
-        title: 'Premium ASIC Miner Online ⚡',
-        message: `Your ${mach.name} node is now fully energized and mining at high intensity! Secure claim window opens in exactly 24 hours.`,
-        type: 'info',
-        read: false,
-        created_at: new Date().toISOString()
+        transaction.set(devRef, {
+          machine_id: mach.id,
+          status: 'active',
+          activated_at: now.toISOString(),
+          expires_at: expires.toISOString(),
+          claimed: false
+        });
+
+        // Post activity update
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: user.uid,
+          title: 'Premium ASIC Miner Online ⚡',
+          message: `Your ${mach.name} node is now fully energized and mining at high intensity! Secure claim window opens in exactly 24 hours.`,
+          type: 'info',
+          read: false,
+          created_at: now.toISOString()
+        });
       });
 
       toast.success(`${mach.name} Core is ONLINE! Live hashing stream initiated.`, { id: toastId });
@@ -730,14 +747,15 @@ export default function MiningPortal() {
           claimed: true
         });
 
-        // 3. Find the associated APPROVED subscription deposit record and update its is_mining_subscription to false (or delete/mark processed)
+        // 3. Find the associated APPROVED subscription record and update its is_mining_subscription to false (or delete/mark processed)
         // so that the user must purchase a NEW subscription rather than reusing the same approved slot.
         const prevSub = getSubRecord(mach.id);
         if (prevSub) {
-          const subRef = doc(db, 'deposits', prevSub.id);
+          const subRef = doc(db, 'mining_upgrades', prevSub.id);
           transaction.update(subRef, {
             is_mining_subscription: false, // consumes the slot
             is_consumed_subscription: true,
+            status: 'completed',
             consumed_at: new Date().toISOString()
           });
         }

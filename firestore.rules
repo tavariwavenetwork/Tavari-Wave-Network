@@ -154,6 +154,19 @@ service cloud.firestore {
       allow delete: if isCipher();
     }
 
+    match /mining_upgrades/{id} {
+      allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
+      allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);
+      allow create: if isSignedIn() && incoming().user_id == request.auth.uid && isStatusActive(request.auth.uid);
+      allow update: if isCipher() || (
+        isSignedIn() && 
+        resource.data.user_id == request.auth.uid && 
+        incoming().user_id == resource.data.user_id && 
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'is_mining_subscription', 'is_consumed_subscription', 'consumed_at', 'updated_at'])
+      );
+      allow delete: if isCipher();
+    }
+
     match /withdrawals/{id} {
       allow get: if isSignedIn() && (resource.data.user_id == request.auth.uid || isCipher());
       allow list: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid);

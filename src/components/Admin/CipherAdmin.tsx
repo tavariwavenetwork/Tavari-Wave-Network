@@ -346,6 +346,7 @@ export default function CipherAdmin() {
 
   const [users, setUsers] = useState<any[]>([]);
   const [deposits, setDeposits] = useState<any[]>([]);
+  const [miningUpgrades, setMiningUpgrades] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
@@ -568,8 +569,8 @@ export default function CipherAdmin() {
   }, [deposits, seenDepositIds]);
 
   const pendingMiningCount = useMemo(() => {
-    return deposits.filter((dep: any) => dep.is_mining_subscription && dep.status === 'pending').length;
-  }, [deposits]);
+    return miningUpgrades.filter((upgrade: any) => upgrade.status === 'pending').length;
+  }, [miningUpgrades]);
 
   const pendingWithdrawalsUnseenCount = useMemo(() => {
     return withdrawals.filter((wit: any) => wit.status === 'pending' && !seenWithdrawalIds.includes(wit.id)).length;
@@ -754,6 +755,14 @@ export default function CipherAdmin() {
       (err) => console.error("Deposits sync failed:", err.message)
     );
 
+    const unsubscribeMining = onSnapshot(query(collection(db, 'mining_upgrades'), orderBy('created_at', 'desc')), 
+      (snap) => {
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMiningUpgrades(list);
+      },
+      (err) => console.error("Mining upgrades sync failed:", err.message)
+    );
+
     const unsubscribeWithdrawals = onSnapshot(query(collection(db, 'withdrawals'), orderBy('created_at', 'desc')), 
       (snap) => {
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -880,6 +889,7 @@ export default function CipherAdmin() {
       unsubscribeSettings();
       unsubscribeUsers();
       unsubscribeDeposits();
+      unsubscribeMining();
       unsubscribeWithdrawals();
       unsubscribeInvestments();
       unsubscribeSupportTickets();
@@ -1183,6 +1193,73 @@ export default function CipherAdmin() {
       await updateDoc(doc(db, 'deposits', id), { status: 'declined', updated_at: new Date().toISOString() });
       toast.success("Deposit Declined");
     } catch (error) {
+      toast.error("Process failed");
+    }
+  };
+
+  const approveMiningUpgrade = async (upgrade: any) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const upgradeRef = doc(db, 'mining_upgrades', upgrade.id);
+        const upgradeDoc = await transaction.get(upgradeRef);
+        if (!upgradeDoc.exists()) throw new Error("Upgrade ticket missing");
+
+        const upgradeData = upgradeDoc.data();
+        if (upgradeData.status !== 'pending') throw new Error("Already processed");
+
+        const userRef = doc(db, 'users', upgrade.user_id);
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User missing");
+
+        const machinePriceValue = parseFloat(upgradeData.amount || upgrade.amount || upgradeData.machine_price || 0);
+
+        transaction.update(upgradeRef, {
+          status: 'inactive',
+          updated_at: new Date().toISOString()
+        });
+
+        // Trigger user notification
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: upgrade.user_id,
+          title: 'ASIC Miner Purchased! 🔌',
+          message: `Your payment of $${machinePriceValue} for the ${upgradeData.machine_name || 'Premium ASIC Machine'} has been verified! Your core activation slot is now unlocked and available for booting in the Mining area.`,
+          type: 'success',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      });
+
+      toast.success("Mining Upgrade Approved!");
+    } catch (error: any) {
+      console.error("ADMIN MINING APPROVAL ERROR:", error);
+      toast.error("Process failed: " + error.message);
+    }
+  };
+
+  const declineMiningUpgrade = async (id: string, userId: string, machineName: string) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const upgradeRef = doc(db, 'mining_upgrades', id);
+        transaction.update(upgradeRef, {
+          status: 'declined',
+          updated_at: new Date().toISOString()
+        });
+
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: userId,
+          title: 'ASIC Miner Purchase Declined ❌',
+          message: `Your payment for the ${machineName} node has been declined. Please check your transaction reference and resubmit.`,
+          type: 'info',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      });
+
+      toast.success("Mining Upgrade Declined");
+    } catch (error: any) {
+      console.error("ADMIN MINING DECLINE ERROR:", error);
       toast.error("Process failed");
     }
   };
@@ -2120,12 +2197,11 @@ export default function CipherAdmin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.02]">
-                  {deposits
-                    .filter((dep: any) => dep.is_mining_subscription)
+                  {miningUpgrades
                     .filter((dep: any) => {
                       if (miningFilter === 'all') return true;
                       if (miningFilter === 'pending') return dep.status === 'pending';
-                      if (miningFilter === 'approved') return dep.status === 'approved';
+                      if (miningFilter === 'approved') return dep.status === 'approved' || dep.status === 'inactive' || dep.status === 'mining' || dep.status === 'completed';
                       if (miningFilter === 'rejected') return dep.status === 'declined' || dep.status === 'rejected';
                       return true;
                     })
@@ -2133,6 +2209,7 @@ export default function CipherAdmin() {
                       const u = getUserDetails(dep.user_id, dep.user_name);
                       const matchedUser = users.find((usr: any) => usr?.id === dep.user_id);
                       const usernameVal = matchedUser?.username || 'n/a';
+                      const isApproved = dep.status === 'approved' || dep.status === 'inactive' || dep.status === 'mining' || dep.status === 'completed';
                       return (
                         <tr 
                           key={dep.id} 
@@ -2146,21 +2223,21 @@ export default function CipherAdmin() {
                           <td className="px-6 py-4 text-xs text-aura-lime font-mono truncate max-w-[100px]">@{usernameVal}</td>
                           <td className="px-6 py-4 text-xs text-aura-muted truncate max-w-[150px]">{u.email}</td>
                           <td className="px-6 py-4 text-xs font-black uppercase tracking-wider text-white truncate max-w-[180px]">{dep.machine_name || 'ASIC Miner'}</td>
-                          <td className="px-6 py-4 text-sm font-black font-serif italic">{formatCurrency(dep.amount || 0)}</td>
+                          <td className="px-6 py-4 text-sm font-black font-serif italic">{formatCurrency(dep.amount || dep.machine_price || 0)}</td>
                           <td className="px-6 py-4 text-[10px] text-gray-400">
                             {dep.created_at ? new Date(dep.created_at).toLocaleString() : 'N/A'}
                           </td>
                           <td className="px-6 py-4">
                             <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded", 
                               dep.status === 'pending' ? "bg-yellow-400/10 text-yellow-500" :
-                              dep.status === 'approved' ? "bg-aura-lime/10 text-aura-lime" : "bg-red-400/10 text-red-100"
+                              isApproved ? "bg-aura-lime/10 text-aura-lime" : "bg-red-400/10 text-red-100"
                             )}>{dep.status}</span>
                           </td>
                           <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                             {dep.status === 'pending' ? (
                               <div className="flex gap-2 justify-end">
-                                <button onClick={() => declineDeposit(dep.id)} className="p-2 bg-red-400/10 text-red-400 hover:bg-red-400 hover:text-white rounded-lg transition-all" title="Decline"><XCircle size={16} /></button>
-                                <button onClick={() => approveDeposit(dep)} className="p-2 bg-aura-lime/10 text-aura-lime hover:bg-aura-lime hover:text-aura-black rounded-lg transition-all" title="Approve"><CheckCircle size={16} /></button>
+                                <button onClick={() => declineMiningUpgrade(dep.id, dep.user_id, dep.machine_name || 'ASIC Miner')} className="p-2 bg-red-400/10 text-red-400 hover:bg-red-400 hover:text-white rounded-lg transition-all" title="Decline"><XCircle size={16} /></button>
+                                <button onClick={() => approveMiningUpgrade(dep)} className="p-2 bg-aura-lime/10 text-aura-lime hover:bg-aura-lime hover:text-aura-black rounded-lg transition-all" title="Approve"><CheckCircle size={16} /></button>
                               </div>
                             ) : (
                               <span className="text-[10px] font-bold text-gray-500 uppercase">Processed</span>
