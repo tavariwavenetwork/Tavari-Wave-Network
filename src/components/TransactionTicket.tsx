@@ -64,9 +64,13 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
       displayType = 'Transfer Received';
     }
   } else if (tx.type === 'deposit') {
-    displayType = 'Capital Deposit';
+    if (tx.is_mining_subscription || tx.machine_id || tx.machine_name) {
+      displayType = tx.title || tx.plan_name || (tx.machine_name ? `${tx.machine_name} Purchase` : 'Mining Upgrade');
+    } else {
+      displayType = 'Capital Deposit';
+    }
   } else if (tx.type === 'mining_upgrade') {
-    displayType = tx.plan_name || tx.title || 'Mining Upgrade';
+    displayType = tx.title || tx.plan_name || (tx.machine_name ? `${tx.machine_name} Purchase` : 'Mining Upgrade');
   } else if (tx.type === 'withdrawal') {
     displayType = 'Liquidity Withdrawal';
   } else if (tx.type === 'investment') {
@@ -129,8 +133,13 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
   let iconComponent = <Zap size={18} />;
   let iconBg = 'bg-[#1e293b]/50 text-blue-400';
   if (tx.type === 'deposit') {
-    iconComponent = <PlusCircle size={18} />;
-    iconBg = 'bg-emerald-500/10 text-emerald-400';
+    if (tx.is_mining_subscription || tx.machine_id || tx.machine_name) {
+      iconComponent = <Zap size={18} />;
+      iconBg = 'bg-cyan-500/10 text-cyan-400';
+    } else {
+      iconComponent = <PlusCircle size={18} />;
+      iconBg = 'bg-emerald-500/10 text-emerald-400';
+    }
   } else if (tx.type === 'mining_upgrade') {
     iconComponent = <Zap size={18} />;
     iconBg = 'bg-cyan-500/10 text-cyan-400';
@@ -243,7 +252,7 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
             )}
 
             {/* MINING UPGRADE DETAILS */}
-            {tx.type === 'mining_upgrade' && (
+            {(tx.type === 'mining_upgrade' || (tx.type === 'deposit' && (tx.is_mining_subscription || tx.machine_id || tx.machine_name))) && (
               <>
                 <div id={`tx-mining-amount-group-${tx.id}`}>
                   <p className="text-[8px] font-black uppercase tracking-widest text-aura-muted flex items-center gap-1"><DollarSign size={8} /> Machine Price</p>

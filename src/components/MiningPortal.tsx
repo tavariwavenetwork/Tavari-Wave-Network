@@ -19,7 +19,8 @@ import {
   RotateCw,
   Coins,
   Download,
-  Info
+  Info,
+  History
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -298,6 +299,7 @@ export default function MiningPortal() {
   }>>({});
 
   const [userDeposits, setUserDeposits] = useState<any[]>([]);
+  const [miningTransactions, setMiningTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Active / Selection modals
@@ -329,8 +331,7 @@ export default function MiningPortal() {
   useEffect(() => {
     if (userDeposits.length === 0) return;
     const unseenApproved = userDeposits.find(dep => 
-      dep.status === 'approved' && 
-      dep.is_mining_subscription === true && 
+      (dep.status === 'approved' || dep.status === 'inactive') && 
       !seenApprovedDepositIds.includes(dep.id)
     );
 
@@ -390,8 +391,7 @@ export default function MiningPortal() {
     const unsubDep = onSnapshot(
       query(
         collection(db, 'mining_upgrades'),
-        where('user_id', '==', user.uid),
-        where('is_mining_subscription', '==', true)
+        where('user_id', '==', user.uid)
       ), 
       (snap) => {
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -421,10 +421,27 @@ export default function MiningPortal() {
       }
     );
 
+    // 4. Listen to mining-related transactions for the history section
+    const unsubMiningTx = onSnapshot(
+      query(
+        collection(db, 'transactions'),
+        where('user_id', '==', user.uid),
+        where('type', '==', 'twn_mining_claim')
+      ),
+      (snap) => {
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMiningTransactions(list);
+      },
+      (error) => {
+        console.error("Failed to load mining transactions:", error);
+      }
+    );
+
     return () => {
       unsubFree();
       unsubDep();
       unsubPremiumDevices();
+      unsubMiningTx();
     };
   }, [user]);
 
@@ -545,6 +562,12 @@ export default function MiningPortal() {
 
   // Find most recent subscription record for a premium machine id
   const getSubRecord = (machId: string) => {
+    const activeSub = userDeposits.find(dep => dep.machine_id === machId && (dep.status === 'mining' || dep.status === 'inactive'));
+    if (activeSub) return activeSub;
+
+    const pendingSub = userDeposits.find(dep => dep.machine_id === machId && (dep.status === 'pending' || dep.status === 'approved'));
+    if (pendingSub) return pendingSub;
+
     return userDeposits.find(dep => dep.machine_id === machId);
   };
 
@@ -553,8 +576,8 @@ export default function MiningPortal() {
     const sub = getSubRecord(mach.id);
     const devState = premiumStates[mach.id];
 
-    // If no subscription records exist or it's declined, state is Locked
-    if (!sub || sub.status === 'declined') {
+    // If no subscription records exist or it's declined/rejected, state is Locked
+    if (!sub || sub.status === 'declined' || sub.status === 'rejected') {
       return { status: 'locked', sub, devState };
     }
 
@@ -563,8 +586,8 @@ export default function MiningPortal() {
       return { status: 'verifying', sub, devState };
     }
 
-    // Approved subscriptions!
-    if (sub.status === 'approved') {
+    // Approved or active/mining subscriptions!
+    if (sub.status === 'approved' || sub.status === 'inactive' || sub.status === 'mining') {
       // If no device state, or it is explicitly marked claimed/idle (meaning ready to run)
       if (!devState || devState.claimed === true || devState.status === 'idle') {
         return { status: 'idle', sub, devState };
@@ -577,10 +600,6 @@ export default function MiningPortal() {
       } else {
         return { status: 'claimable', sub, devState };
       }
-    }
-
-    if (sub.status === 'rejected' || sub.status === 'declined') {
-      return { status: 'locked', sub, devState };
     }
 
     return { status: 'locked', sub, devState };
@@ -627,6 +646,21 @@ export default function MiningPortal() {
       };
 
       await addDoc(collection(db, 'mining_upgrades'), payload);
+
+      // Create transaction history record with status 'pending' and correct title
+      await addDoc(collection(db, 'transactions'), {
+        user_id: user.uid,
+        user_name: profile?.name || 'User',
+        username: profile?.username || user.email?.split('@')[0] || 'user',
+        type: 'mining_upgrade',
+        amount: selectedMachine.price,
+        status: 'pending',
+        is_mining_subscription: true,
+        machine_id: selectedMachine.id,
+        machine_name: selectedMachine.name,
+        created_at: new Date().toISOString(),
+        title: `${selectedMachine.name} ${premiumStates[selectedMachine.id] ? "Upgrade" : "Purchase"}`
+      });
 
       // Create notification
       await addDoc(collection(db, 'notifications'), {
@@ -753,10 +787,8 @@ export default function MiningPortal() {
         if (prevSub) {
           const subRef = doc(db, 'mining_upgrades', prevSub.id);
           transaction.update(subRef, {
-            is_mining_subscription: false, // consumes the slot
-            is_consumed_subscription: true,
-            status: 'completed',
-            consumed_at: new Date().toISOString()
+            status: 'inactive',
+            updated_at: new Date().toISOString()
           });
         }
 
@@ -779,7 +811,7 @@ export default function MiningPortal() {
         transaction.set(notifRef, {
           user_id: user.uid,
           title: 'ASIC Rewards Disbursed 🔌',
-          message: `${totalRewards.toLocaleString()} TWN harvested successfully from completed 24h ${mach.name} mining cycle. Slot consumed.`,
+          message: `${totalRewards.toLocaleString()} TWN harvested successfully from completed 24h ${mach.name} mining cycle. Machine status is now Inactive and ready for reactivation.`,
           type: 'info',
           read: false,
           created_at: new Date().toISOString()
@@ -840,6 +872,153 @@ export default function MiningPortal() {
   };
 
   const stats = getMiningStats();
+
+  const getMiningHistory = () => {
+    const history: any[] = [];
+
+    // Add purchase requests and statuses
+    userDeposits.forEach((dep: any) => {
+      // Each premium upgrade record represents a purchase/upgrade event
+      history.push({
+        id: `upgrade_${dep.id}`,
+        type: 'subscription',
+        title: dep.title || `${dep.machine_name || 'Premium'} Node Purchase`,
+        machineName: dep.machine_name || 'ASIC Miner',
+        amount: dep.amount || dep.machine_price || 0,
+        status: dep.status, // 'pending', 'inactive', 'mining', 'declined'
+        created_at: dep.created_at,
+        reference: dep.reference || '',
+        updated_at: dep.updated_at || dep.created_at
+      });
+    });
+
+    // Add harvest/claim claims
+    miningTransactions.forEach((tx: any) => {
+      history.push({
+        id: `claim_${tx.id}`,
+        type: 'claim',
+        title: tx.type_detail === 'free_mining_cycle_completed' 
+          ? 'Free Mining Harvest' 
+          : `${tx.type_detail?.replace('premium_mining_','')?.replace('_completed','')?.toUpperCase()?.replace(/_/g, ' ') || 'Premium'} Node Harvest`,
+        twnAmount: tx.twn_amount || 0,
+        status: tx.status || 'approved',
+        created_at: tx.created_at,
+        reference: tx.id
+      });
+    });
+
+    // Sort by created_at descending
+    return history.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  };
+
+  const renderMiningHistory = () => {
+    const historyItems = getMiningHistory();
+
+    return (
+      <div className="w-full max-w-7xl mx-auto px-4 md:px-8 mt-12 mb-4" id="twn-mining-history-section">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 flex items-center gap-2">
+            <History size={14} className="text-indigo-500" />
+            MINING INTERLOCK HISTORY
+          </h2>
+          <span className="text-[10px] uppercase font-bold tracking-wider font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-0.5 rounded-full">
+            {historyItems.length} Record{historyItems.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {historyItems.length === 0 ? (
+          <div className="p-10 text-center bg-white border border-slate-200/60 rounded-[32px] shadow-sm">
+            <p className="text-sm font-medium text-slate-400">No mining activity recorded yet.</p>
+            <p className="text-xs text-slate-400/80 mt-1">Activate the free miner or purchase a premium node to begin.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {historyItems.map((item) => {
+              const isClaim = item.type === 'claim';
+              const isPending = item.status === 'pending';
+              const isDeclined = item.status === 'declined';
+              const isSuccess = !isPending && !isDeclined;
+
+              let iconBg = "bg-indigo-50 border-indigo-100/50 text-indigo-600";
+              let statusLabel = "SUCCEEDED";
+              let statusBg = "bg-emerald-50 text-emerald-700 border-emerald-100";
+
+              if (isClaim) {
+                iconBg = "bg-emerald-50 border-emerald-100/50 text-emerald-600";
+              } else {
+                if (isPending) {
+                  statusLabel = "AWAITING APPROVAL";
+                  statusBg = "bg-amber-50 text-amber-700 border-amber-100";
+                } else if (isDeclined) {
+                  statusLabel = "DECLINED";
+                  statusBg = "bg-rose-50 text-rose-700 border-rose-100";
+                } else {
+                  statusLabel = "READY/ACTIVE";
+                  statusBg = "bg-indigo-50 text-indigo-700 border-indigo-100";
+                }
+              }
+
+              return (
+                <div 
+                  key={item.id} 
+                  className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex items-start gap-4 relative overflow-hidden"
+                >
+                  <div className={`absolute top-0 left-0 w-[4px] h-full ${isClaim ? 'bg-emerald-500' : isPending ? 'bg-amber-400' : isDeclined ? 'bg-rose-500' : 'bg-indigo-500'}`} />
+
+                  <div className={`p-3 rounded-2xl border shrink-0 ${iconBg}`}>
+                    {isClaim ? <Coins size={18} /> : <Cpu size={18} />}
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight truncate">
+                        {item.title}
+                      </h4>
+                      <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 font-mono ${statusBg}`}>
+                        {statusLabel}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 mt-2.5 text-[10px] md:text-xs text-slate-400 font-mono">
+                      <span className="flex items-center gap-1 text-slate-500">
+                        <Clock size={12} className="opacity-75" />
+                        {new Date(item.created_at).toLocaleString([], {
+                          year: 'numeric',
+                          month: 'short',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+
+                      {!isClaim && item.reference && (
+                        <span className="truncate max-w-[150px] leading-none py-0.5 px-1 bg-slate-50 border border-slate-100 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-help" title={`Tx Hash: ${item.reference}`}>
+                          TX: {item.reference.substring(0, 10)}...
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                        {isClaim ? 'Yield Claimed' : 'Investment Price'}
+                      </p>
+                      <p className="font-mono font-black text-sm text-slate-800">
+                        {isClaim ? (
+                          <span className="text-emerald-600">+{item.twnAmount} TWN</span>
+                        ) : (
+                          <span className="text-slate-700">${item.amount} USDT</span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#F9FAFB] text-slate-800 relative overflow-hidden pb-12" id="twn-mining-portal-main">
@@ -1358,6 +1537,8 @@ export default function MiningPortal() {
                 </div>
               </div>
             )}
+            {/* MINING HISTORY SECTION */}
+            {renderMiningHistory()}
           </div>
         );
       })()}

@@ -1199,6 +1199,23 @@ export default function CipherAdmin() {
 
   const approveMiningUpgrade = async (upgrade: any) => {
     try {
+      // Find matching pending transactions in transactions collection
+      let matchingTxId: string | null = null;
+      try {
+        const txsQuery = query(
+          collection(db, 'transactions'),
+          where('user_id', '==', upgrade.user_id),
+          where('machine_id', '==', upgrade.machine_id),
+          where('status', '==', 'pending')
+        );
+        const txsSnap = await getDocs(txsQuery);
+        if (!txsSnap.empty) {
+          matchingTxId = txsSnap.docs[0].id;
+        }
+      } catch (txErr) {
+        console.error("ERROR SEARCHING MATCHING TRANSACTION:", txErr);
+      }
+
       await runTransaction(db, async (transaction) => {
         const upgradeRef = doc(db, 'mining_upgrades', upgrade.id);
         const upgradeDoc = await transaction.get(upgradeRef);
@@ -1217,6 +1234,30 @@ export default function CipherAdmin() {
           status: 'inactive',
           updated_at: new Date().toISOString()
         });
+
+        if (matchingTxId) {
+          const txRef = doc(db, 'transactions', matchingTxId);
+          transaction.update(txRef, {
+            status: 'approved',
+            updated_at: new Date().toISOString()
+          });
+        } else {
+          // If for some reason one didn't exist, we fallback-create one
+          const txRef = doc(collection(db, 'transactions'));
+          transaction.set(txRef, {
+            user_id: upgrade.user_id,
+            user_name: upgrade.user_name || 'User',
+            username: upgrade.username || 'user',
+            type: 'mining_upgrade',
+            amount: machinePriceValue,
+            status: 'approved',
+            is_mining_subscription: true,
+            machine_id: upgradeData.machine_id,
+            machine_name: upgradeData.machine_name,
+            created_at: new Date().toISOString(),
+            title: `${upgradeData.machine_name || 'ASIC Miner'} Purchase`
+          });
+        }
 
         // Trigger user notification
         const notifRef = doc(collection(db, 'notifications'));
@@ -1239,12 +1280,44 @@ export default function CipherAdmin() {
 
   const declineMiningUpgrade = async (id: string, userId: string, machineName: string) => {
     try {
+      // Find matching pending upgrade to retrieve machine_id
+      let matchingTxId: string | null = null;
+      try {
+        const upgradeDoc = await getDoc(doc(db, 'mining_upgrades', id));
+        if (upgradeDoc.exists()) {
+          const uData = upgradeDoc.data();
+          const machId = uData.machine_id;
+          if (machId) {
+            const txsQuery = query(
+              collection(db, 'transactions'),
+              where('user_id', '==', userId),
+              where('machine_id', '==', machId),
+              where('status', '==', 'pending')
+            );
+            const txsSnap = await getDocs(txsQuery);
+            if (!txsSnap.empty) {
+              matchingTxId = txsSnap.docs[0].id;
+            }
+          }
+        }
+      } catch (txErr) {
+        console.error("ERROR FINDING TRANSACTION FOR DECLINE:", txErr);
+      }
+
       await runTransaction(db, async (transaction) => {
         const upgradeRef = doc(db, 'mining_upgrades', id);
         transaction.update(upgradeRef, {
           status: 'declined',
           updated_at: new Date().toISOString()
         });
+
+        if (matchingTxId) {
+          const txRef = doc(db, 'transactions', matchingTxId);
+          transaction.update(txRef, {
+            status: 'declined',
+            updated_at: new Date().toISOString()
+          });
+        }
 
         const notifRef = doc(collection(db, 'notifications'));
         transaction.set(notifRef, {

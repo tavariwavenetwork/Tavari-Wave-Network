@@ -30,17 +30,18 @@ service cloud.firestore {
     }
 
     function isSuspended(data) {
-      return 'suspended' in data && data.suspended == true;
+      return data.get('suspended', false) == true;
     }
 
     function isBanned(data) {
-      return 'banned' in data && data.banned == true;
+      return data.get('banned', false) == true;
     }
 
     function isStatusActive(uid) {
-      return exists(/databases/$(database)/documents/users/$(uid)) && 
-             !isSuspended(get(/databases/$(database)/documents/users/$(uid)).data) && 
-             !isBanned(get(/databases/$(database)/documents/users/$(uid)).data);
+      return !exists(/databases/$(database)/documents/users/$(uid)) || (
+        get(/databases/$(database)/documents/users/$(uid)).data.get('suspended', false) != true && 
+        get(/databases/$(database)/documents/users/$(uid)).data.get('banned', false) != true
+      );
     }
 
     // --- VALIDATION HELPERS ---
