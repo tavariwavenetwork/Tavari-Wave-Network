@@ -270,7 +270,7 @@ export default function CipherAdmin() {
   const [withdrawalFilter, setWithdrawalFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [selectedSupportTicket, setSelectedSupportTicket] = useState<any>(null);
-  const [ticketType, setTicketType] = useState<'deposit' | 'withdrawal' | 'investment' | null>(null);
+  const [ticketType, setTicketType] = useState<'deposit' | 'withdrawal' | 'investment' | 'mining_upgrade' | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userDevices, setUserDevices] = useState<any[]>([]);
@@ -2287,7 +2287,7 @@ export default function CipherAdmin() {
                         <tr 
                           key={dep.id} 
                           className="group hover:bg-white/[0.02] transition-colors cursor-pointer text-white"
-                          onClick={() => { setSelectedTicket(dep); setTicketType('deposit'); }}
+                          onClick={() => { setSelectedTicket(dep); setTicketType('mining_upgrade'); }}
                         >
                           <td className="px-6 py-4 font-mono text-[10px] text-gray-400">
                             <span className="truncate max-w-[80px] block" title={dep.user_id}>{dep.user_id}</span>
@@ -5274,7 +5274,7 @@ export default function CipherAdmin() {
                   </span>
                 </div>
                 <h3 className="text-2xl font-black font-serif italic text-white capitalize">
-                  {ticketType} Ticket
+                  {ticketType === 'mining_upgrade' ? 'ASIC Purchase' : ticketType} Ticket
                 </h3>
               </div>
 
@@ -5319,6 +5319,14 @@ export default function CipherAdmin() {
                         <span className="text-aura-muted uppercase font-bold text-[10px]">Investment Plan:</span>
                         <span className="text-aura-lime uppercase font-black tracking-widest text-[10px]">
                           {selectedTicket.plan_name || 'Regular'} Node
+                        </span>
+                      </div>
+                    )}
+                    {ticketType === 'mining_upgrade' && (
+                      <div className="flex justify-between items-center text-xs pt-1">
+                        <span className="text-aura-muted uppercase font-bold text-[10px]">ASIC Model Name:</span>
+                        <span className="text-aura-lime uppercase font-black tracking-widest text-[10px]">
+                          {selectedTicket.machine_name || 'ASIC Miner'}
                         </span>
                       </div>
                     )}
@@ -5442,6 +5450,7 @@ export default function CipherAdmin() {
                         if (ticketType === 'deposit') declineDeposit(selectedTicket.id);
                         if (ticketType === 'withdrawal') declineWithdrawal(selectedTicket);
                         if (ticketType === 'investment') rejectInvestment(selectedTicket.id);
+                        if (ticketType === 'mining_upgrade') declineMiningUpgrade(selectedTicket.id, selectedTicket.user_id, selectedTicket.machine_name || 'ASIC Miner');
                         setSelectedTicket(null);
                       }}
                       className="px-6 py-3 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-xs uppercase font-black tracking-widest transition-all border border-red-500/20"
@@ -5453,6 +5462,7 @@ export default function CipherAdmin() {
                         if (ticketType === 'deposit') approveDeposit(selectedTicket);
                         if (ticketType === 'withdrawal') approveWithdrawal(selectedTicket);
                         if (ticketType === 'investment') approveInvestment(selectedTicket);
+                        if (ticketType === 'mining_upgrade') approveMiningUpgrade(selectedTicket);
                         setSelectedTicket(null);
                       }}
                       className="px-6 py-3 bg-aura-lime text-aura-black hover:bg-aura-lime/95 rounded-xl text-xs uppercase font-black tracking-widest transition-all"

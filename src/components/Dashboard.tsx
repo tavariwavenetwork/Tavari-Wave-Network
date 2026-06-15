@@ -178,7 +178,7 @@ export default function Dashboard() {
       (snap) => {
         currentTransfers = snap.docs
           .map(doc => ({ id: doc.id, type: 'transfer', ...doc.data() }))
-          .filter(t => t.type !== 'withdrawal' && t.type !== 'deposit' && t.type !== 'investment');
+          .filter(t => t.type !== 'withdrawal' && t.type !== 'deposit' && t.type !== 'investment' && t.type !== 'mining_upgrade');
         updateCombined();
       },
       (error) => console.warn("Transfers listener blocked:", error.message)

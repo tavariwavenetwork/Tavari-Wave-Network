@@ -299,6 +299,7 @@ export default function MiningPortal() {
   }>>({});
 
   const [userDeposits, setUserDeposits] = useState<any[]>([]);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
   const [miningTransactions, setMiningTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -876,35 +877,81 @@ export default function MiningPortal() {
   const getMiningHistory = () => {
     const history: any[] = [];
 
-    // Add purchase requests and statuses
+    // 1. Purchase & Approval Events
     userDeposits.forEach((dep: any) => {
-      // Each premium upgrade record represents a purchase/upgrade event
+      // Add purchase event
       history.push({
         id: `upgrade_${dep.id}`,
         type: 'subscription',
-        title: dep.title || `${dep.machine_name || 'Premium'} Node Purchase`,
+        title: `${dep.machine_name || 'Premium ASIC Miner'} Purchase`,
         machineName: dep.machine_name || 'ASIC Miner',
+        machineType: 'Premium Liquid-Cooled Node',
         amount: dep.amount || dep.machine_price || 0,
         status: dep.status, // 'pending', 'inactive', 'mining', 'declined'
         created_at: dep.created_at,
         reference: dep.reference || '',
         updated_at: dep.updated_at || dep.created_at
       });
+
+      // Add ONE approval event when approved
+      const isApproved = dep.status === 'approved' || dep.status === 'inactive' || dep.status === 'mining' || dep.status === 'completed';
+      if (isApproved) {
+        history.push({
+          id: `approval_${dep.id}`,
+          type: 'approval',
+          title: `Verification Approved: ${dep.machine_name || 'Premium ASIC Miner'}`,
+          machineName: dep.machine_name || 'ASIC Miner',
+          machineType: 'Premium Liquid-Cooled Node',
+          status: 'Inactive',
+          created_at: dep.updated_at || dep.created_at,
+          approvedTimestamp: dep.updated_at || dep.created_at,
+          reference: dep.reference || '',
+        });
+      }
     });
 
-    // Add harvest/claim claims
+    // 2. Harvest/Claim Claims
     miningTransactions.forEach((tx: any) => {
-      history.push({
-        id: `claim_${tx.id}`,
-        type: 'claim',
-        title: tx.type_detail === 'free_mining_cycle_completed' 
-          ? 'Free Mining Harvest' 
-          : `${tx.type_detail?.replace('premium_mining_','')?.replace('_completed','')?.toUpperCase()?.replace(/_/g, ' ') || 'Premium'} Node Harvest`,
-        twnAmount: tx.twn_amount || 0,
-        status: tx.status || 'approved',
-        created_at: tx.created_at,
-        reference: tx.id
-      });
+      const isFree = tx.type_detail === 'free_mining_cycle_completed';
+      
+      if (isFree) {
+        // Free Machine History
+        const parsedCreated = new Date(tx.created_at);
+        const parsedStart = new Date(parsedCreated.getTime() - 2 * 60 * 60 * 1000); // approx 2h run time
+        
+        history.push({
+          id: `claim_${tx.id}`,
+          type: 'free_claim',
+          title: 'Free Mining Harvest',
+          machineName: 'Free Mining Machine',
+          machineType: 'Standard Air-Cooled Miner',
+          coinEarned: tx.twn_amount || 20,
+          claimStatus: 'Claimed',
+          claimTime: tx.created_at,
+          startTime: parsedStart.toISOString(),
+          endTime: tx.created_at,
+          created_at: tx.created_at,
+          timestamp: tx.created_at,
+          session: 'Free 1.4s Duty Cycle'
+        });
+      } else {
+        // Premium Machine History
+        const mId = tx.type_detail?.replace('premium_mining_', '')?.replace('_completed', '') || '';
+        const mach = PREMIUM_MACHINES.find(m => m.id === mId);
+        
+        history.push({
+          id: `claim_${tx.id}`,
+          type: 'premium_claim',
+          title: `${mach?.name || 'ASIC'} Reward Harvest`,
+          machineName: mach?.name || 'Premium ASIC Miner',
+          machineType: 'Premium Liquid-Cooled Node',
+          coinEarned: tx.twn_amount || 0,
+          claimStatus: 'Claimed',
+          timestamp: tx.created_at,
+          created_at: tx.created_at,
+          session: '24-Hour Duty Cycle'
+        });
+      }
     });
 
     // Sort by created_at descending
@@ -914,16 +961,52 @@ export default function MiningPortal() {
   const renderMiningHistory = () => {
     const historyItems = getMiningHistory();
 
+    if (!isHistoryExpanded) {
+      return (
+        <div className="w-full max-w-7xl mx-auto px-4 md:px-8 mt-12 mb-4" id="twn-mining-history-section">
+          <div className="bg-white border border-slate-200/85 hover:border-slate-300 rounded-[32px] p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 transition-all">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl">
+                <History size={18} />
+              </div>
+              <div className="text-left">
+                <h3 className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">
+                  MINING INTERLOCK HISTORY
+                </h3>
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Explore and analyze older premium duty sessions, free claims, and machine orders ({historyItems.length} records).
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsHistoryExpanded(true)}
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs uppercase font-black tracking-widest transition-all shadow-md hover:shadow-indigo-500/10 active:scale-95 cursor-pointer font-mono shrink-0"
+            >
+              Expand History
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="w-full max-w-7xl mx-auto px-4 md:px-8 mt-12 mb-4" id="twn-mining-history-section">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 flex items-center gap-2">
-            <History size={14} className="text-indigo-500" />
-            MINING INTERLOCK HISTORY
-          </h2>
-          <span className="text-[10px] uppercase font-bold tracking-wider font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-0.5 rounded-full">
-            {historyItems.length} Record{historyItems.length !== 1 ? 's' : ''}
-          </span>
+      <div className="w-full max-w-7xl mx-auto px-4 md:px-8 mt-12 mb-4" id="twn-mining-history-section-expanded">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-xs font-black uppercase tracking-[0.25em] text-slate-500 flex items-center gap-2">
+              <History size={14} className="text-indigo-500" />
+              MINING INTERLOCK HISTORY (EXPANDED)
+            </h2>
+            <span className="text-[10px] uppercase font-bold tracking-wider font-mono text-slate-500 bg-slate-100 border border-slate-200 px-3 py-0.5 rounded-full">
+              {historyItems.length} Record{historyItems.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <button 
+            onClick={() => setIsHistoryExpanded(false)}
+            className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 hover:border-slate-300 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all font-mono self-start sm:self-auto cursor-pointer"
+          >
+            Collapse History
+          </button>
         </div>
 
         {historyItems.length === 0 ? (
@@ -932,83 +1015,221 @@ export default function MiningPortal() {
             <p className="text-xs text-slate-400/80 mt-1">Activate the free miner or purchase a premium node to begin.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-1">
             {historyItems.map((item) => {
-              const isClaim = item.type === 'claim';
+              if (item.type === 'free_claim') {
+                return (
+                  <div 
+                    key={item.id} 
+                    className="bg-white border border-slate-200 rounded-[28px] p-5 shadow-sm hover:shadow transition-all relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 w-[4px] h-full bg-amber-500" />
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-amber-50 border border-amber-100 text-amber-600 rounded-2xl shrink-0">
+                        <Cpu size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight truncate">
+                            Machine: {item.machineName}
+                          </h4>
+                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 bg-emerald-50 text-emerald-700 border-emerald-100 font-mono">
+                            {item.claimStatus}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1 font-mono">{item.machineType}</p>
+                        
+                        <div className="grid grid-cols-2 gap-1.5 mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-mono">
+                          <div>
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Start Time</span>
+                            {new Date(item.startTime).toLocaleString()}
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">End Time</span>
+                            {new Date(item.endTime).toLocaleString()}
+                          </div>
+                          <div className="mt-1">
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Claim Time</span>
+                            {new Date(item.claimTime).toLocaleString()}
+                          </div>
+                          <div className="mt-1">
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Timestamp</span>
+                            {new Date(item.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                            Yield Harvested
+                          </p>
+                          <p className="font-mono font-black text-sm text-emerald-600">
+                            +{item.coinEarned} TWN
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (item.type === 'premium_claim') {
+                return (
+                  <div 
+                    key={item.id} 
+                    className="bg-white border border-slate-200 rounded-[28px] p-5 shadow-sm hover:shadow transition-all relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 w-[4px] h-full bg-emerald-500" />
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-2xl shrink-0">
+                        <Coins size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight truncate">
+                            Machine: {item.machineName}
+                          </h4>
+                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 bg-emerald-50 text-emerald-700 border-emerald-100 font-mono">
+                            {item.claimStatus}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1 font-mono">{item.machineType}</p>
+                        
+                        <div className="grid grid-cols-2 gap-1.5 mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-mono">
+                          <div>
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Mining Session</span>
+                            {item.session}
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Yield Disbursed</span>
+                            {item.coinEarned} TWN
+                          </div>
+                          <div className="mt-1 col-span-2">
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Claim Timestamp</span>
+                            {new Date(item.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                            Yield Harvested
+                          </p>
+                          <p className="font-mono font-black text-sm text-emerald-600">
+                            +{item.coinEarned} TWN
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (item.type === 'approval') {
+                return (
+                  <div 
+                    key={item.id} 
+                    className="bg-white border border-slate-200 rounded-[28px] p-5 shadow-sm hover:shadow transition-all relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 left-0 w-[4px] h-full bg-slate-400" />
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-slate-50 border border-slate-150 text-slate-600 rounded-2xl shrink-0">
+                        <CheckCircle2 size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight truncate">
+                            {item.machineName}
+                          </h4>
+                          <span className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 bg-slate-100 text-slate-600 border-slate-200 font-mono">
+                            {item.status}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1 font-mono">{item.machineType}</p>
+                        
+                        <div className="mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-400 font-mono">
+                          <span className="text-slate-500 block uppercase font-bold text-[8px]">Approved Timestamp</span>
+                          {new Date(item.approvedTimestamp).toLocaleString()}
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                            Channel Protocol
+                          </p>
+                          <p className="font-mono font-black text-xs text-slate-700">
+                            Core Slot Verified
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Purchase request ('subscription')
               const isPending = item.status === 'pending';
               const isDeclined = item.status === 'declined';
-              const isSuccess = !isPending && !isDeclined;
-
-              let iconBg = "bg-indigo-50 border-indigo-100/50 text-indigo-600";
+              
               let statusLabel = "SUCCEEDED";
               let statusBg = "bg-emerald-50 text-emerald-700 border-emerald-100";
 
-              if (isClaim) {
-                iconBg = "bg-emerald-50 border-emerald-100/50 text-emerald-600";
+              if (isPending) {
+                statusLabel = "AWAITING APPROVAL";
+                statusBg = "bg-amber-50 text-amber-700 border-amber-100";
+              } else if (isDeclined) {
+                statusLabel = "DECLINED";
+                statusBg = "bg-rose-50 text-rose-700 border-rose-100";
               } else {
-                if (isPending) {
-                  statusLabel = "AWAITING APPROVAL";
-                  statusBg = "bg-amber-50 text-amber-700 border-amber-100";
-                } else if (isDeclined) {
-                  statusLabel = "DECLINED";
-                  statusBg = "bg-rose-50 text-rose-700 border-rose-100";
-                } else {
-                  statusLabel = "READY/ACTIVE";
-                  statusBg = "bg-indigo-50 text-indigo-700 border-indigo-100";
-                }
+                statusLabel = "READY/ACTIVE";
+                statusBg = "bg-indigo-50 text-indigo-700 border-indigo-100";
               }
 
               return (
                 <div 
                   key={item.id} 
-                  className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-3xl p-5 shadow-sm hover:shadow-md transition-all flex items-start gap-4 relative overflow-hidden"
+                  className="bg-white border border-slate-200 rounded-[28px] p-5 shadow-sm hover:shadow transition-all relative overflow-hidden"
                 >
-                  <div className={`absolute top-0 left-0 w-[4px] h-full ${isClaim ? 'bg-emerald-500' : isPending ? 'bg-amber-400' : isDeclined ? 'bg-rose-500' : 'bg-indigo-500'}`} />
-
-                  <div className={`p-3 rounded-2xl border shrink-0 ${iconBg}`}>
-                    {isClaim ? <Coins size={18} /> : <Cpu size={18} />}
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight truncate">
-                        {item.title}
-                      </h4>
-                      <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 font-mono ${statusBg}`}>
-                        {statusLabel}
-                      </span>
+                  <div className={`absolute top-0 left-0 w-[4px] h-full ${isPending ? 'bg-amber-400' : isDeclined ? 'bg-rose-500' : 'bg-indigo-500'}`} />
+                  <div className="flex items-start gap-4">
+                    <div className="p-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl shrink-0">
+                      <Cpu size={18} />
                     </div>
-
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 mt-2.5 text-[10px] md:text-xs text-slate-400 font-mono">
-                      <span className="flex items-center gap-1 text-slate-500">
-                        <Clock size={12} className="opacity-75" />
-                        {new Date(item.created_at).toLocaleString([], {
-                          year: 'numeric',
-                          month: 'short',
-                          day: '2-digit',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-
-                      {!isClaim && item.reference && (
-                        <span className="truncate max-w-[150px] leading-none py-0.5 px-1 bg-slate-50 border border-slate-100 rounded text-slate-400 hover:text-slate-600 transition-colors cursor-help" title={`Tx Hash: ${item.reference}`}>
-                          TX: {item.reference.substring(0, 10)}...
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-sans font-bold text-slate-800 text-sm leading-tight truncate">
+                          {item.title}
+                        </h4>
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border shrink-0 font-mono ${statusBg}`}>
+                          {statusLabel}
                         </span>
-                      )}
-                    </div>
-
-                    <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                        {isClaim ? 'Yield Claimed' : 'Investment Price'}
-                      </p>
-                      <p className="font-mono font-black text-sm text-slate-800">
-                        {isClaim ? (
-                          <span className="text-emerald-600">+{item.twnAmount} TWN</span>
-                        ) : (
-                          <span className="text-slate-700">${item.amount} USDT</span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-1 font-mono">{item.machineType}</p>
+                      
+                      <div className="grid grid-cols-2 gap-1.5 mt-3 pt-3 border-t border-slate-100 text-[10px] text-slate-500 font-mono">
+                        <div>
+                          <span className="text-slate-400 block uppercase font-bold text-[8px]">Purchase Cost</span>
+                          ${item.amount} USDT
+                        </div>
+                        <div>
+                          <span className="text-slate-400 block uppercase font-bold text-[8px]">Ordered</span>
+                          {new Date(item.created_at).toLocaleDateString()}
+                        </div>
+                        {item.reference && (
+                          <div className="col-span-2 mt-1">
+                            <span className="text-slate-400 block uppercase font-bold text-[8px]">Blockchain Reference Hash</span>
+                            <span className="truncate max-w-full block text-slate-500 hover:text-slate-700" title={item.reference}>
+                              {item.reference}
+                            </span>
+                          </div>
                         )}
-                      </p>
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                          Order Core Payment
+                        </p>
+                        <p className="font-mono font-black text-sm text-slate-800">
+                          ${item.amount} USDT
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
