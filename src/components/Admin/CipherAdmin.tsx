@@ -1313,10 +1313,7 @@ export default function CipherAdmin() {
 
         if (matchingTxId) {
           const txRef = doc(db, 'transactions', matchingTxId);
-          transaction.update(txRef, {
-            status: 'declined',
-            updated_at: new Date().toISOString()
-          });
+          transaction.delete(txRef);
         }
 
         const notifRef = doc(collection(db, 'notifications'));

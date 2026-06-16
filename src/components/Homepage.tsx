@@ -245,6 +245,8 @@ export default function Homepage() {
   };
 
   const handleCompoundClick = async () => {
+    if (!user || isCompounding) return;
+
     const isAutoCompoundActive = !!(
       profile?.auto_compound_enabled &&
       profile?.auto_compound_end_date &&
@@ -253,16 +255,145 @@ export default function Homepage() {
 
     if (isAutoCompoundActive) {
       setShowDurationSelector(false);
-    } else {
+      return;
+    }
+
+    setIsCompounding(true);
+    const toastId = toast.loading("Processing compounding transfer to Assets...");
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const nowIso = new Date().toISOString();
+      let transferredAmount = 0;
+
+      await runTransaction(db, async (transaction) => {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error("User profile not found.");
+        }
+
+        const userData = userSnap.data();
+        const curAvailable = userData.available_balance || 0;
+        const curReward = userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
+
+        const walletsToCompound: ('available' | 'reward')[] = [];
+        if (curAvailable >= 7) {
+          walletsToCompound.push('available');
+        }
+        if (curReward >= 7) {
+          walletsToCompound.push('reward');
+        }
+
+        let availableDeduction = 0;
+        let rewardDeduction = 0;
+
+        if (walletsToCompound.includes('available')) {
+          availableDeduction = curAvailable;
+        }
+        if (walletsToCompound.includes('reward')) {
+          rewardDeduction = curReward;
+        }
+
+        const totalToCompound = availableDeduction + rewardDeduction;
+        if (totalToCompound <= 0) {
+          throw new Error("Deduction threshold not met. Minimum amount is $7.");
+        }
+
+        transferredAmount = totalToCompound;
+
+        const updates: any = {};
+        if (availableDeduction > 0) {
+          updates.available_balance = increment(-availableDeduction);
+        }
+
+        if (rewardDeduction > 0) {
+          const existingWithdrawMethods = userData.withdraw_methods || {};
+          const oldReward = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
+          updates.withdraw_methods = {
+            ...existingWithdrawMethods,
+            reward_dollar_balance: oldReward - rewardDeduction
+          };
+        }
+
+        updates.total_invested = increment(totalToCompound);
+
+        const existingCompounds = userData.withdraw_methods?.compounded_amounts || userData.compounded_amounts || [];
+        const newCompounds = [...existingCompounds, totalToCompound];
+
+        const existingWithdrawMethodsUpdate = updates.withdraw_methods || userData.withdraw_methods || {};
+        updates.withdraw_methods = {
+          ...existingWithdrawMethodsUpdate,
+          compounded_amounts: newCompounds,
+          last_compound_popup_date: todayDateStr
+        };
+
+        if (userData.compounded_amounts) {
+          const existingCompoundsStd = userData.compounded_amounts || [];
+          updates.compounded_amounts = [...existingCompoundsStd, totalToCompound];
+        }
+
+        transaction.update(userRef, updates);
+
+        if (availableDeduction > 0) {
+          const txRef1 = doc(collection(db, 'transactions'));
+          transaction.set(txRef1, {
+            user_id: user.uid,
+            type: 'compound',
+            type_detail: 'compound_available_balance',
+            amount: availableDeduction,
+            status: 'approved',
+            created_at: nowIso,
+            description: 'Compounded Available Balance to active investment asset'
+          });
+        }
+        if (rewardDeduction > 0) {
+          const txRef2 = doc(collection(db, 'transactions'));
+          transaction.set(txRef2, {
+            user_id: user.uid,
+            type: 'compound',
+            type_detail: 'compound_reward_balance',
+            amount: rewardDeduction,
+            status: 'approved',
+            created_at: nowIso,
+            description: 'Compounded Reward Balance to active investment asset'
+          });
+        }
+
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: user.uid,
+          type: 'success',
+          title: 'Balance Compounded to Assets',
+          message: `Your balance of ${formatCurrency(totalToCompound)} has been successfully transferred to your Asset Portfolio. Reinvestment complete.`,
+          read: false,
+          created_at: nowIso
+        });
+      });
+
+      localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
+      toast.success(`Transferred ${formatCurrency(transferredAmount)} to Assets!`, { id: toastId });
+
+      broadcastActivity(
+        profile?.name || "Client",
+        "Compounded Balance to Assets",
+        `$${transferredAmount.toFixed(2)}`,
+        true,
+        "🔁"
+      );
+
       setShowDurationSelector(true);
+    } catch (err: any) {
+      console.error("Compounding transfer failed:", err);
+      toast.error(err.message || "Failed to process compounding transfer.", { id: toastId });
+    } finally {
+      setIsCompounding(false);
     }
   };
 
   const selectCompoundingDuration = async (days: number) => {
     if (!user || isCompounding) return;
     setIsCompounding(true);
-    const toastId = toast.loading("Activating automated daily compounding...");
-    let compoundedAmountCalculated = 0;
+    const toastId = toast.loading("Activating automated daily compounding schedule...");
 
     try {
       const startDate = new Date();
@@ -270,34 +401,12 @@ export default function Homepage() {
       endDate.setDate(startDate.getDate() + days);
 
       const userRef = doc(db, 'users', user.uid);
-      
-      const walletsToCompound: ('available' | 'reward')[] = [];
-      if (availableBalance >= 7) {
-        walletsToCompound.push('available');
-      }
-      if (rewardBalance >= 7) {
-        walletsToCompound.push('reward');
-      }
 
       await runTransaction(db, async (transaction) => {
         const userSnap = await transaction.get(userRef);
         if (!userSnap.exists()) {
           throw new Error("User profile not found.");
         }
-        
-        const userData = userSnap.data();
-        let availableDeduction = 0;
-        let rewardDeduction = 0;
-
-        if (walletsToCompound.includes('available')) {
-          availableDeduction = userData.available_balance || 0;
-        }
-
-        if (walletsToCompound.includes('reward')) {
-          rewardDeduction = userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
-        }
-
-        const totalToCompound = availableDeduction + rewardDeduction;
 
         const updates: any = {
           auto_compound_enabled: true,
@@ -307,109 +416,28 @@ export default function Homepage() {
           auto_compound_expired: false
         };
 
-        if (totalToCompound > 0) {
-          compoundedAmountCalculated = totalToCompound;
-
-          if (availableDeduction > 0) {
-            updates.available_balance = increment(-availableDeduction);
-          }
-
-          if (rewardDeduction > 0) {
-            const existingWithdrawMethods = userData.withdraw_methods || {};
-            const oldReward = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
-            updates.withdraw_methods = {
-              ...existingWithdrawMethods,
-              reward_dollar_balance: oldReward - rewardDeduction
-            };
-          }
-
-          updates.total_invested = increment(totalToCompound);
-
-          const existingCompounds = userData.withdraw_methods?.compounded_amounts || userData.compounded_amounts || [];
-          const newCompounds = [...existingCompounds, totalToCompound];
-
-          const existingWithdrawMethodsUpdate = updates.withdraw_methods || userData.withdraw_methods || {};
-          updates.withdraw_methods = {
-            ...existingWithdrawMethodsUpdate,
-            compounded_amounts: newCompounds,
-            last_compound_popup_date: todayDateStr
-          };
-
-          const nowIso = new Date().toISOString();
-          if (availableDeduction > 0) {
-            const txRef1 = doc(collection(db, 'transactions'));
-            transaction.set(txRef1, {
-              user_id: user.uid,
-              type: 'compound',
-              type_detail: 'compound_available_balance',
-              amount: availableDeduction,
-              status: 'approved',
-              created_at: nowIso,
-              description: 'Compounded Available Balance to active investment asset'
-            });
-          }
-          if (rewardDeduction > 0) {
-            const txRef2 = doc(collection(db, 'transactions'));
-            transaction.set(txRef2, {
-              user_id: user.uid,
-              type: 'compound',
-              type_detail: 'compound_reward_balance',
-              amount: rewardDeduction,
-              status: 'approved',
-              created_at: nowIso,
-              description: 'Compounded Reward Balance to active investment asset'
-            });
-          }
-
-          const notifRef = doc(collection(db, 'notifications'));
-          transaction.set(notifRef, {
-            user_id: user.uid,
-            type: 'success',
-            title: 'Automated Compounding Active',
-            message: `Successfully set up ${days}-day automated compounding and reinvested ${formatCurrency(totalToCompound)}.`,
-            read: false,
-            created_at: nowIso
-          });
-        } else {
-          const nowIso = new Date().toISOString();
-          const notifRef = doc(collection(db, 'notifications'));
-          transaction.set(notifRef, {
-            user_id: user.uid,
-            type: 'success',
-            title: 'Automated Compounding Active',
-            message: `Successfully set up ${days}-day automated compounding protocol. Daily ROI will be reinvested automatically.`,
-            read: false,
-            created_at: nowIso
-          });
-        }
-
-        if (userData.compounded_amounts) {
-          const existingCompoundsStd = userData.compounded_amounts || [];
-          updates.compounded_amounts = totalToCompound > 0 ? [...existingCompoundsStd, totalToCompound] : existingCompoundsStd;
-        }
+        const nowIso = new Date().toISOString();
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: user.uid,
+          type: 'success',
+          title: 'Automated Compounding Active',
+          message: `Successfully set up ${days}-day automated compounding protocol. Daily ROI will be reinvested automatically.`,
+          read: false,
+          created_at: nowIso
+        });
 
         transaction.update(userRef, updates);
       });
 
-      localStorage.setItem(`last_compound_popup_date_${user.uid}`, todayDateStr);
       toast.success(`Automated compounding protocol (${days} days) active!`, { id: toastId });
-      
-      if (compoundedAmountCalculated > 0) {
-        broadcastActivity(
-          profile?.name || "Client",
-          "Activated Auto-Compound",
-          `$${compoundedAmountCalculated.toFixed(2)}`,
-          true,
-          "🔁"
-        );
-      }
       
       closePopup('compound-profits');
       setShowDurationSelector(false);
       setShowCompoundSuccess(true);
     } catch (err: any) {
-      console.error("Compounding setup failed:", err);
-      toast.error(err.message || "Failed to start automated compounding.", { id: toastId });
+      console.error("Compounding schedule setup failed:", err);
+      toast.error(err.message || "Failed to activate compounding schedule.", { id: toastId });
     } finally {
       setIsCompounding(false);
     }
@@ -863,10 +891,13 @@ export default function Homepage() {
                     </button>
                   ) : showDurationSelector ? (
                     <button
-                      onClick={() => setShowDurationSelector(false)}
+                      onClick={() => {
+                        closePopup('compound-profits');
+                        setShowDurationSelector(false);
+                      }}
                       className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-[0.25em] text-white transition-all duration-200 cursor-pointer italic text-center"
                     >
-                      Back
+                      Exit
                     </button>
                   ) : (
                     <>

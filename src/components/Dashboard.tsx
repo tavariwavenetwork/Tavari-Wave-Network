@@ -285,7 +285,7 @@ export default function Dashboard() {
         }
       });
 
-      // Trigger the $3 welcome bonus deduction popup if it was first activation
+      // Trigger the $5 welcome bonus deduction popup if it was first activation
       if (isFirstActivation && !profile.welcome_bonus_deducted) {
         setIsWelcomeBonusDeductedPopupOpen({
           planName: activatedPlanName,

@@ -353,7 +353,7 @@ export default function Layout() {
         if (!uSnap.exists()) throw new Error("Awaiting user profile sync.");
 
         transaction.update(userRef, {
-          total_invested: increment(-3),
+          total_invested: increment(-5),
           welcome_bonus_deducted: true
         });
 
@@ -361,7 +361,7 @@ export default function Layout() {
         transaction.set(txRef, {
           user_id: user.uid,
           type: 'fee',
-          amount: -3.00,
+          amount: -5.00,
           status: 'AI Active',
           description: 'AI Bot Activation',
           created_at: now
@@ -2221,7 +2221,7 @@ export default function Layout() {
                   AI Trading Bot Activated
                 </h4>
                 <p className="text-[11px] text-gray-300 mt-2 leading-relaxed font-sans">
-                  $3 AI Trading Bot Activation Fee has been deducted from your account.
+                  $5 AI Trading Bot Activation Fee has been deducted from your account.
                 </p>
                 <div className="mt-3.5">
                   <button 

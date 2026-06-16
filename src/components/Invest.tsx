@@ -20,7 +20,8 @@ import {
   Check,
   Globe,
   X,
-  Send
+  Send,
+  Search
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -28,6 +29,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
 import { useNavigate, Link } from 'react-router-dom';
+import { COUNTRIES } from '../constants/countries';
+import { detectUserLocation } from '../utils/geo';
 import investmentHeaderImage from '../assets/images/investment_header_1779476124204.png';
 import { DynamicBalance } from './DynamicBalance';
 import SuccessModal from './SuccessModal';
@@ -92,25 +95,6 @@ const getPlanIcon = (id: string) => {
     </div>
   );
 };
-
-// --- HIGH-QUALITY COUNTRY DATA ---
-const COUNTRIES = [
-  { name: 'United States', flag: '🇺🇸', code: 'US' },
-  { name: 'United Kingdom', flag: '🇬🇧', code: 'GB' },
-  { name: 'Canada', flag: '🇨🇦', code: 'CA' },
-  { name: 'Australia', flag: '🇦🇺', code: 'AU' },
-  { name: 'Germany', flag: '🇩🇪', code: 'DE' },
-  { name: 'France', flag: '🇫🇷', code: 'FR' },
-  { name: 'Singapore', flag: '🇸🇬', code: 'SG' },
-  { name: 'Tanzania', flag: '🇹🇿', code: 'TZ' },
-  { name: 'South Africa', flag: '🇿🇦', code: 'ZA' },
-  { name: 'Nigeria', flag: '🇳🇬', code: 'NG' },
-  { name: 'Cameroon', flag: '🇨🇲', code: 'CM' },
-  { name: 'Uganda', flag: '🇺🇬', code: 'UG' },
-  { name: 'Ghana', flag: '🇬🇭', code: 'GH' },
-  { name: 'Kenya', flag: '🇰🇪', code: 'KE' },
-  { name: 'Kuwait', flag: '🇰🇼', code: 'KW' }
-];
 
 // --- HIGH-QUALITY REALISTIC FINTECH SVG ICONS ---
 const RealisticBankIcon = () => (
@@ -257,6 +241,36 @@ export default function Invest() {
   const [showCountryModal, setShowCountryModal] = useState(false);
   const [notSupportedCountry, setNotSupportedCountry] = useState<string | null>(null);
   const [showCardUnavailable, setShowCardUnavailable] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(() => {
+    // Initial sync detection via timezone so we have a reliable fallback instantly!
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.toLowerCase();
+      if (tz.includes('lagos')) return 'Nigeria';
+      if (tz.includes('sydney') || tz.includes('melbourne') || tz.includes('brisbane') || tz.includes('perth') || tz.includes('adelaide') || tz.includes('darwin') || tz.includes('hobart') || tz.includes('canberra') || tz.includes('australia')) return 'Australia';
+      if (tz.includes('london') || tz.includes('belfast') || tz.includes('europe')) return 'United Kingdom';
+      if (tz.includes('toronto') || tz.includes('vancouver') || tz.includes('montreal') || tz.includes('edmonton') || tz.includes('winnipeg') || tz.includes('halifax') || tz.includes('canada')) return 'Canada';
+      if (tz.includes('berlin') || tz.includes('munich') || tz.includes('frankfurt') || tz.includes('germany')) return 'Germany';
+      if (tz.includes('paris') || tz.includes('france')) return 'France';
+      if (tz.includes('singapore')) return 'Singapore';
+      if (tz.includes('new_york') || tz.includes('chicago') || tz.includes('los_angeles') || tz.includes('denver') || tz.includes('phoenix') || tz.includes('america')) return 'United States';
+    } catch (e) {}
+    return 'Nigeria'; // default fallback
+  });
+
+  useEffect(() => {
+    async function loadDetectedLocation() {
+      try {
+        const result = await detectUserLocation();
+        setDetectedCountry(result.country);
+        console.log("[Invest] Detected geographic location:", result.country, result.code, result.method);
+      } catch (err) {
+        console.error("[Invest] Failed to run dynamic geolocation protocol:", err);
+        // Fallback already handled during state setup
+      }
+    }
+    loadDetectedLocation();
+  }, []);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -389,7 +403,7 @@ export default function Invest() {
         }
       });
 
-      // Trigger the $3 welcome bonus deduction popup if it was first activation
+      // Trigger the $5 welcome bonus deduction popup if it was first activation
       if (isFirstActivation && !profile.welcome_bonus_deducted) {
         setIsWelcomeBonusDeductedPopupOpen({
           planName: inv.plan_name,
@@ -844,12 +858,19 @@ export default function Invest() {
  
                 <div className="flex flex-col gap-4">
                    {(() => {
-                     const options = [
+                     const rawOptions = [
                        { id: 'bank' as const, label: 'Bank Transfer', icon: <RealisticBankIcon />, description: "Direct institutional transfer", badge: "Recommended", badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", isRecommended: true },
                        { id: 'crypto' as const, label: 'Crypto Payments', icon: <RealisticBitcoinIcon />, description: "Pay via USDT, BTC, or ERC20" },
                        { id: 'wallet' as const, label: 'Wallet Balance', icon: <RealisticWalletIcon />, description: `${selectedWallet === 'reward_dollar_balance' ? 'Reward' : selectedWallet.split('_')[0].charAt(0).toUpperCase() + selectedWallet.split('_')[0].slice(1)} balance (${formatCurrency(walletBalanceToShow)})` },
-                        { id: 'card' as const, label: 'Card Payment', icon: <RealisticCardIcon />, description: "Instant settlement via card integration", isUnavailable: true },
+                       { id: 'card' as const, label: 'Card Payment', icon: <RealisticCardIcon />, description: "Instant settlement via card integration", isUnavailable: true },
                      ];
+
+                     const options = rawOptions.filter(opt => {
+                       if (opt.id === 'bank') {
+                         return selectedCountry === 'Nigeria';
+                       }
+                       return true;
+                     });
 
                      const sortedOptions = [...options].sort((a, b) => {
                         if (a.id === paymentMethod) return 1;
@@ -1098,42 +1119,75 @@ export default function Invest() {
                   </h3>
                 </div>
                 <button 
-                  onClick={() => setShowCountryModal(false)}
+                  onClick={() => {
+                    setSearchQuery('');
+                    setShowCountryModal(false);
+                  }}
                   className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-aura-muted hover:text-white transition-all flex-shrink-0 ml-4"
                 >
                   <X size={16} />
                 </button>
               </div>
 
+              {/* Search Bar */}
+              <div className="px-6 md:px-8 pt-4 pb-2 flex-shrink-0">
+                <div className="relative">
+                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-aura-muted" />
+                  <input 
+                    type="text" 
+                    placeholder="Search countries..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 pl-11 pr-5 text-sm font-bold text-white outline-none focus:border-primary/50 transition-colors font-sans"
+                  />
+                </div>
+              </div>
+
               {/* Grid Content */}
-              <div className="flex-1 p-6 md:p-8 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4 max-h-[50vh]">
-                {COUNTRIES.map((c) => {
+              <div className="flex-1 p-6 md:p-8 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[45vh]">
+                {COUNTRIES.filter(c => 
+                  c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  c.code.toLowerCase().includes(searchQuery.toLowerCase())
+                ).map((c) => {
                   const isNigeria = c.code === 'NG';
+                  const isDetected = detectedCountry && (
+                    c.name.toLowerCase() === detectedCountry.toLowerCase() || 
+                    c.code.toLowerCase() === detectedCountry.toLowerCase()
+                  );
                   return (
                     <button
                       key={c.code}
                       onClick={() => {
-                        if (isNigeria) {
-                          setSelectedCountry('Nigeria');
-                          setShowCountryModal(false);
-                          setView('payment');
-                          toast.success('Assigned instant local institutional settlement route.');
-                        } else {
+                        const matches = detectedCountry ? (
+                          c.name.toLowerCase() === detectedCountry.toLowerCase() || 
+                          c.code.toLowerCase() === detectedCountry.toLowerCase()
+                        ) : true;
+                        
+                        setSearchQuery('');
+                        if (!matches) {
                           setShowCountryModal(false);
                           setNotSupportedCountry(c.name);
+                        } else {
+                          setSelectedCountry(c.name);
+                          setShowCountryModal(false);
+                          setView('payment');
+                          if (c.name !== 'Nigeria' && paymentMethod === 'bank') {
+                            setPaymentMethod(null);
+                          }
+                          toast.success(`Assigned instant local institutional settlement route for ${c.name}.`);
                         }
                       }}
                       className={cn(
-                        "p-3 rounded-2xl border flex flex-row items-center justify-start text-left gap-3.5 transition-all duration-300 group relative overflow-hidden w-full",
-                        isNigeria 
-                          ? "bg-emerald-500/[0.03] border-emerald-500/30 hover:border-emerald-500/65 hover:bg-emerald-500/[0.06] shadow-[0_0_15px_rgba(16,185,129,0.05)]"
+                        "p-4 rounded-2xl border flex flex-row items-center justify-start text-left gap-3.5 transition-all duration-300 group relative overflow-hidden w-full",
+                        isDetected 
+                          ? "bg-primary/[0.03] border-primary/40 hover:border-primary hover:bg-primary/[0.06] shadow-[0_0_15px_rgba(234,179,8,0.05)]"
                           : "bg-white/5 border-white/5 hover:border-white/15 hover:bg-white/[0.08]"
                       )}
                     >
-                      {isNigeria && (
+                      {isDetected && (
                         <div className="absolute top-1.5 right-1.5 flex h-1.5 w-1.5 items-center justify-center">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[#EAB308]"></span>
                         </div>
                       )}
                       
@@ -1143,13 +1197,13 @@ export default function Invest() {
                       
                       <div className="space-y-0.5 min-w-0 pr-1 flex-1">
                         <p className={cn(
-                          "text-[9px] md:text-[10px] font-bold uppercase tracking-widest truncate",
-                          isNigeria ? "text-emerald-400" : "text-white/95"
+                          "text-[10px] md:text-[11px] font-black uppercase tracking-widest truncate",
+                          isDetected ? "text-primary" : "text-white/95"
                         )}>
                           {c.name}
                         </p>
-                        <p className="text-[6px] md:text-[7px] font-black text-aura-muted uppercase tracking-[0.12em] truncate">
-                          {isNigeria ? 'Direct Bridge supported' : 'Routing required'}
+                        <p className="text-[7px] md:text-[8px] font-black text-aura-muted uppercase tracking-[0.12em] truncate">
+                          {isDetected ? 'Highly matching node' : 'Alternate region'}
                         </p>
                       </div>
                     </button>
@@ -1239,17 +1293,7 @@ export default function Invest() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-2xl font-black text-white italic font-serif leading-none">Premium Card Processing</h3>
-                <p className="text-[8px] font-black text-primary uppercase tracking-[0.25em]">Coming Soon / PCI-DSS</p>
-              </div>
-
-              <div className="space-y-4 text-xs font-bold text-aura-muted leading-relaxed uppercase tracking-wider text-center">
-                <p>
-                  Card payments are currently undergoing a scheduled PCI-DSS security upgrade.
-                </p>
-                <p className="text-[10px] text-white/90">
-                  To ensure immediate settlement of your transaction, please use Bank Transfer or Crypto Payments.
-                </p>
+                <h3 className="text-2xl font-black text-white italic font-serif leading-none">Coming Soon...</h3>
               </div>
 
               <button 

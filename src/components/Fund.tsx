@@ -43,29 +43,13 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from 'sonner';
+import { COUNTRIES } from '../constants/countries';
+import { detectUserLocation } from '../utils/geo';
 import { broadcastActivity } from '../lib/activity_logger';
 
 import SuccessModal from './SuccessModal';
 import PinProtocolModal from './PinProtocolModal';
 import { TransactionTicket } from './TransactionTicket';
-
-const COUNTRIES = [
-  { name: 'United States', flag: '🇺🇸', code: 'US' },
-  { name: 'United Kingdom', flag: '🇬🇧', code: 'GB' },
-  { name: 'Canada', flag: '🇨🇦', code: 'CA' },
-  { name: 'Australia', flag: '🇦🇺', code: 'AU' },
-  { name: 'Germany', flag: '🇩🇪', code: 'DE' },
-  { name: 'France', flag: '🇫🇷', code: 'FR' },
-  { name: 'Singapore', flag: '🇸🇬', code: 'SG' },
-  { name: 'Tanzania', flag: '🇹🇿', code: 'TZ' },
-  { name: 'South Africa', flag: '🇿🇦', code: 'ZA' },
-  { name: 'Nigeria', flag: '🇳🇬', code: 'NG' },
-  { name: 'Cameroon', flag: '🇨🇲', code: 'CM' },
-  { name: 'Uganda', flag: '🇺🇬', code: 'UG' },
-  { name: 'Ghana', flag: '🇬🇭', code: 'GH' },
-  { name: 'Kenya', flag: '🇰🇪', code: 'KE' },
-  { name: 'Kuwait', flag: '🇰🇼', code: 'KW' }
-];
 
 // --- BANK SELECTOR MODAL ---
 const NIGERIAN_BANKS = [
@@ -309,6 +293,35 @@ export default function Fund() {
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
   const [notSupportedCountry, setNotSupportedCountry] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [detectedCountry, setDetectedCountry] = useState<string | null>(() => {
+    // Initial sync detection via timezone so we have a reliable fallback instantly!
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.toLowerCase();
+      if (tz.includes('lagos')) return 'Nigeria';
+      if (tz.includes('sydney') || tz.includes('melbourne') || tz.includes('brisbane') || tz.includes('perth') || tz.includes('adelaide') || tz.includes('darwin') || tz.includes('hobart') || tz.includes('canberra') || tz.includes('australia')) return 'Australia';
+      if (tz.includes('london') || tz.includes('belfast') || tz.includes('europe')) return 'United Kingdom';
+      if (tz.includes('toronto') || tz.includes('vancouver') || tz.includes('montreal') || tz.includes('edmonton') || tz.includes('winnipeg') || tz.includes('halifax') || tz.includes('canada')) return 'Canada';
+      if (tz.includes('berlin') || tz.includes('munich') || tz.includes('frankfurt') || tz.includes('germany')) return 'Germany';
+      if (tz.includes('paris') || tz.includes('france')) return 'France';
+      if (tz.includes('singapore')) return 'Singapore';
+      if (tz.includes('new_york') || tz.includes('chicago') || tz.includes('los_angeles') || tz.includes('denver') || tz.includes('phoenix') || tz.includes('america')) return 'United States';
+    } catch (e) {}
+    return 'Nigeria'; // default fallback
+  });
+
+  useEffect(() => {
+    async function loadDetectedLocation() {
+      try {
+        const result = await detectUserLocation();
+        setDetectedCountry(result.country);
+        console.log("[Fund] Detected geographic location:", result.country, result.code, result.method);
+      } catch (err) {
+        console.error("[Fund] Failed to run dynamic geolocation protocol:", err);
+        // Fallback already handled during state setup
+      }
+    }
+    loadDetectedLocation();
+  }, []);
 
   // --- DEPOSIT STATES ---
   const [depositAmount, setDepositAmount] = useState('');
@@ -707,22 +720,24 @@ export default function Fund() {
             </button>
           </div>
           
-          <button 
-            onClick={() => setDepositMethod('bank')}
-            className={cn(
-              "w-full p-6 flex items-center justify-between rounded-2xl border transition-all group",
-              depositMethod === 'bank' ? "bg-aura-lime/10 border-aura-lime text-aura-lime" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
-            )}
-          >
-            <div className="flex items-center gap-4">
-              <Building2 size={24} className={cn(depositMethod === 'bank' ? "text-aura-lime" : "text-aura-muted")} />
-              <div className="text-left">
-                <p className="text-sm font-bold uppercase tracking-tight">Bank Transfer</p>
-                <p className="text-[10px] opacity-60 font-medium">Instant Institutional</p>
+          {selectedCountry === 'Nigeria' && (
+            <button 
+              onClick={() => setDepositMethod('bank')}
+              className={cn(
+                "w-full p-6 flex items-center justify-between rounded-2xl border transition-all group",
+                depositMethod === 'bank' ? "bg-aura-lime/10 border-aura-lime text-aura-lime" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+              )}
+            >
+              <div className="flex items-center gap-4">
+                <Building2 size={24} className={cn(depositMethod === 'bank' ? "text-aura-lime" : "text-aura-muted")} />
+                <div className="text-left">
+                  <p className="text-sm font-bold uppercase tracking-tight">Bank Transfer</p>
+                  <p className="text-[10px] opacity-60 font-medium">Instant Institutional</p>
+                </div>
               </div>
-            </div>
-            {depositMethod === 'bank' && <div className="w-2 h-2 rounded-full bg-aura-lime animate-pulse" />}
-          </button>
+              {depositMethod === 'bank' && <div className="w-2 h-2 rounded-full bg-aura-lime animate-pulse" />}
+            </button>
+          )}
 
           <button 
             onClick={() => setDepositMethod('crypto')}
@@ -1250,25 +1265,41 @@ export default function Fund() {
               {/* Countries Grid */}
               <div className="p-8 overflow-y-auto flex-1 custom-scrollbar">
                 <div className="grid grid-cols-2 gap-3">
-                  {COUNTRIES.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).map((c) => {
+                  {COUNTRIES.filter(c => 
+                    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    c.code.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((c) => {
+                    const isDetected = detectedCountry && (
+                      c.name.toLowerCase() === detectedCountry.toLowerCase() || 
+                      c.code.toLowerCase() === detectedCountry.toLowerCase()
+                    );
                     const isNigeria = c.name === 'Nigeria';
                     return (
                       <button 
                         key={c.code}
                         onClick={() => {
-                          if (isNigeria) {
-                            setSelectedCountry('Nigeria');
-                            setShowCountryModal(false);
-                            toast.success('Assigned instant local institutional settlement route.');
-                            navigate('/fund/deposit');
-                          } else {
+                          const matches = detectedCountry ? (
+                            c.name.toLowerCase() === detectedCountry.toLowerCase() || 
+                            c.code.toLowerCase() === detectedCountry.toLowerCase()
+                          ) : true;
+                          
+                          setSearchQuery('');
+                          if (!matches) {
                             setShowCountryModal(false);
                             setNotSupportedCountry(c.name);
+                          } else {
+                            setSelectedCountry(c.name);
+                            setShowCountryModal(false);
+                            // Reset depositMethod if previous was bank and we changed to other country
+                            if (c.name !== 'Nigeria' && depositMethod === 'bank') {
+                              setDepositMethod(null);
+                            }
+                            toast.success(`Assigned instant local institutional settlement route for ${c.name}.`);
                           }
                         }}
                         className={cn(
-                          "p-4 flex items-center justify-between bg-white/5 border rounded-2xl transition-all hover:bg-white/10 group text-left",
-                          isNigeria ? "border-aura-lime/30 text-white" : "border-white/5 text-aura-muted"
+                          "p-4 flex items-center justify-between bg-white/5 border rounded-2xl transition-all hover:bg-white/10 group text-left relative overflow-hidden",
+                          isDetected ? "border-aura-lime/50 text-white bg-aura-lime/[0.02]" : "border-white/5 text-aura-muted"
                         )}
                       >
                         <div className="flex items-center gap-3">
@@ -1278,9 +1309,9 @@ export default function Fund() {
                             <p className="text-[8px] font-bold opacity-40 font-mono mt-0.5">{c.code}</p>
                           </div>
                         </div>
-                        {isNigeria && (
-                          <span className="text-[8px] font-black uppercase tracking-widest text-aura-lime px-2 py-0.5 bg-aura-lime/10 border border-aura-lime/20 rounded-md">
-                            Active
+                        {isDetected && (
+                          <span className="text-[8px] font-black uppercase tracking-widest text-[#EAB308] px-2 py-0.5 bg-[#EAB308]/10 border border-[#EAB308]/20 rounded-md">
+                            Detected
                           </span>
                         )}
                       </button>

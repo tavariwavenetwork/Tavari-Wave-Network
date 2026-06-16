@@ -561,7 +561,7 @@ export default function LandingPage() {
           funding_balance: 0,
           available_balance: 0,
           total_earnings: 0,
-          total_invested: 3, // $3 signup bonus directly into Assets Balance
+          total_invested: 5, // $5 signup bonus directly into Assets Balance
           email_verified: true,
           suspended: false,
           banned: false,
@@ -599,10 +599,10 @@ export default function LandingPage() {
           await setDoc(doc(db, 'transactions', txId), {
             user_id: firebaseUser.uid,
             type: 'signup_bonus',
-            amount: 3,
+            amount: 5,
             created_at: new Date().toISOString(),
             status: 'approved',
-            description: "Congratulations, you have just received a $3 signup bonus into your assets balance."
+            description: "Congratulations, you have just received a $5 signup bonus into your assets balance."
           });
         } catch (setErr) {
           console.warn("Grace-failed setting profile on sign-in, AuthContext will auto-heal:", setErr);
@@ -788,7 +788,7 @@ export default function LandingPage() {
           funding_balance: 0,
           available_balance: 0,
           total_earnings: 0,
-          total_invested: 3, // $3 signup bonus directly into Assets Balance
+          total_invested: 5, // $5 signup bonus directly into Assets Balance
           email_verified: true,
           suspended: false,
           banned: false,
@@ -826,10 +826,10 @@ export default function LandingPage() {
           await setDoc(doc(db, 'transactions', txId), {
             user_id: user.uid,
             type: 'signup_bonus',
-            amount: 3,
+            amount: 5,
             created_at: new Date().toISOString(),
             status: 'approved',
-            description: "Congratulations, you have just received a $3 signup bonus into your assets balance."
+            description: "Congratulations, you have just received a $5 signup bonus into your assets balance."
           });
         } catch (setErr) {
           console.warn("Grace-failed setting profile on Google sign-in, AuthContext will auto-heal:", setErr);
