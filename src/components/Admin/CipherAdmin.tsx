@@ -288,6 +288,7 @@ export default function CipherAdmin() {
   const [maintenanceTitle, setMaintenanceTitle] = useState<string>("System Upgrading");
   const [maintenanceMessage, setMaintenanceMessage] = useState<string>("We are updating our nodes. Normal services will resume shortly.");
   const [maintenanceEta, setMaintenanceEta] = useState<string>("");
+  const [withdrawalSystemBusy, setWithdrawalSystemBusy] = useState<boolean>(false);
   
   // UI History System
   const [uiVersions, setUiVersions] = useState<any[]>([]);
@@ -734,6 +735,7 @@ export default function CipherAdmin() {
           setMaintenanceTitle(data.maintenance_title || "System Upgrading");
           setMaintenanceMessage(data.maintenance_message || "We are updating our nodes. Normal services will resume shortly.");
           setMaintenanceEta(data.maintenance_eta || "");
+          setWithdrawalSystemBusy(!!data.withdrawal_system_busy);
         }
       },
       (err) => console.error("System settings sync failed:", err.message)
@@ -1487,6 +1489,19 @@ export default function CipherAdmin() {
     } catch (error) {
       console.error("MAINTENANCE UPDATE ERROR:", error);
       toast.error("Failed to update maintenance settings");
+    }
+  };
+
+  const updateWithdrawalSystemBusy = async (busy: boolean) => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { 
+        withdrawal_system_busy: busy,
+        last_updated: new Date().toISOString()
+      }, { merge: true });
+      toast.success("Withdrawal system busy status updated");
+    } catch (error) {
+      console.error("WITHDRAWAL STATUS UPDATE ERROR:", error);
+      toast.error("Failed to update withdrawal status");
     }
   };
 
@@ -3999,6 +4014,38 @@ export default function CipherAdmin() {
                      <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest ml-2 italic underline underline-offset-4 decoration-red-500/30">Used specifically for User Withdrawals and Conversion calculations</p>
                   </div>
                </div>
+            </div>
+
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
+                  <Settings size={16} className="text-red-400" /> Withdrawal Controls
+                </h3>
+                <div className="space-y-6">
+                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
+                      <div>
+                         <h4 className="text-sm font-black uppercase font-sans text-white">Withdrawal System Busy</h4>
+                         <p className="text-[10px] text-aura-muted font-bold uppercase tracking-widest">
+                            {withdrawalSystemBusy ? "ON - BLOCKS ALL WITHDRAWALS WITH SYSTEM BUSY MESSAGE" : "OFF - SYSTEM WITHDRAWALS WORK NORMALLY"}
+                         </p>
+                      </div>
+                      <button
+                         type="button"
+                         onClick={async () => {
+                            const nextVal = !withdrawalSystemBusy;
+                            setWithdrawalSystemBusy(nextVal);
+                            await updateWithdrawalSystemBusy(nextVal);
+                         }}
+                         className={cn(
+                            "px-6 py-2.5 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all cursor-pointer select-none",
+                            withdrawalSystemBusy 
+                               ? "bg-red-500 text-white shadow-[0_4px_12px_rgba(239,68,68,0.3)] hover:bg-red-600" 
+                               : "bg-white/5 text-red-500 border border-red-500/20 hover:bg-red-500/10"
+                         )}
+                      >
+                         {withdrawalSystemBusy ? "ON" : "OFF"}
+                      </button>
+                   </div>
+                </div>
             </div>
 
             <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">

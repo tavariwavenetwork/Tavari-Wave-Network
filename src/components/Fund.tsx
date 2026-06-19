@@ -344,6 +344,8 @@ export default function Fund() {
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [showPinModal, setShowPinModal] = useState(false);
   const [showBankSelector, setShowBankSelector] = useState(false);
+  const [withdrawalSystemBusy, setWithdrawalSystemBusy] = useState<boolean>(false);
+  const [showSystemBusyModal, setShowSystemBusyModal] = useState<boolean>(false);
 
   const withdrawalThreshold = 7;
   const withdrawalFeePercent = 20;
@@ -426,6 +428,7 @@ export default function Fund() {
         const data = doc.data();
         setExchangeRate(data.usd_to_ngn_rate || 1400);
         setWithdrawExchangeRate(data.usd_to_ngn_withdrawal_rate || data.usd_to_ngn_rate || 1400);
+        setWithdrawalSystemBusy(!!data.withdrawal_system_busy);
       }
     });
 
@@ -541,6 +544,10 @@ export default function Fund() {
   };
 
   const handleWithdrawalRequest = () => {
+    if (withdrawalSystemBusy) {
+      setShowSystemBusyModal(true);
+      return;
+    }
     if (profile?.withdrawals_frozen) {
       toast.error("Withdrawal services are currently restricted for this account.");
       return;
@@ -1210,6 +1217,50 @@ export default function Fund() {
         }}
         isSubmitting={isSubmitting}
       />
+
+      {/* SYSTEM BUSY MODAL */}
+      <AnimatePresence>
+        {showSystemBusyModal && (
+          <div className="fixed inset-0 z-[1200] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSystemBusyModal(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-xl"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="relative w-full max-w-md bg-[#0a0d17]/95 border border-white/10 rounded-[28px] p-8 md:p-10 shadow-[0_0_80px_rgba(239,68,68,0.15)] overflow-hidden text-center backdrop-blur-xl"
+            >
+              {/* Background Glow */}
+              <div className="absolute top-[-25%] left-[-25%] w-[60%] h-[60%] bg-red-400/10 rounded-full blur-[90px] pointer-events-none" />
+              <div className="absolute bottom-[-25%] right-[-25%] w-[60%] h-[60%] bg-red-400/10 rounded-full blur-[90px] pointer-events-none" />
+
+              <div className="relative space-y-6">
+                <div className="space-y-3">
+                  <h3 className="text-xl md:text-2xl font-black uppercase tracking-tight italic font-serif text-white">
+                    System Busy
+                  </h3>
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent mx-auto opacity-50" />
+                  <p className="text-gray-300 text-xs md:text-sm font-medium leading-relaxed text-center px-2">
+                    There are too many traffic in the system at the moment.<br/><br/>Please try again later.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={() => setShowSystemBusyModal(false)}
+                  className="w-full py-4 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-xl active:scale-98 transition-all"
+                >
+                  OK
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* COUNTRY SELECTOR MODAL */}
       <AnimatePresence>
