@@ -139,7 +139,20 @@ function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngin
 
     const interval = setInterval(() => {
       const now = new Date().getTime();
-      const totalDuration = 24 * 60 * 60 * 1000;
+      let hours = 24;
+      if (userInvestments && userInvestments.length > 0) {
+        const firstActive = userInvestments[0];
+        const matchingPlan = (plans || []).find((p: any) => 
+          p.id === firstActive.plan_id ||
+          (p.id || '').toLowerCase() === (firstActive.plan_name || '').toLowerCase() ||
+          (p.name || '').toLowerCase() === (firstActive.plan_name || '').toLowerCase() ||
+          (firstActive.amount >= p.min && firstActive.amount <= p.max)
+        );
+        if (matchingPlan && matchingPlan.cycle_duration_hours !== undefined) {
+          hours = matchingPlan.cycle_duration_hours;
+        }
+      }
+      const totalDuration = hours * 60 * 60 * 1000;
       const cycleStart = new Date(userValue.roi_cycle_start || userValue.created_at || now).getTime();
       const elapsed = now - cycleStart;
       
@@ -157,7 +170,7 @@ function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngin
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [userValue.roi_cycle_start, userValue.created_at, activeCount, yieldSum]);
+  }, [userValue.roi_cycle_start, userValue.created_at, activeCount, yieldSum, plans, userInvestments]);
 
   if (activeCount === 0) return null;
 
@@ -5664,10 +5677,13 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
       setLocalPlans(plans.map(p => ({
         ...p,
         roiPercent: (p.roi * 100).toString(),
+        weekday_roiPercent: ((p.weekday_roi !== undefined ? p.weekday_roi : p.roi) * 100).toString(),
+        weekend_roiPercent: ((p.weekend_roi !== undefined ? p.weekend_roi : (p.roi * 0.6)) * 100).toString(),
         minStr: p.min.toString(),
         maxStr: p.max.toString(),
         minWithdrawalStr: (p.minWithdrawal || 0).toString(),
-        durationStr: (p.duration || 1).toString()
+        durationStr: (p.duration || 1).toString(),
+        cycleDurationStr: (p.cycle_duration_hours !== undefined ? p.cycle_duration_hours : 24).toString()
       })));
     }
   }, [plans]);
@@ -5687,13 +5703,17 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
 
     setLoadingId(id);
     try {
-      const roiNum = parseFloat(plan.roiPercent) / 100;
+      const weekdayRoiPercentVal = parseFloat(plan.weekday_roiPercent);
+      const weekendRoiPercentVal = parseFloat(plan.weekend_roiPercent);
+      const weekdayRoiNum = weekdayRoiPercentVal / 100;
+      const weekendRoiNum = weekendRoiPercentVal / 100;
       const minNum = parseFloat(plan.minStr);
       const maxNum = parseFloat(plan.maxStr);
       const durationNum = parseInt(plan.durationStr) || 1;
+      const cycleDurationNum = parseInt(plan.cycleDurationStr) || 24;
       const minWithdrawalNum = parseFloat(plan.minWithdrawalStr) || 0;
 
-      if (isNaN(roiNum) || isNaN(minNum) || isNaN(maxNum)) {
+      if (isNaN(weekdayRoiNum) || isNaN(weekendRoiNum) || isNaN(cycleDurationNum) || isNaN(minNum) || isNaN(maxNum)) {
         toast.error("Please provide valid numeric fields.");
         return;
       }
@@ -5702,7 +5722,10 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
       const updatePayload = {
         name: plan.name,
         description: plan.description || '',
-        roi: roiNum,
+        roi: weekdayRoiNum,
+        weekday_roi: weekdayRoiNum,
+        weekend_roi: weekendRoiNum,
+        cycle_duration_hours: cycleDurationNum,
         min: minNum,
         max: maxNum,
         duration: durationNum,
@@ -5717,7 +5740,7 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
       await setDoc(docRef, updatePayload, { merge: true });
       toast.success(`${plan.name} configuration saved successfully!`);
       
-      await logAudit('update_investment_plan', `Updated ${plan.name} (ROI: ${plan.roiPercent}%, min: ${minNum}, max: ${maxNum})`);
+      await logAudit('update_investment_plan', `Updated ${plan.name} (Weekday ROI: ${plan.weekday_roiPercent}%, Weekend ROI: ${plan.weekend_roiPercent}%, cycle: ${cycleDurationNum}h, min: ${minNum}, max: ${maxNum})`);
     } catch (err: any) {
       toast.error(`Error saving plan: ${err?.message || err}`);
     } finally {
@@ -5736,6 +5759,9 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
           min: 10,
           max: 40000,
           roi: 0.025,
+          weekday_roi: 0.025,
+          weekend_roi: 0.015,
+          cycle_duration_hours: 24,
           minWithdrawal: 3,
           description: 'Stable entry-level investment plan.',
           color: 'text-blue-400',
@@ -5753,6 +5779,9 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
           min: 50000,
           max: 900000,
           roi: 0.027,
+          weekday_roi: 0.027,
+          weekend_roi: 0.017,
+          cycle_duration_hours: 24,
           minWithdrawal: 15000,
           description: 'Advanced plan for high-volume investors.',
           color: 'text-emerald-400',
@@ -5770,6 +5799,9 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
           min: 1000000,
           max: 10000000,
           roi: 0.029,
+          weekday_roi: 0.029,
+          weekend_roi: 0.019,
+          cycle_duration_hours: 24,
           minWithdrawal: 30000,
           description: 'Institutional-grade investment plan.',
           color: 'text-amber-400',
@@ -5874,12 +5906,33 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted mb-1.5 block">Daily Yield % (e.g., 2.5)</label>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted mb-1.5 block">Weekday Yield % (e.g., 2.5)</label>
                       <input 
                         type="number"
                         step="0.1"
-                        value={plan.roiPercent || ''}
-                        onChange={(e) => handleChangeField(plan.id, 'roiPercent', e.target.value)}
+                        value={plan.weekday_roiPercent || ''}
+                        onChange={(e) => handleChangeField(plan.id, 'weekday_roiPercent', e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-aura-lime focus:bg-white/10 transition-all font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted mb-1.5 block">Weekend Yield % (e.g., 1.5)</label>
+                      <input 
+                        type="number"
+                        step="0.1"
+                        value={plan.weekend_roiPercent || ''}
+                        onChange={(e) => handleChangeField(plan.id, 'weekend_roiPercent', e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-aura-lime focus:bg-white/10 transition-all font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-widest text-aura-muted mb-1.5 block">Cycle Duration (Hours)</label>
+                      <input 
+                        type="number"
+                        value={plan.cycleDurationStr || ''}
+                        onChange={(e) => handleChangeField(plan.id, 'cycleDurationStr', e.target.value)}
                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono text-white outline-none focus:border-aura-lime focus:bg-white/10 transition-all font-bold"
                       />
                     </div>
@@ -6020,11 +6073,23 @@ export function CipherPlansEditor({ plans }: CipherPlansEditorProps) {
                             </div>
                           </div>
 
-                          <div className="border-t border-white/5 pt-2.5 my-2">
+                          <div className="border-t border-white/5 pt-2 my-2 space-y-1">
                             <div className="flex items-center justify-between">
-                              <span className="text-[6px] font-black text-aura-muted uppercase tracking-widest font-bold">Daily Yield</span>
-                              <span className="text-lg font-black italic font-serif font-bold" style={plan.accent_color ? { color: plan.accent_color } : { color: '#ffffff' }}>
-                                {plan.roiPercent || '0.0'}%
+                              <span className="text-[7px] font-black text-aura-muted uppercase tracking-widest font-bold">Weekday Yield</span>
+                              <span className="text-xs font-black italic font-serif font-bold text-white">
+                                {plan.weekday_roiPercent || '0.0'}%
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[7px] font-black text-aura-muted uppercase tracking-widest font-bold">Weekend Yield</span>
+                              <span className="text-xs font-black italic font-serif font-bold text-white">
+                                {plan.weekend_roiPercent || '0.0'}%
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-[7px] font-black text-aura-muted uppercase tracking-widest font-bold">Cycle Duration</span>
+                              <span className="text-xs font-mono font-bold text-white">
+                                {plan.cycleDurationStr || '24'}h
                               </span>
                             </div>
                           </div>

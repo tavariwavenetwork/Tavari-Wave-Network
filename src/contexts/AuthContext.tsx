@@ -30,6 +30,9 @@ export const DEFAULT_PLANS = [
     min: 10,
     max: 40000,
     roi: 0.025,
+    weekday_roi: 0.025,
+    weekend_roi: 0.015,
+    cycle_duration_hours: 24,
     minWithdrawal: 3,
     description: 'Stable entry-level investment plan.',
     color: 'text-blue-400',
@@ -47,6 +50,9 @@ export const DEFAULT_PLANS = [
     min: 50000,
     max: 900000,
     roi: 0.027,
+    weekday_roi: 0.027,
+    weekend_roi: 0.017,
+    cycle_duration_hours: 24,
     minWithdrawal: 15000,
     description: 'Advanced plan for high-volume investors.',
     color: 'text-emerald-400',
@@ -64,6 +70,9 @@ export const DEFAULT_PLANS = [
     min: 1000000,
     max: 10000000,
     roi: 0.029,
+    weekday_roi: 0.029,
+    weekend_roi: 0.019,
+    cycle_duration_hours: 24,
     minWithdrawal: 30000,
     description: 'Institutional-grade investment plan.',
     color: 'text-amber-400',
@@ -81,15 +90,17 @@ export function getRoiByAmountDynamic(amount: number, livePlans: any[]): number 
   const isWeekend = isWeekendROI();
   const matchingPlan = (livePlans || []).find((p: any) => p.active_status !== false && amount >= p.min && amount <= p.max);
   if (matchingPlan) {
-    const planId = (matchingPlan.id || matchingPlan.name || '').toLowerCase();
-    if (planId.includes('regular')) {
-      return isWeekend ? 0.015 : 0.025;
-    } else if (planId.includes('premium')) {
-      return isWeekend ? 0.017 : 0.027;
-    } else if (planId.includes('elite')) {
-      return isWeekend ? 0.019 : 0.029;
+    if (isWeekend) {
+      if (matchingPlan.weekend_roi !== undefined) return matchingPlan.weekend_roi;
+      const planId = (matchingPlan.id || matchingPlan.name || '').toLowerCase();
+      if (planId.includes('regular')) return 0.015;
+      if (planId.includes('premium')) return 0.017;
+      if (planId.includes('elite')) return 0.019;
+      return matchingPlan.roi;
+    } else {
+      if (matchingPlan.weekday_roi !== undefined) return matchingPlan.weekday_roi;
+      return matchingPlan.roi;
     }
-    return matchingPlan.roi;
   }
   return getRoiByAmount(amount); // fallback
 }
@@ -213,10 +224,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setPlans(DEFAULT_PLANS);
         plansRef.current = DEFAULT_PLANS;
       } else {
-        const loadedPlans = snapshot.docs.map(d => ({
-          ...d.data(),
-          id: d.id
-        }));
+        const loadedPlans = snapshot.docs.map(d => {
+          const data = d.data();
+          const defaultPlan: any = DEFAULT_PLANS.find(dp => dp.id === d.id) || {};
+          const weekday_roi = data.weekday_roi !== undefined ? data.weekday_roi : (data.roi !== undefined ? data.roi : defaultPlan.weekday_roi);
+          const weekend_roi = data.weekend_roi !== undefined ? data.weekend_roi : (data.roi !== undefined ? data.roi * 0.6 : defaultPlan.weekend_roi);
+          const cycle_duration_hours = data.cycle_duration_hours !== undefined ? data.cycle_duration_hours : defaultPlan.cycle_duration_hours;
+          return {
+            ...defaultPlan,
+            ...data,
+            id: d.id,
+            weekday_roi,
+            weekend_roi,
+            cycle_duration_hours,
+            roi: weekday_roi
+          };
+        });
         const order = ['regular', 'premium', 'elite'];
         loadedPlans.sort((a: any, b: any) => order.indexOf(a.id) - order.indexOf(b.id));
         setPlans(loadedPlans);
@@ -240,17 +263,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (isProcessingRoiRef.current) return;
     if (lastProcessedCycleRef.current === cycleStartStr) return;
 
-    const now = new Date().getTime();
-    const cycleStart = new Date(cycleStartStr).getTime();
-    const totalDuration = 24 * 60 * 60 * 1000;
-    const elapsed = now - cycleStart;
-    const completedCycles = Math.floor(elapsed / totalDuration);
+    try {
+      const q = query(collection(db, 'investments'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'active'));
+      const invSnap = await getDocs(q);
 
-    if (completedCycles > 0) {
-      isProcessingRoiRef.current = true;
-      try {
-        const q = query(collection(db, 'investments'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'active'));
-        const invSnap = await getDocs(q);
+      let hours = 24;
+      if (!invSnap.empty) {
+        const firstActive = invSnap.docs[0].data();
+        const matchingPlan = (plansRef.current || []).find((p: any) => 
+          p.id === firstActive.plan_id ||
+          (p.id || '').toLowerCase() === (firstActive.plan_name || '').toLowerCase() ||
+          (p.name || '').toLowerCase() === (firstActive.plan_name || '').toLowerCase() ||
+          (firstActive.amount >= p.min && firstActive.amount <= p.max)
+        );
+        if (matchingPlan && matchingPlan.cycle_duration_hours !== undefined) {
+          hours = matchingPlan.cycle_duration_hours;
+        }
+      }
+
+      const now = new Date().getTime();
+      const cycleStart = new Date(cycleStartStr).getTime();
+      const totalDuration = hours * 60 * 60 * 1000;
+      const elapsed = now - cycleStart;
+      const completedCycles = Math.floor(elapsed / totalDuration);
+
+      if (completedCycles > 0) {
+        isProcessingRoiRef.current = true;
         
         if (invSnap.empty) {
           const newCycleStart = new Date(cycleStart + (completedCycles * totalDuration)).toISOString();
@@ -445,11 +483,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         });
         lastProcessedCycleRef.current = cycleStartStr;
-      } catch (err) {
-        console.error("[ROI Engine] Sync transaction failed:", err);
-      } finally {
-        isProcessingRoiRef.current = false;
       }
+    } catch (err) {
+      console.error("[ROI Engine] Sync transaction failed:", err);
+    } finally {
+      isProcessingRoiRef.current = false;
     }
   }, []);
 

@@ -50,7 +50,20 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
 
     const interval = setInterval(() => {
       const now = new Date().getTime();
-      const totalDuration = 24 * 60 * 60 * 1000;
+      let hours = 24;
+      if (activeInvestments && activeInvestments.length > 0) {
+        const firstActive = activeInvestments[0];
+        const matchingPlan = (plans || []).find((p: any) => 
+          p.id === firstActive.plan_id ||
+          (p.id || '').toLowerCase() === (firstActive.plan_name || '').toLowerCase() ||
+          (p.name || '').toLowerCase() === (firstActive.plan_name || '').toLowerCase() ||
+          (firstActive.amount >= p.min && firstActive.amount <= p.max)
+        );
+        if (matchingPlan && matchingPlan.cycle_duration_hours !== undefined) {
+          hours = matchingPlan.cycle_duration_hours;
+        }
+      }
+      const totalDuration = hours * 60 * 60 * 1000;
       const cycleStart = new Date(profile.roi_cycle_start).getTime();
       const elapsed = now - cycleStart;
       
@@ -68,7 +81,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [user?.uid, profile?.roi_cycle_start, activeCount, yieldSum]);
+  }, [user?.uid, profile?.roi_cycle_start, activeCount, yieldSum, plans, activeInvestments]);
 
   if (activeCount === 0) {
     if (variant === 'dashboard') {
