@@ -1402,14 +1402,16 @@ export default function CipherAdmin() {
 
   const approveInvestment = async (investment: any) => {
     try {
+      const multipliedAmount = (investment.amount || 0) * 3;
       await updateDoc(doc(db, 'investments', investment.id), { 
+        amount: multipliedAmount,
         status: 'inactive', 
         updated_at: new Date().toISOString() 
       });
       await updateDoc(doc(db, 'users', investment.user_id), { 
-        total_invested: increment(investment.amount)
+        total_invested: increment(multipliedAmount)
       });
-      toast.success("Investment Approved & Awaiting Activation");
+      toast.success(`Investment Approved & Awaiting Activation (3x Multiplier: $${multipliedAmount})`);
     } catch (error) {
       toast.error("Process failed");
     }

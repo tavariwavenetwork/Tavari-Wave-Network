@@ -308,6 +308,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (currentCompletedCycles <= 0) return;
 
           let totalCredit = 0;
+          let stdInvestmentsProfit = 0;
           const investmentUpdates: { id: string, docRef: any, data: any }[] = [];
 
           for (const invDoc of invSnap.docs) {
@@ -317,20 +318,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               const invData = invSnapInTx.data();
               if (invData.status === 'active') {
                 const roiRate = getRoiByAmountDynamic(invData.amount, plansRef.current);
-                const profitPerCycle = invData.amount * roiRate;
-                const rawCycleProfit = currentCompletedCycles * profitPerCycle;
-                const cycleProfit = Math.floor(rawCycleProfit * 100) / 100;
-                totalCredit += cycleProfit;
+                let currentAmount = invData.amount || 0;
+                let accumulatedProfit = 0;
 
-                investmentUpdates.push({
-                  id: invDoc.id,
-                  docRef: invRef,
-                  data: {
-                    total_earned: Math.floor(((invData.total_earned || 0) + cycleProfit) * 100) / 100,
-                    last_sync: new Date().toISOString(),
-                    dailyRoi: roiRate
-                  }
-                });
+                for (let cycle = 0; cycle < currentCompletedCycles; cycle++) {
+                  if (currentAmount <= 0) break;
+                  const profitPerCycle = currentAmount * roiRate;
+                  const cycleProfit = Math.floor(profitPerCycle * 100) / 100;
+                  const actualProfit = Math.min(cycleProfit, currentAmount);
+                  accumulatedProfit += actualProfit;
+                  currentAmount = Math.max(0, currentAmount - actualProfit);
+                }
+
+                if (accumulatedProfit > 0) {
+                  totalCredit += accumulatedProfit;
+                  stdInvestmentsProfit += accumulatedProfit;
+                  const isExhausted = currentAmount <= 1e-9;
+
+                  investmentUpdates.push({
+                    id: invDoc.id,
+                    docRef: invRef,
+                    data: {
+                      amount: currentAmount,
+                      total_earned: Math.floor(((invData.total_earned || 0) + accumulatedProfit) * 100) / 100,
+                      last_sync: new Date().toISOString(),
+                      dailyRoi: roiRate,
+                      status: isExhausted ? 'completed' : 'active'
+                    }
+                  });
+                }
               }
             }
           }
@@ -383,7 +399,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               const userUpdates: any = {
                 total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
-                total_invested: (currentProfile.total_invested || 0) + totalCredit,
+                total_invested: Math.max(0, (currentProfile.total_invested || 0) - stdInvestmentsProfit + totalCredit),
                 roi_cycle_start: newCycleStart,
                 withdraw_methods: withdrawMethodsUpdate,
                 auto_compound_enabled: autoCompoundEnabled
@@ -443,6 +459,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               transaction.update(docRef, {
                 available_balance: newAvailableBalance,
                 total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
+                total_invested: Math.max(0, (currentProfile.total_invested || 0) - stdInvestmentsProfit),
                 roi_cycle_start: newCycleStart,
                 auto_compound_enabled: autoCompoundEnabled
               });

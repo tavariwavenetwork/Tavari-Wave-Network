@@ -277,6 +277,16 @@ export default function LandingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 1024);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Hero carousel slider state
   const carouselImages = [
     "https://i.imgur.com/XOcTzj3.png",
@@ -374,8 +384,15 @@ export default function LandingPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get('ref');
+    const isSignupPath = window.location.pathname === '/signup';
+    
     if (ref) {
       setReferralCode(ref.toUpperCase());
+    }
+    
+    if (ref || isSignupPath) {
+      setAuthMode('signup');
+      setIsModalOpen(true);
     }
   }, []);
 
@@ -861,6 +878,228 @@ export default function LandingPage() {
       setLoading(false);
     }
   };
+
+  if (isMobile) {
+    return (
+      <div className="relative min-h-[100dvh] w-full text-white overflow-hidden bg-black flex flex-col justify-between select-none">
+        {/* Full-screen Background Image with exact centering, ratio preservation, and black blend */}
+        <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center z-0 pointer-events-none">
+          <img 
+            src="https://i.imgur.com/tpelb01.png"
+            className="w-full h-full object-contain object-center select-none"
+            referrerPolicy="no-referrer"
+            alt="Mobile Background"
+          />
+        </div>
+
+        {/* Content Overlay */}
+        <div className="relative z-10 flex flex-col justify-between min-h-[100dvh] w-full">
+          {/* Top spacer (artwork/logo safe area - no overlap) */}
+          <div className="flex-none h-[18vh] min-h-[120px] pointer-events-none" />
+
+          {/* Central black area content */}
+          <div className="flex-1 flex flex-col justify-center px-8 w-full max-w-[400px] mx-auto overflow-y-auto scrollbar-hide py-4 md:py-8 lg:py-12">
+            
+            {verificationSent ? (
+              <div className="text-center space-y-6">
+                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
+                  <CheckCircle2 size={32} className="text-emerald-500" />
+                </div>
+                <div className="space-y-3">
+                  <h3 className="text-xl font-bold uppercase tracking-wide">Verify Your Email</h3>
+                  <p className="text-aura-muted text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                    Your account has been created successfully.<br/>
+                    Please check your inbox or spam folder to verify your email before signing in.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => { 
+                    setVerificationSent(false); 
+                    setAuthMode('signin'); 
+                  }}
+                  className="w-full py-4 bg-primary text-white font-black uppercase tracking-wider text-[10px] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                >
+                  OK <ArrowRight size={14} />
+                </button>
+              </div>
+            ) : requiresOtp ? (
+              <div className="text-center space-y-6">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto border border-primary/20">
+                  <Lock size={28} className="text-primary animate-pulse" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-bold uppercase tracking-wide">Confirm Device</h3>
+                  <p className="text-aura-muted text-[9px] font-bold uppercase tracking-widest leading-relaxed">
+                    Unrecognized device. Enter your Transaction PIN to authorize.
+                  </p>
+                </div>
+
+                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                  <div className="flex justify-center">
+                    <input 
+                      type="password" 
+                      maxLength={8}
+                      placeholder="••••"
+                      value={userOtp}
+                      onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, ''))}
+                      className="w-full max-w-[200px] bg-white/[0.04] border border-white/10 rounded-2xl py-4 text-center text-2xl font-black tracking-[0.4em] text-primary focus:border-primary focus:bg-white/[0.08] outline-none transition-all placeholder:text-white/10 font-mono"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <button 
+                      disabled={loading || userOtp.length < 4}
+                      className="w-full py-4 bg-primary text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+                    >
+                      {loading ? 'Authenticating...' : 'Authorize Device'}
+                    </button>
+                    
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        setRequiresOtp(false);
+                        setTempUser(null);
+                        setUserOtp('');
+                      }}
+                      className="text-[9px] font-black uppercase tracking-widest text-aura-muted hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                {/* Social Button */}
+                <div>
+                  <button 
+                    disabled={loading}
+                    onClick={handleGoogleAuth}
+                    className="w-full py-3.5 bg-white text-black rounded-2xl flex items-center justify-center gap-3 font-semibold text-xs hover:bg-white/90 active:scale-98 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google logo" />
+                    {authMode === 'signup' ? 'Sign Up with Google' : 'Sign In with Google'}
+                  </button>
+                </div>
+
+                {/* Divider */}
+                <div className="relative flex items-center gap-3">
+                  <div className="h-px bg-white/10 flex-1"></div>
+                  <span className="text-[9px] font-bold text-white/25 uppercase tracking-widest leading-none">or</span>
+                  <div className="h-px bg-white/10 flex-1"></div>
+                </div>
+
+                {/* Form fields */}
+                <form 
+                  onSubmit={(e) => {
+                    // Pre-fill username on mobile if signing up
+                    if (authMode === 'signup' && !username) {
+                      setUsername(email.split('@')[0] || 'user');
+                    }
+                    if (authMode === 'signup') {
+                      handleSignup(e);
+                    } else {
+                      handleSignin(e);
+                    }
+                  }} 
+                  className="space-y-3.5"
+                >
+                  {authMode === 'signup' && (
+                    <AuthInput icon={<User size={16} />} label="Full Name" placeholder="Full Name" value={fullName} onChange={setFullName} required />
+                  )}
+
+                  <AuthInput 
+                    icon={<Mail size={16} />} 
+                    label="Email Address" 
+                    placeholder="Email Address" 
+                    type="email" 
+                    value={authMode === 'signup' ? email : signinEmail} 
+                    onChange={authMode === 'signup' ? setEmail : setSigninEmail} 
+                    required 
+                  />
+
+                  {authMode === 'signup' && (
+                    <div className="space-y-2">
+                      <PhoneInput
+                        country={'us'}
+                        value={phone}
+                        onChange={(val) => setPhone(val)}
+                        containerClass="nexus-phone-container"
+                        inputClass="nexus-phone-input"
+                        buttonClass="nexus-phone-button"
+                        dropdownClass="nexus-phone-dropdown"
+                        placeholder="Phone Number"
+                        enableSearch={true}
+                        disableSearchIcon={true}
+                        searchPlaceholder="Search country..."
+                      />
+                    </div>
+                  )}
+
+                  <AuthInput 
+                    icon={<Lock size={16} />} 
+                    label="Password" 
+                    placeholder="Password" 
+                    type="password" 
+                    value={authMode === 'signup' ? password : signinPassword} 
+                    onChange={authMode === 'signup' ? setPassword : setSigninPassword} 
+                    required 
+                    showPasswordToggle={true}
+                    isPasswordVisible={authMode === 'signup' ? showPassword : showSigninPassword}
+                    onTogglePassword={() => authMode === 'signup' ? setShowPassword(!showPassword) : setShowSigninPassword(!showSigninPassword)}
+                  />
+
+                  {authMode === 'signup' && (
+                    <AuthInput 
+                      icon={<Lock size={16} />} 
+                      label="Confirm Password" 
+                      placeholder="Confirm Password" 
+                      type="password" 
+                      value={confirmPassword} 
+                      onChange={setConfirmPassword} 
+                      required 
+                      showPasswordToggle={true}
+                      isPasswordVisible={showConfirmPassword}
+                      onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                    />
+                  )}
+
+                  {authMode === 'signup' && (
+                    <AuthInput icon={<TrendingUp size={16} />} label="Referral Code" placeholder="Referral Code (Optional)" value={referralCode} onChange={setReferralCode} />
+                  )}
+
+                  <button 
+                    disabled={loading}
+                    type="submit"
+                    className="w-full py-4 bg-gradient-to-r from-primary to-secondary text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:scale-[1.01] transition-all disabled:opacity-50 mt-4 text-sm"
+                  >
+                    {loading ? 'Processing...' : authMode === 'signup' ? 'Sign Up' : 'Sign In'}
+                  </button>
+                </form>
+
+                {/* Switch Link / Switch Button */}
+                <p className="text-center text-xs font-semibold text-aura-muted">
+                  {authMode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
+                  <button 
+                    type="button"
+                    onClick={() => setAuthMode(authMode === 'signup' ? 'signin' : 'signup')}
+                    className="text-secondary font-bold hover:text-accent transition-colors"
+                  >
+                    {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
+                  </button>
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom spacer (bottom graphic safe area - no overlap) */}
+          <div className="flex-none h-[18vh] min-h-[120px] pointer-events-none" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#050608] text-white selection:bg-primary selection:text-white overflow-hidden relative">
@@ -1652,7 +1891,7 @@ function AuthInput({
           onChange={(e) => onChange(e.target.value)}
           required={required}
           className={cn(
-            "w-full bg-white/[0.03] border border-white/5 rounded-xl py-4 transition-all outline-none focus:border-secondary/30 focus:bg-white/[0.05] text-base md:text-sm font-medium text-white placeholder:text-white/20",
+            "w-full bg-white/[0.04] border border-white/10 backdrop-blur-md rounded-2xl py-4 transition-all outline-none focus:border-white/20 focus:bg-white/[0.06] text-base md:text-sm font-medium text-white placeholder:text-white/30",
             icon ? "pl-12" : "pl-4",
             showPasswordToggle ? "pr-12" : "pr-4"
           )}

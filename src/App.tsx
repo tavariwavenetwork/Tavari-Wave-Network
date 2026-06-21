@@ -122,6 +122,7 @@ export default function App() {
               <Toaster position="top-right" theme="dark" closeButton richColors />
               <Routes>
               <Route path="/welcome" element={<LandingPage />} />
+              <Route path="/signup" element={<LandingPage />} />
               <Route path="/about" element={<About />} />
               <Route path="/how-it-works" element={<HowItWorks />} />
               <Route path="/blog" element={<Blog />} />
