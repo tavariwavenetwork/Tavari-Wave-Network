@@ -277,6 +277,48 @@ export default function LandingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
 
+  const [detectedCountry, setDetectedCountry] = useState('us');
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        if (data && data.country_code) {
+          setDetectedCountry(data.country_code.toLowerCase());
+          return;
+        }
+      } catch (err) {
+        console.warn("ipapi.co failed, trying fallback country detection:", err);
+      }
+
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (tz) {
+          if (tz.includes('Europe/London')) { setDetectedCountry('gb'); return; }
+          if (tz.includes('Africa/Lagos')) { setDetectedCountry('ng'); return; }
+          if (tz.includes('Africa/Nairobi')) { setDetectedCountry('ke'); return; }
+          if (tz.includes('Africa/Johannesburg')) { setDetectedCountry('za'); return; }
+          if (tz.includes('Asia/Kolkata')) { setDetectedCountry('in'); return; }
+          if (tz.includes('America/New_York') || tz.includes('America/Chicago') || tz.includes('America/Los_Angeles')) { setDetectedCountry('us'); return; }
+        }
+      } catch (e) {
+        console.warn("Fallback timezone detection failed:", e);
+      }
+
+      // Default language check
+      try {
+        const lang = window.navigator.language || '';
+        if (lang.includes('GB') || lang.includes('gb')) setDetectedCountry('gb');
+        else if (lang.includes('NG') || lang.includes('ng')) setDetectedCountry('ng');
+        else if (lang.includes('KE') || lang.includes('ke')) setDetectedCountry('ke');
+        else if (lang.includes('IN') || lang.includes('in')) setDetectedCountry('in');
+      } catch (e) {
+        console.warn("Language detection failed:", e);
+      }
+    };
+    detectCountry();
+  }, []);
+
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const checkMobile = () => {
@@ -882,31 +924,33 @@ export default function LandingPage() {
   if (isMobile) {
     return (
       <div className="relative min-h-[100dvh] w-full text-white overflow-hidden bg-black flex flex-col justify-between select-none">
-        {/* Full-screen Background Image with exact centering, ratio preservation, and black blend */}
-        <div className="absolute inset-0 w-full h-full bg-black flex items-center justify-center z-0 pointer-events-none">
+        {/* Fixed Full-screen Background Image with exact centering and cover style scaling */}
+        <div className="fixed inset-0 w-full h-full z-0 pointer-events-none bg-black overflow-hidden select-none">
           <img 
             src="https://i.imgur.com/tpelb01.png"
-            className="w-full h-full object-contain object-center select-none"
+            className="w-full h-full object-cover object-center select-none"
             referrerPolicy="no-referrer"
+            loading="eager"
             alt="Mobile Background"
+            style={{ willChange: 'transform' }}
           />
         </div>
 
         {/* Content Overlay */}
         <div className="relative z-10 flex flex-col justify-between min-h-[100dvh] w-full">
           {/* Top spacer (artwork/logo safe area - no overlap) */}
-          <div className="flex-none h-[18vh] min-h-[120px] pointer-events-none" />
+          <div className={`flex-none pointer-events-none transition-all duration-300 ${authMode === 'signup' ? 'h-[17vh] min-h-[125px]' : 'h-[14vh] min-h-[100px]'}`} />
 
           {/* Central black area content */}
-          <div className="flex-1 flex flex-col justify-center px-8 w-full max-w-[400px] mx-auto overflow-y-auto scrollbar-hide py-4 md:py-8 lg:py-12">
+          <div className="flex-1 flex flex-col justify-center px-8 w-full max-w-[400px] mx-auto overflow-y-auto scrollbar-hide py-2 md:py-4">
             
             {verificationSent ? (
-              <div className="text-center space-y-6">
-                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
-                  <CheckCircle2 size={32} className="text-emerald-500" />
+              <div className="text-center space-y-4">
+                <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto border border-emerald-500/20">
+                  <CheckCircle2 size={28} className="text-emerald-500" />
                 </div>
-                <div className="space-y-3">
-                  <h3 className="text-xl font-bold uppercase tracking-wide">Verify Your Email</h3>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold uppercase tracking-wide">Verify Your Email</h3>
                   <p className="text-aura-muted text-[10px] font-bold uppercase tracking-widest leading-relaxed">
                     Your account has been created successfully.<br/>
                     Please check your inbox or spam folder to verify your email before signing in.
@@ -917,24 +961,24 @@ export default function LandingPage() {
                     setVerificationSent(false); 
                     setAuthMode('signin'); 
                   }}
-                  className="w-full py-4 bg-primary text-white font-black uppercase tracking-wider text-[10px] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-primary text-white font-black uppercase tracking-wider text-[10px] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                 >
                   OK <ArrowRight size={14} />
                 </button>
               </div>
             ) : requiresOtp ? (
-              <div className="text-center space-y-6">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto border border-primary/20">
-                  <Lock size={28} className="text-primary animate-pulse" />
+              <div className="text-center space-y-4">
+                <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center mx-auto border border-primary/20">
+                  <Lock size={24} className="text-primary animate-pulse" />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-bold uppercase tracking-wide">Confirm Device</h3>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold uppercase tracking-wide">Confirm Device</h3>
                   <p className="text-aura-muted text-[9px] font-bold uppercase tracking-widest leading-relaxed">
                     Unrecognized device. Enter your Transaction PIN to authorize.
                   </p>
                 </div>
 
-                <form onSubmit={handleVerifyOtp} className="space-y-5">
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
                   <div className="flex justify-center">
                     <input 
                       type="password" 
@@ -942,16 +986,16 @@ export default function LandingPage() {
                       placeholder="••••"
                       value={userOtp}
                       onChange={(e) => setUserOtp(e.target.value.replace(/\D/g, ''))}
-                      className="w-full max-w-[200px] bg-white/[0.04] border border-white/10 rounded-2xl py-4 text-center text-2xl font-black tracking-[0.4em] text-primary focus:border-primary focus:bg-white/[0.08] outline-none transition-all placeholder:text-white/10 font-mono"
+                      className="w-full max-w-[180px] bg-white/[0.04] border border-white/10 rounded-2xl py-3 text-center text-xl font-black tracking-[0.4em] text-primary focus:border-primary focus:bg-white/[0.08] outline-none transition-all placeholder:text-white/10 font-mono"
                       required
                       autoFocus
                     />
                   </div>
                   
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <button 
                       disabled={loading || userOtp.length < 4}
-                      className="w-full py-4 bg-primary text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-primary text-white font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all disabled:opacity-30 flex items-center justify-center gap-2"
                     >
                       {loading ? 'Authenticating...' : 'Authorize Device'}
                     </button>
@@ -971,13 +1015,13 @@ export default function LandingPage() {
                 </form>
               </div>
             ) : (
-              <div className="space-y-5">
-                {/* Social Button */}
+              <div className="space-y-3.5">
+                {/* Social Button - Visible on both Sign-In and Sign-Up modes */}
                 <div>
                   <button 
                     disabled={loading}
                     onClick={handleGoogleAuth}
-                    className="w-full py-3.5 bg-white text-black rounded-2xl flex items-center justify-center gap-3 font-semibold text-xs hover:bg-white/90 active:scale-98 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-2.5 bg-white text-black rounded-2xl flex items-center justify-center gap-3 font-semibold text-xs hover:bg-white/90 active:scale-98 transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google logo" />
                     {authMode === 'signup' ? 'Sign Up with Google' : 'Sign In with Google'}
@@ -1004,26 +1048,27 @@ export default function LandingPage() {
                       handleSignin(e);
                     }
                   }} 
-                  className="space-y-3.5"
+                  className="space-y-2"
                 >
                   {authMode === 'signup' && (
-                    <AuthInput icon={<User size={16} />} label="Full Name" placeholder="Full Name" value={fullName} onChange={setFullName} required />
+                    <AuthInput icon={<User size={15} />} label="Full Name" placeholder="Full Name" value={fullName} onChange={setFullName} required compact={true} />
                   )}
 
                   <AuthInput 
-                    icon={<Mail size={16} />} 
+                    icon={<Mail size={15} />} 
                     label="Email Address" 
                     placeholder="Email Address" 
                     type="email" 
                     value={authMode === 'signup' ? email : signinEmail} 
                     onChange={authMode === 'signup' ? setEmail : setSigninEmail} 
                     required 
+                    compact={true}
                   />
 
                   {authMode === 'signup' && (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 is-compact">
                       <PhoneInput
-                        country={'us'}
+                        country={detectedCountry}
                         value={phone}
                         onChange={(val) => setPhone(val)}
                         containerClass="nexus-phone-container"
@@ -1039,7 +1084,7 @@ export default function LandingPage() {
                   )}
 
                   <AuthInput 
-                    icon={<Lock size={16} />} 
+                    icon={<Lock size={15} />} 
                     label="Password" 
                     placeholder="Password" 
                     type="password" 
@@ -1049,11 +1094,12 @@ export default function LandingPage() {
                     showPasswordToggle={true}
                     isPasswordVisible={authMode === 'signup' ? showPassword : showSigninPassword}
                     onTogglePassword={() => authMode === 'signup' ? setShowPassword(!showPassword) : setShowSigninPassword(!showSigninPassword)}
+                    compact={true}
                   />
 
                   {authMode === 'signup' && (
                     <AuthInput 
-                      icon={<Lock size={16} />} 
+                      icon={<Lock size={15} />} 
                       label="Confirm Password" 
                       placeholder="Confirm Password" 
                       type="password" 
@@ -1063,24 +1109,25 @@ export default function LandingPage() {
                       showPasswordToggle={true}
                       isPasswordVisible={showConfirmPassword}
                       onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                      compact={true}
                     />
                   )}
 
                   {authMode === 'signup' && (
-                    <AuthInput icon={<TrendingUp size={16} />} label="Referral Code" placeholder="Referral Code (Optional)" value={referralCode} onChange={setReferralCode} />
+                    <AuthInput icon={<TrendingUp size={15} />} label="Referral Code" placeholder="Referral Code (Optional)" value={referralCode} onChange={setReferralCode} compact={true} />
                   )}
 
                   <button 
                     disabled={loading}
                     type="submit"
-                    className="w-full py-4 bg-gradient-to-r from-primary to-secondary text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:scale-[1.01] transition-all disabled:opacity-50 mt-4 text-sm"
+                    className="w-full py-3 bg-gradient-to-r from-primary to-secondary text-white font-bold rounded-2xl shadow-[0_0_15px_rgba(124,58,237,0.25)] hover:scale-[1.01] transition-all disabled:opacity-50 mt-2 text-xs"
                   >
                     {loading ? 'Processing...' : authMode === 'signup' ? 'Sign Up' : 'Sign In'}
                   </button>
                 </form>
 
                 {/* Switch Link / Switch Button */}
-                <p className="text-center text-xs font-semibold text-aura-muted">
+                <p className="text-center text-xs font-semibold text-aura-muted pt-1 pb-0 flex-none leading-normal">
                   {authMode === 'signup' ? 'Already have an account?' : "Don't have an account?"}{' '}
                   <button 
                     type="button"
@@ -1090,12 +1137,15 @@ export default function LandingPage() {
                     {authMode === 'signup' ? 'Sign In' : 'Sign Up'}
                   </button>
                 </p>
+
+                {/* Highly Polished Luxury Slide-to-Join WhatsApp Community Action */}
+                <WhatsAppCommunitySlider />
               </div>
             )}
           </div>
 
           {/* Bottom spacer (bottom graphic safe area - no overlap) */}
-          <div className="flex-none h-[18vh] min-h-[120px] pointer-events-none" />
+          <div className="flex-none h-[14vh] min-h-[80px] pointer-events-none" />
         </div>
       </div>
     );
@@ -1640,7 +1690,7 @@ export default function LandingPage() {
                       {authMode === 'signup' && (
                         <div className="space-y-2">
                           <PhoneInput
-                            country={'us'}
+                            country={detectedCountry}
                             value={phone}
                             onChange={(val) => setPhone(val)}
                             containerClass="nexus-phone-container"
@@ -1849,6 +1899,233 @@ export default function LandingPage() {
   );
 }
 
+const WhatsAppCommunitySlider = () => {
+  const [position, setPosition] = useState(0); // 0 to 100
+  const [isDragging, setIsDragging] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const startXRef = React.useRef(0);
+  const startPosRef = React.useRef(0);
+
+  const handleStart = (clientX: number) => {
+    if (isLocked) return;
+    setIsDragging(true);
+    startXRef.current = clientX;
+    startPosRef.current = position;
+  };
+
+  const handleMove = (clientX: number) => {
+    if (!isDragging || isLocked || !containerRef.current) return;
+    const containerWidth = containerRef.current.clientWidth;
+    const thumbWidth = 38; // match our thumb width
+    const padding = 8; // 4px padding on left/right of track (p-1 is 4px)
+    const maxTravel = containerWidth - thumbWidth - padding - 14; // stops before touching the end edge
+    
+    if (maxTravel <= 0) return;
+    
+    const deltaX = clientX - startXRef.current;
+    const deltaPercent = (deltaX / maxTravel) * 100;
+    
+    let newPercent = startPosRef.current + deltaPercent;
+    if (newPercent < 0) newPercent = 0;
+    if (newPercent > 100) newPercent = 100;
+    
+    setPosition(newPercent);
+    
+    if (newPercent >= 96) {
+      handleComplete();
+    }
+  };
+
+  const handleEnd = () => {
+    if (isLocked) return;
+    setIsDragging(false);
+    if (position < 96) {
+      // smooth recoil using requestAnimationFrame
+      const startVal = position;
+      const startTime = performance.now();
+      const animate = (time: number) => {
+        const elapsed = time - startTime;
+        const duration = 250; // ms
+        const progress = Math.min(elapsed / duration, 1);
+        const ease = 1 - Math.pow(1 - progress, 3);
+        const currentVal = startVal * (1 - ease);
+        setPosition(currentVal);
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          setPosition(0);
+        }
+      };
+      requestAnimationFrame(animate);
+    }
+  };
+
+  const handleComplete = () => {
+    setIsLocked(true);
+    setPosition(100);
+    setIsDragging(false);
+    
+    toast.success("Welcome to the WhatsApp Community!");
+    setTimeout(() => {
+      window.location.href = "https://chat.whatsapp.com/CoNzUZBmDsDC8bV8nB7uIH?s=cl&p=i&ilr=4";
+    }, 150);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const onMouseMove = (e: MouseEvent) => {
+      handleMove(e.clientX);
+    };
+    const onMouseUp = () => {
+      handleEnd();
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length > 0) {
+        handleMove(e.touches[0].clientX);
+      }
+    };
+    const onTouchEnd = () => {
+      handleEnd();
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove, { passive: true });
+    window.addEventListener('touchend', onTouchEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [isDragging, position]);
+
+  const maxTravelPx = containerRef.current 
+    ? containerRef.current.clientWidth - 38 - 8 - 14
+    : 0;
+  const currentTranslateX = (position / 100) * maxTravelPx;
+
+  return (
+    <div className="w-full mt-1.5 gpu-accelerate">
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes custom-arrow-slide {
+          0% { opacity: 0.1; transform: translateX(-4px) scale(0.9); }
+          50% { opacity: 0.9; transform: translateX(2px) scale(1.15); }
+          100% { opacity: 0.1; transform: translateX(-4px) scale(0.9); }
+        }
+        @keyframes custom-glow-pulse {
+          0% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0.45); }
+          70% { box-shadow: 0 0 0 10px rgba(37, 211, 102, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(37, 211, 102, 0); }
+        }
+      `}} />
+
+      <div 
+        ref={containerRef}
+        className="relative h-[48px] w-full rounded-2xl bg-black/60 border border-white/10 p-1 flex items-center overflow-hidden shadow-[inset_0_3px_10px_rgba(0,0,0,0.8)] backdrop-blur-md"
+        style={{ touchAction: 'none' }}
+      >
+        <div 
+          className="absolute left-1 top-1 bottom-1 rounded-xl bg-gradient-to-r from-[#031d0f]/60 via-[#15803d]/80 to-[#22c55e]/90 shadow-[0_0_12px_rgba(37,211,102,0.3)] pointer-events-none"
+          style={{ 
+            width: isLocked ? 'calc(100% - 22px)' : `${currentTranslateX + 22}px`,
+            transition: isDragging ? 'none' : 'width 300ms cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        />
+
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none gap-2 bg-transparent">
+          <div className="flex items-center gap-1.5 opacity-40">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <svg 
+                key={i} 
+                className="w-3 h-3 text-[#25D366]/65 filter drop-shadow-[0_0_2px_rgba(37,211,102,0.5)]" 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor" 
+                strokeWidth={3}
+                style={{
+                  animation: `custom-arrow-slide 1.5s infinite ease-in-out`,
+                  animationDelay: `${i * 120}ms`,
+                  opacity: Math.max(0.1, 1 - (i * 0.18))
+                }}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            ))}
+          </div>
+          <span className="text-[10px] font-bold text-white/40 tracking-wider filter drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)] font-sans">
+            {isLocked ? (
+              <span>Success Connection Secured</span>
+            ) : (
+              <>
+                Slide to join <span className="text-[#25D366] font-extrabold">community</span>
+              </>
+            )}
+          </span>
+        </div>
+
+        <div 
+          style={{
+            transform: `translateX(${currentTranslateX}px)`,
+            transition: isDragging ? 'none' : 'transform 300ms cubic-bezier(0.16, 1, 0.3, 1)',
+            touchAction: 'none'
+          }}
+          onMouseDown={(e) => handleStart(e.clientX)}
+          onTouchStart={(e) => {
+            if (e.touches.length > 0) {
+              handleStart(e.touches[0].clientX);
+            }
+          }}
+          className={cn(
+            "w-9.5 h-9.5 rounded-xl flex items-center justify-center cursor-grab active:cursor-grabbing z-30 select-none relative",
+            isDragging ? "scale-105" : "hover:scale-102"
+          )}
+        >
+          <div 
+            className="absolute inset-0 rounded-xl"
+            style={{
+              background: 'radial-gradient(circle at 35% 25%, #4ae380 0%, #25d366 50%, #128c7e 100%)',
+              boxShadow: 'inset 0 1.5px 2px rgba(255,255,255,0.5), inset 0 -2px 4px rgba(0,0,0,0.4), 0 3px 8px rgba(0,0,0,0.5)',
+              animation: isLocked ? 'none' : 'custom-glow-pulse 2s infinite ease-in-out'
+            }}
+          />
+          
+          <div 
+            className="absolute top-0.5 left-0.5 right-0.5 h-1/2 rounded-t-xl opacity-30 pointer-events-none"
+            style={{
+              background: 'linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 100%)',
+            }}
+          />
+
+          <svg className="w-4.5 h-4.5 text-white z-10 relative filter drop-shadow-[0_1px_1.5px_rgba(0,0,0,0.4)]" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.1 1.45 4.6 1.45 5.517 0 10.005-4.487 10.008-10.004.002-2.673-1.04-5.185-2.936-7.083-1.895-1.897-4.41-2.94-7.083-2.94-5.522 0-10.01 4.488-10.013 10.007-.001 1.83.483 3.62 1.4 5.21l-.995 3.63 3.733-.98c1.568.855 3.137 1.3 4.29 1.3zm10.742-7.41c-.29-.145-1.713-.846-1.978-.942-.265-.096-.458-.145-.65.145-.193.29-.747.942-.916 1.133-.169.191-.338.216-.628.072-.29-.145-1.226-.452-2.335-1.442-.863-.77-1.446-1.72-1.615-2.01-.17-.29-.018-.447.127-.59.13-.13.29-.338.434-.507.145-.17.193-.29.29-.483.097-.193.048-.361-.024-.507-.072-.145-.65-1.566-.89-2.145-.236-.57-.474-.492-.65-.5-.169-.008-.362-.01-.555-.01-.193 0-.506.072-.77.362-.265.29-1.012.99-1.012 2.417 0 1.425 1.036 2.802 1.18 2.995.145.193 2.036 3.11 4.933 4.364.688.298 1.225.476 1.644.609.693.22 1.324.19 1.823.115.556-.084 1.713-.699 1.954-1.374.24-.675.24-1.253.169-1.374-.07-.12-.264-.191-.555-.337z"/>
+          </svg>
+        </div>
+
+        <div className="absolute right-1 w-9.5 h-9.5 rounded-xl border border-dashed border-white/20 flex items-center justify-center bg-black/50 overflow-hidden select-none pointer-events-none shadow-[inset_0_2px_4px_rgba(0,0,0,0.7)]">
+          {isLocked ? (
+            <div className="absolute inset-0 bg-[#25D366] flex items-center justify-center animate-pulse">
+              <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center">
+              <svg className="w-4 h-4 text-white/20 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 015.656 0l4 4a4 4 0 11-5.656 5.656l-1.1-1.1" />
+              </svg>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 function AuthInput({ 
   icon, 
   label, 
@@ -1861,7 +2138,8 @@ function AuthInput({
   pattern,
   showPasswordToggle,
   onTogglePassword,
-  isPasswordVisible
+  isPasswordVisible,
+  compact = false
 }: { 
   icon?: React.ReactNode, 
   label: string, 
@@ -1874,12 +2152,13 @@ function AuthInput({
   pattern?: string,
   showPasswordToggle?: boolean,
   onTogglePassword?: () => void,
-  isPasswordVisible?: boolean
+  isPasswordVisible?: boolean,
+  compact?: boolean
 }) {
   const inputType = showPasswordToggle ? (isPasswordVisible ? 'text' : 'password') : type;
 
   return (
-    <div className="space-y-2">
+    <div className={cn("space-y-2", compact && "space-y-0.5")}>
       <div className="relative group">
         {icon && <div className="absolute inset-y-0 left-4 flex items-center text-white/20 group-focus-within:text-secondary transition-colors">{icon}</div>}
         <input 
@@ -1891,7 +2170,8 @@ function AuthInput({
           onChange={(e) => onChange(e.target.value)}
           required={required}
           className={cn(
-            "w-full bg-white/[0.04] border border-white/10 backdrop-blur-md rounded-2xl py-4 transition-all outline-none focus:border-white/20 focus:bg-white/[0.06] text-base md:text-sm font-medium text-white placeholder:text-white/30",
+            "w-full bg-white/[0.04] border border-white/10 backdrop-blur-md rounded-2xl transition-all outline-none focus:border-white/20 focus:bg-white/[0.06] text-white placeholder:text-white/30",
+            compact ? "py-2 px-4 text-xs font-semibold" : "py-4 text-base md:text-sm font-medium",
             icon ? "pl-12" : "pl-4",
             showPasswordToggle ? "pr-12" : "pr-4"
           )}
@@ -1902,7 +2182,7 @@ function AuthInput({
             onClick={onTogglePassword}
             className="absolute inset-y-0 right-4 flex items-center text-white/20 hover:text-white transition-colors focus:outline-none"
           >
-            {isPasswordVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+            {isPasswordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
         )}
       </div>

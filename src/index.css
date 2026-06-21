@@ -124,11 +124,24 @@
 }
 
 .nexus-phone-input {
-  @apply !w-full !bg-white/5 !border !border-white/10 !rounded-xl !py-4 !pr-4 !pl-14 !h-auto !transition-all !outline-none focus:!border-primary/50 !text-base md:!text-sm !font-medium !text-white placeholder:!text-white/10 !font-sans;
+  @apply !w-full !bg-white/5 !border !border-white/10 !rounded-2xl !py-4 !pr-4 !pl-14 !h-auto !transition-all !outline-none focus:!border-primary/50 !text-base md:!text-sm !font-medium !text-white placeholder:!text-white/10 !font-sans;
+}
+
+.is-compact .nexus-phone-input {
+  @apply !py-2 !pl-14 !pr-4 !text-xs !font-semibold !rounded-2xl;
+  height: 32px !important;
+  border-radius: 1rem !important;
 }
 
 .nexus-phone-button {
-  @apply !bg-transparent !border-r !border-white/10 !rounded-l-xl !w-12 !h-full !transition-colors hover:!bg-white/5;
+  @apply !bg-transparent !border-r !border-white/10 !rounded-l-2xl !w-12 !h-full !transition-colors hover:!bg-white/5;
+}
+
+.is-compact .nexus-phone-button {
+  @apply !w-12 !rounded-l-2xl;
+  border-bottom-left-radius: 1rem !important;
+  border-top-left-radius: 1rem !important;
+  height: 32px !important;
 }
 
 .nexus-phone-dropdown {
