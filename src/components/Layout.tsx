@@ -46,6 +46,7 @@ import { useAuth, handleFirestoreError, OperationType } from '../contexts/AuthCo
 import { useLanguage, LANGUAGES } from '../contexts/LanguageContext';
 import { useUI } from '../contexts/UIContext';
 import TransferModal from './TransferModal';
+import LegacyUpgradeModal from './LegacyUpgradeModal';
 import { db } from '../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, limit, doc, updateDoc, deleteDoc, increment, runTransaction } from 'firebase/firestore';
 import { formatDistanceToNow } from 'date-fns';
@@ -1331,6 +1332,8 @@ export default function Layout() {
         isOpen={isTransferModalOpen}
         onClose={closeTransferModal}
       />
+
+      <LegacyUpgradeModal />
 
       {/* Global Dynamic Adverts Overlay System */}
       <AnimatePresence>
