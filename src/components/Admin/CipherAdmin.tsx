@@ -1402,18 +1402,35 @@ export default function CipherAdmin() {
 
   const approveInvestment = async (investment: any) => {
     try {
-      const multipliedAmount = (investment.amount || 0) * 3;
+      const userRef = doc(db, 'users', investment.user_id);
+      const userSnap = await getDoc(userRef);
+      const userData = userSnap.exists() ? userSnap.data() : null;
+      const isEnrolled = userData?.migration_status === 'accepted';
+
+      const multiplier = isEnrolled ? 3 : 1;
+      const multipliedAmount = (investment.amount || 0) * multiplier;
+
       await updateDoc(doc(db, 'investments', investment.id), { 
         amount: multipliedAmount,
         status: 'inactive', 
         updated_at: new Date().toISOString() 
       });
-      await updateDoc(doc(db, 'users', investment.user_id), { 
+
+      const userUpdates: any = {
         total_invested: increment(multipliedAmount)
-      });
-      toast.success(`Investment Approved & Awaiting Activation (3x Multiplier: $${multipliedAmount})`);
-    } catch (error) {
-      toast.error("Process failed");
+      };
+      if (isEnrolled) {
+        userUpdates.remaining_upgraded_assets = increment(multipliedAmount);
+      }
+      await updateDoc(userRef, userUpdates);
+
+      toast.success(isEnrolled 
+        ? `Investment Approved & Awaiting Activation (3x Multiplier: $${multipliedAmount})`
+        : `Investment Approved & Awaiting Activation: $${multipliedAmount}`
+      );
+    } catch (error: any) {
+      console.error("CipherAdmin approveInvestment error:", error);
+      toast.error("Process failed: " + error.message);
     }
   };
 

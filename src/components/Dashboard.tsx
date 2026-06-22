@@ -37,7 +37,7 @@ import { useUI } from '../contexts/UIContext';
 import { ROIEngineStats } from './ROIEngineDisplay';
 import { DynamicBalance } from './DynamicBalance';
 
-const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, highlight }: { icon: any, label: string, value: string, subtext?: string, color: string, highlight?: boolean }) => {
+const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, highlight, action }: { icon: any, label: string, value: string, subtext?: string, color: string, highlight?: boolean, action?: React.ReactNode }) => {
   return (
     <div 
       style={{ willChange: 'transform' }}
@@ -49,6 +49,7 @@ const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, hi
         <div className={cn("p-2 lg:p-3 rounded-lg lg:rounded-2xl shadow-inner", highlight ? "bg-white/20" : "bg-white/5", color)}>
           <Icon size={16} className="lg:w-5 lg:h-5" />
         </div>
+        {action}
       </div>
       <div className="overflow-hidden">
         <p className={cn("text-[7px] lg:text-[9px] font-black uppercase tracking-[0.2em] mb-1", highlight ? "text-white/70" : "text-aura-muted")}>{label}</p>
@@ -509,6 +510,20 @@ export default function Dashboard() {
           label="Total Assets" 
           value={formatCurrency(profile?.total_invested || 0)} 
           color="text-orange-400" 
+          action={
+            profile?.migration_status === 'declined' ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.dispatchEvent(new CustomEvent('open-legacy-upgrade-modal'));
+                }}
+                className="relative px-3 py-1 text-[9px] font-black uppercase tracking-wider rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white cursor-pointer shadow-sm flex items-center justify-center gap-1 transition-all select-none hover:scale-[1.05] shadow-lg shadow-emerald-600/20"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                <span>Upgrade</span>
+              </button>
+            ) : undefined
+          }
         />
         <DashboardCard 
           icon={Percent} 

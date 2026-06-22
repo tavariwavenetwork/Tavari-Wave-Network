@@ -93,6 +93,10 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isSignedIn() && (incoming().get('role', 'user') == 'user' || isCipher()); 
       allow update: if (isCipher() || 
                        (isOwner(userId) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly([
+                          'migration_status', 'original_assets_before_upgrade', 'remaining_upgraded_assets', 'total_invested', 'roi_cycle_start'
+                        ])) ||
+                       (isOwner(userId) && 
                         !isSuspended(incoming()) && 
                         !isSuspended(existing()) && 
                         !isBanned(incoming()) && 
@@ -106,7 +110,8 @@ service cloud.firestore {
                           'referral_code', 'referral_link', 'referred_by', 'created_at', 'last_active_at',
                           'twn_balance', 'points_balance', 'profile_edited', 'welcome_bonus_deducted',
                           'auto_compound_enabled', 'auto_compound_duration', 'auto_compound_start_date',
-                          'auto_compound_end_date', 'auto_compound_expired', 'compounded_amounts'
+                          'auto_compound_end_date', 'auto_compound_expired', 'compounded_amounts',
+                          'migration_status', 'original_assets_before_upgrade', 'remaining_upgraded_assets'
                         ])) ||
                        (isSignedIn() && existing().get('referred_by', '') == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
                        (isSignedIn() && !isOwner(userId) && 
@@ -130,7 +135,8 @@ service cloud.firestore {
         incoming().get('user_id', '') == request.auth.uid ||
         (incoming().keys().hasAny(['sender_id']) && incoming().sender_id == request.auth.uid)
       );
-      allow update, delete: if isCipher();
+      allow update: if isCipher() || (isSignedIn() && (resource.data.user_id == request.auth.uid || incoming().user_id == request.auth.uid));
+      allow delete: if isCipher();
     }
 
     match /notifications/{id} {
@@ -188,7 +194,12 @@ service cloud.firestore {
          get(/databases/$(database)/documents/users/$(resource.data.user_id)).data.get('referred_by', '') == request.auth.uid)
       ));
       allow create: if isSignedIn() && incoming().user_id == request.auth.uid && isValidInvestment(incoming()) && isStatusActive(request.auth.uid);
-      allow update: if isCipher() || (isSignedIn() && resource.data.user_id == request.auth.uid && incoming().user_id == resource.data.user_id && isStatusActive(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'last_sync', 'total_earned', 'referral_bonus_processed', 'dailyRoi']));
+      allow update: if isCipher() || 
+                    (isSignedIn() && 
+                     resource.data.user_id == request.auth.uid && 
+                     incoming().user_id == resource.data.user_id && 
+                     incoming().diff(existing()).affectedKeys().hasOnly(['status', 'amount', 'updated_at'])) ||
+                    (isSignedIn() && resource.data.user_id == request.auth.uid && incoming().user_id == resource.data.user_id && isStatusActive(request.auth.uid) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'activated_at', 'last_sync', 'total_earned', 'referral_bonus_processed', 'dailyRoi', 'amount', 'updated_at']));
       allow delete: if isCipher();
     }
 

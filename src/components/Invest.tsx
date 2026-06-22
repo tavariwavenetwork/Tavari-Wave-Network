@@ -508,11 +508,16 @@ export default function Invest() {
         }
 
         // 3. LOG INVESTMENT
+        const isEnrolled = userData.migration_status === 'accepted';
+        const finalInvAmount = (paymentMethod === 'wallet' && isEnrolled) 
+          ? confirmedAmount * 3 
+          : confirmedAmount;
+
         transaction.set(invRef, {
           user_id: user.uid,
           user_name: userData.name,
           plan_name: selectedPlan.name,
-          amount: confirmedAmount,
+          amount: finalInvAmount,
           dailyRoi: selectedPlan.roi,
           duration: selectedPlan.duration,
           payment_method: paymentMethod,
@@ -525,22 +530,25 @@ export default function Invest() {
 
         // 4. ATOMIC BALANCE UPDATE
         if (paymentMethod === 'wallet') {
+          const userUpdates: any = {
+            total_invested: increment(finalInvAmount)
+          };
+          if (isEnrolled) {
+            userUpdates.remaining_upgraded_assets = increment(finalInvAmount);
+          }
+
           if (selectedWallet === 'reward_dollar_balance') {
             const existingWithdrawMethods = userData.withdraw_methods || {};
             const oldRewardDollarBalance = existingWithdrawMethods.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
-            transaction.update(userRef, {
-              withdraw_methods: {
-                ...existingWithdrawMethods,
-                reward_dollar_balance: oldRewardDollarBalance - confirmedAmount
-              },
-              total_invested: increment(confirmedAmount)
-            });
+            userUpdates.withdraw_methods = {
+              ...existingWithdrawMethods,
+              reward_dollar_balance: oldRewardDollarBalance - confirmedAmount
+            };
           } else {
-            transaction.update(userRef, {
-              [selectedWallet]: increment(-confirmedAmount),
-              total_invested: increment(confirmedAmount)
-            });
+            userUpdates[selectedWallet] = increment(-confirmedAmount);
           }
+          
+          transaction.update(userRef, userUpdates);
         }
 
         // 5. TRANSACTION RECORD
@@ -548,7 +556,7 @@ export default function Invest() {
         transaction.set(txRef, {
           user_id: user.uid,
           type: 'investment',
-          amount: confirmedAmount,
+          amount: finalInvAmount,
           plan_name: selectedPlan.name,
           method: paymentMethod,
           wallet_source: paymentMethod === 'wallet' ? selectedWallet : null,

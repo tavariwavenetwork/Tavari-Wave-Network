@@ -42,6 +42,7 @@ import DailyPointsHub from './components/DailyPointsHub';
 import SpinAndWin from './components/SpinAndWin';
 import SpinAndWinGuidelines from './components/SpinAndWinGuidelines';
 import JoinUs from './components/JoinUs';
+import AssetMultiplierPage from './components/AssetMultiplierPage';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -148,6 +149,7 @@ export default function App() {
                 }
               >
                 <Route path="/home" element={<Homepage />} />
+                <Route path="/multiplier-upgrade" element={<AssetMultiplierPage />} />
                 <Route path="/guide" element={<Guide />} />
                 <Route path="/token" element={<TWNTokenPortal />} />
                 <Route path="/mining" element={<MiningPortal />} />
