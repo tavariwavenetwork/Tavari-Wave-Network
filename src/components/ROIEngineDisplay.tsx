@@ -37,7 +37,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
   }, []);
 
   const activeInvestments = useMemo(() => investments.filter(i => i.status === 'active'), [investments]);
-  const activeCount = profile?.migration_status === 'accepted' ? 1 : activeInvestments.length;
+  const activeCount = activeInvestments.length;
   const yieldSum = expectedDailyRoi;
 
   useEffect(() => {

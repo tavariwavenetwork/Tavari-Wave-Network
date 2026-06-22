@@ -23,23 +23,6 @@ import { auth, db } from '../lib/firebase';
 import { getRoiByAmount, isWeekendROI } from '../lib/utils';
 import PremiumLoader from '../components/PremiumLoader';
 
-export const getCutoffTime = () => {
-  return new Date("2026-06-21T17:35:00-07:00").getTime();
-};
-
-export const isLegacyUser = (profileData: any): boolean => {
-  if (!profileData) return false;
-  if (!profileData.created_at) return true; // older accounts without created_at are definitely legacy
-  const cutoff = getCutoffTime();
-  const userTime = new Date(profileData.created_at).getTime();
-  return userTime < cutoff;
-};
-
-export const isNewUser = (profileData: any): boolean => {
-  if (!profileData) return false;
-  return !isLegacyUser(profileData);
-};
-
 export const DEFAULT_PLANS = [
   {
     id: 'regular',
@@ -125,31 +108,21 @@ export function getRoiByAmountDynamic(amount: number, livePlans: any[]): number 
 export function calculateExpectedDailyRoi(
   activeInvestments: any[],
   compoundedAmounts: number[] | undefined,
-  plans: any[],
-  profile?: any
+  plans: any[]
 ): number {
-  if (profile?.migration_status === 'accepted') {
-    const remaining = profile.remaining_upgraded_assets ?? 0;
-    return Math.floor((remaining * 0.005) * 100) / 100;
-  }
-
   if (activeInvestments.length === 0) return 0;
-
-  const isNew = isNewUser(profile);
 
   let originalRoi = 0;
   activeInvestments.forEach((inv) => {
     const amount = inv.amount;
-    const roiRate = isNew ? 0.005 : getRoiByAmountDynamic(amount, plans);
-    originalRoi += amount * roiRate;
+    originalRoi += amount * getRoiByAmountDynamic(amount, plans);
   });
 
   let compoundedRoi = 0;
   const compounds = compoundedAmounts || [];
   compounds.forEach(compAmount => {
     if (compAmount > 0) {
-      const roiRate = isNew ? 0.005 : getRoiByAmountDynamic(compAmount, plans);
-      compoundedRoi += compAmount * roiRate;
+      compoundedRoi += compAmount * getRoiByAmountDynamic(compAmount, plans);
     }
   });
 
@@ -284,108 +257,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isRoiDisabled = profileData.roi_disabled === true;
     if (isRoiDisabled) return;
 
-    if (profileData.migration_status === 'completed') return;
-
     let cycleStartStr = profileData.roi_cycle_start;
     if (!cycleStartStr) return;
 
     if (isProcessingRoiRef.current) return;
     if (lastProcessedCycleRef.current === cycleStartStr) return;
 
-    const isMigratedLegacy = profileData.migration_status === 'accepted';
-
     try {
-      if (isMigratedLegacy) {
-        const now = new Date().getTime();
-        const cycleStart = new Date(cycleStartStr).getTime();
-        const totalDuration = 24 * 60 * 60 * 1000; // 24-hour cycle
-        const elapsed = now - cycleStart;
-        const completedCycles = Math.floor(elapsed / totalDuration);
-
-        if (completedCycles > 0) {
-          isProcessingRoiRef.current = true;
-          
-          await runTransaction(db, async (transaction) => {
-            const userSnap = await transaction.get(docRef);
-            if (!userSnap.exists()) return;
-            
-            const currentProfile = userSnap.data() as UserProfile;
-            if (currentProfile.migration_status === 'completed') return;
-
-            const currentCycleStart = new Date(currentProfile.roi_cycle_start || cycleStartStr).getTime();
-            const currentCompletedCycles = Math.floor((new Date().getTime() - currentCycleStart) / totalDuration);
-
-            if (currentCompletedCycles <= 0) return;
-
-            let remainingAssets = currentProfile.remaining_upgraded_assets ?? 0;
-            let totalCredit = 0;
-
-            if (remainingAssets <= 0) {
-              transaction.update(docRef, {
-                migration_status: 'completed',
-                roi_cycle_start: new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString()
-              });
-              return;
-            }
-
-            for (let cycle = 0; cycle < currentCompletedCycles; cycle++) {
-              if (remainingAssets <= 0) break;
-              const cycleProfit = Math.floor((remainingAssets * 0.005) * 100) / 100;
-              const actualProfit = Math.min(cycleProfit, remainingAssets);
-              totalCredit += actualProfit;
-              remainingAssets = Math.max(0, remainingAssets - actualProfit);
-            }
-
-            const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();
-            const isExhausted = remainingAssets <= 1e-9;
-            const finalRemaining = isExhausted ? 0 : remainingAssets;
-
-            if (totalCredit > 0) {
-              const oldAvailableBalance = currentProfile.available_balance || 0;
-              const newAvailableBalance = oldAvailableBalance + totalCredit;
-
-              transaction.update(docRef, {
-                available_balance: newAvailableBalance,
-                total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
-                remaining_upgraded_assets: finalRemaining,
-                total_invested: finalRemaining,
-                roi_cycle_start: newCycleStart,
-                migration_status: isExhausted ? 'completed' : 'accepted'
-              });
-
-              const txId = `roi-legacy-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
-              const txRef = doc(db, 'transactions', txId);
-              transaction.set(txRef, {
-                user_id: firebaseUser.uid,
-                type: 'roi_harvest',
-                amount: totalCredit,
-                plan_name: 'Legacy Upgrade Cycle',
-                created_at: new Date().toISOString(),
-                status: 'approved',
-                description: `Legacy Asset Multiplier ROI of 0.5% (Disbursed: $${totalCredit.toFixed(2)}, Remaining Assets: $${finalRemaining.toFixed(2)})`
-              });
-
-              const notifRef = doc(collection(db, 'notifications'));
-              transaction.set(notifRef, {
-                user_id: firebaseUser.uid,
-                type: 'success',
-                title: 'ROI Cycle Deposited',
-                message: `Legacy Upgrade ROI cycle has matured. Added $${totalCredit.toFixed(2)} to your available balance.`,
-                read: false,
-                created_at: new Date().toISOString()
-              });
-            } else {
-              transaction.update(docRef, {
-                roi_cycle_start: newCycleStart,
-                migration_status: isExhausted ? 'completed' : 'accepted'
-              });
-            }
-          });
-          lastProcessedCycleRef.current = cycleStartStr;
-        }
-        return;
-      }
-
       const q = query(collection(db, 'investments'), where('user_id', '==', firebaseUser.uid), where('status', '==', 'active'));
       const invSnap = await getDocs(q);
 
@@ -439,10 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (invSnapInTx.exists()) {
               const invData = invSnapInTx.data();
               if (invData.status === 'active') {
-                let roiRate = getRoiByAmountDynamic(invData.amount, plansRef.current);
-                if (isNewUser(currentProfile)) {
-                  roiRate = 0.005; // 0.5% force for new users
-                }
+                const roiRate = getRoiByAmountDynamic(invData.amount, plansRef.current);
                 let currentAmount = invData.amount || 0;
                 let accumulatedProfit = 0;
 
@@ -480,10 +355,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let compoundsProfit = 0;
           compounds.forEach((compAmount: number) => {
             if (compAmount > 0) {
-              let roiRate = getRoiByAmountDynamic(compAmount, plansRef.current);
-              if (isNewUser(currentProfile)) {
-                roiRate = 0.005; // 0.5% force for new users
-              }
+              const roiRate = getRoiByAmountDynamic(compAmount, plansRef.current);
               const profitPerCycle = compAmount * roiRate;
               const rawCompProfit = currentCompletedCycles * profitPerCycle;
               compoundsProfit += Math.floor(rawCompProfit * 100) / 100;
@@ -1110,21 +982,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const rawRoi = calculateExpectedDailyRoi(
       activeInvestments, 
       derivedCompoundedAmounts, 
-      dynamicPlans,
-      profile
+      dynamicPlans
     );
     if (rawRoi > 0) {
       lastValidRoiRef.current = rawRoi;
-      return rawRoi;
-    }
-    if (profile?.migration_status === 'accepted') {
       return rawRoi;
     }
     if (activeInvestments.length === 0) {
       return 0;
     }
     return lastValidRoiRef.current || 0;
-  }, [activeInvestments, derivedCompoundedAmounts, dynamicPlans, profile]);
+  }, [activeInvestments, derivedCompoundedAmounts, dynamicPlans]);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, logout, refreshAuth, plans: dynamicPlans, expectedDailyRoi }}>
