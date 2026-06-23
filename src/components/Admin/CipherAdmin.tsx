@@ -68,7 +68,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi } from '../../contexts/AuthContext';
+import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi, isLegacyUser } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { logAudit } from '../../lib/auth_security';
 
@@ -1405,7 +1405,7 @@ export default function CipherAdmin() {
       const userRef = doc(db, 'users', investment.user_id);
       const userSnap = await getDoc(userRef);
       const userData = userSnap.exists() ? userSnap.data() : null;
-      const isEnrolled = userData?.migration_status === 'accepted';
+      const isEnrolled = userData?.migration_status === 'accepted' || (userData && !isLegacyUser(userData));
 
       const multiplier = isEnrolled ? 3 : 1;
       const multipliedAmount = (investment.amount || 0) * multiplier;

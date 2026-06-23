@@ -202,12 +202,6 @@ export default function LegacyUpgradeModal() {
           throw new Error("Migration already finalized for this account.");
         }
 
-        // Verify transaction isn't already created
-        const snapTx = await transaction.get(txRef);
-        if (snapTx.exists() && data.migration_status !== 'declined') {
-          // If transaction exists and user was declined, we allow re-migrating
-        }
-
         // Update the user profile
         transaction.update(userRef, {
           migration_status: 'accepted',

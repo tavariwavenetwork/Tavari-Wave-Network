@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { cn, formatCurrency } from '../lib/utils';
 import { QRCodeCanvas } from 'qrcode.react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, isLegacyUser } from '../contexts/AuthContext';
 import { useUI } from '../contexts/UIContext';
 import { useUIConfig } from '../contexts/UIConfigContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -508,7 +508,7 @@ export default function Invest() {
         }
 
         // 3. LOG INVESTMENT
-        const isEnrolled = userData.migration_status === 'accepted';
+        const isEnrolled = userData.migration_status === 'accepted' || !isLegacyUser(userData);
         const finalInvAmount = (paymentMethod === 'wallet' && isEnrolled) 
           ? confirmedAmount * 3 
           : confirmedAmount;

@@ -18,7 +18,7 @@ import {
 import { cn, formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import Footer from './Footer';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth, isLegacyUser } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useUI } from '../contexts/UIContext';
 import { DynamicBalance } from './DynamicBalance';
@@ -544,6 +544,37 @@ export default function Homepage() {
         <div 
           className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-blue-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(59,130,246,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-blue-500/50 hover:shadow-[0_22px_50px_rgba(59,130,246,0.08),inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-500 relative overflow-hidden gpu-accelerate"
         >
+          {profile && isLegacyUser(profile) && profile.migration_status !== 'accepted' && profile.migration_status !== 'completed' && (
+            <>
+              <style dangerouslySetInnerHTML={{__html: `
+                @keyframes premiumPulse {
+                  0%, 100% {
+                    transform: scale(1);
+                    box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+                  }
+                  50% {
+                    transform: scale(1.05);
+                    box-shadow: 0 0 18px rgba(124, 58, 237, 0.7);
+                  }
+                }
+                .animate-premium-pulse {
+                  animation: premiumPulse 2s infinite ease-in-out;
+                }
+              `}} />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.dispatchEvent(new CustomEvent('open-legacy-upgrade-modal'));
+                }}
+                className="animate-premium-pulse absolute top-3 right-3 lg:top-5 lg:right-5 px-2.5 py-1 text-[8px] lg:text-[9px] font-black uppercase tracking-wider rounded-full bg-[#7c3aed] hover:bg-[#8b5cf6] text-white cursor-pointer select-none border border-white/10 flex items-center justify-center gap-1 transition-all z-10"
+                style={{ willChange: 'transform' }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Upgrade</span>
+              </button>
+            </>
+          )}
+
           {/* Subtle 3D glossy highlight line overlay */}
           <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-blue-500/25 to-transparent pointer-events-none" />
 
