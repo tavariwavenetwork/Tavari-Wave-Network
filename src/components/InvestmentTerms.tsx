@@ -166,6 +166,57 @@ export default function InvestmentTerms() {
             </div>
           </div>
         </section>
+
+        {/* Section F: Market Holidays, Trading Suspensions & AI Operational Cycles */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-4 text-aura-lime">
+            <Calendar size={20} className="text-aura-lime" />
+            <h2 className="text-sm font-black uppercase tracking-[0.3em]">F. Market Holidays, Trading Suspensions & AI Operational Cycles</h2>
+          </div>
+          <div className="p-8 bg-white/[0.01] border border-white/5 hover:border-white/10 rounded-[24px] space-y-6 transition-all">
+            <p className="text-aura-muted leading-relaxed">
+              The Wave Ecosystem AI trading infrastructure operates according to real-time market conditions, liquidity availability, institutional trading windows, and global market accessibility.
+            </p>
+            <p className="text-aura-muted leading-relaxed">
+              Users should understand that there may be specific public holidays, banking holidays, exchange closures, liquidity disruptions, or exceptional market conditions during which the AI trading system may temporarily suspend or significantly reduce trading activity.
+            </p>
+            <p className="text-aura-muted leading-relaxed">
+              During such periods, ROI generation may be paused, reduced, delayed, or unavailable depending on market accessibility and the availability of qualified trading opportunities identified by the AI system.
+            </p>
+            <p className="text-aura-muted leading-relaxed font-bold border-l-2 border-aura-lime pl-4">
+              This is a normal operational safeguard and does not indicate any issue with a user's account, investment, assets, portfolio, or platform functionality.
+            </p>
+            <p className="text-aura-muted leading-relaxed font-bold border-l-2 border-primary pl-4">
+              Users should not panic if daily ROI is not generated on certain days. The AI trading infrastructure is designed to prioritize capital preservation, risk management, and intelligent market participation over forced trade execution during unfavorable or restricted market conditions.
+            </p>
+            <div className="space-y-3 pt-2">
+              <h4 className="text-xs font-black uppercase tracking-widest text-white">ROI generation is therefore dependent on:</h4>
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-aura-muted">
+                {[
+                  "Active market availability",
+                  "Institutional trading windows",
+                  "Exchange operational status",
+                  "Banking and settlement schedules",
+                  "Global public holidays",
+                  "Liquidity conditions",
+                  "AI risk assessment parameters",
+                  "Real-time market opportunities"
+                ].map((term, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 bg-aura-lime rounded-full" />
+                    <span>{term}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="text-aura-muted leading-relaxed pt-2">
+              When normal market conditions resume, the AI system automatically continues its trading operations according to the active investment plan and existing ROI framework.
+            </p>
+            <p className="text-aura-muted leading-relaxed">
+              This policy exists to ensure long-term sustainability, responsible trade execution, and enhanced protection of user capital across all market environments.
+            </p>
+          </div>
+        </section>
       </main>
 
       {/* Footer minimal info indicator */}

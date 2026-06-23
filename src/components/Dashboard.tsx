@@ -511,17 +511,35 @@ export default function Dashboard() {
           value={formatCurrency(profile?.total_invested || 0)} 
           color="text-orange-400" 
           action={
-            profile?.migration_status === 'declined' ? (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.dispatchEvent(new CustomEvent('open-legacy-upgrade-modal'));
-                }}
-                className="relative px-3 py-1 text-[9px] font-black uppercase tracking-wider rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white cursor-pointer shadow-sm flex items-center justify-center gap-1 transition-all select-none hover:scale-[1.05] shadow-lg shadow-emerald-600/20"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                <span>Upgrade</span>
-              </button>
+            profile && profile.migration_status !== 'accepted' && profile.migration_status !== 'completed' ? (
+              <>
+                <style dangerouslySetInnerHTML={{__html: `
+                  @keyframes premiumPulse {
+                    0%, 100% {
+                      transform: scale(1);
+                      box-shadow: 0 0 8px rgba(124, 58, 237, 0.4);
+                    }
+                    50% {
+                      transform: scale(1.05);
+                      box-shadow: 0 0 18px rgba(124, 58, 237, 0.7);
+                    }
+                  }
+                  .animate-premium-pulse {
+                    animation: premiumPulse 2s infinite ease-in-out;
+                  }
+                `}} />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.dispatchEvent(new CustomEvent('open-legacy-upgrade-modal'));
+                  }}
+                  className="animate-premium-pulse relative px-2.5 py-1 text-[8px] lg:text-[9px] font-black uppercase tracking-wider rounded-full bg-primary hover:bg-[#8b5cf6] text-white cursor-pointer select-none border border-white/10 flex items-center justify-center gap-1 transition-all"
+                  style={{ willChange: 'transform' }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>Upgrade</span>
+                </button>
+              </>
             ) : undefined
           }
         />

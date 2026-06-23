@@ -185,7 +185,7 @@ export default function Support() {
               </svg>
             }
             label="Hot/Quick Response NG 🔥" 
-            value="+234 916 795 3016" 
+            value="+234 705 253 2095" 
             href="https://wa.me/2349167953016?text=Hello%20Tavari%20Wave%20Network%20Quick%20Response%20Support%2C%20I%20need%20urgent%20assistance%20regarding%20my%20account."
             brandColor="text-amber-500"
             bgColor="bg-amber-500/10"

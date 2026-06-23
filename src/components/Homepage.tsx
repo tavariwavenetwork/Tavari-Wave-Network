@@ -575,20 +575,7 @@ export default function Homepage() {
         />
       </div>
       
-      {/* Footer Status */}
-      <div className="hidden xl:flex pt-10 items-center justify-between gap-6 opacity-20 hover:opacity-50 transition-opacity">
-        <div className="flex items-center gap-8">
-           <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Mainnet Secured</p>
-           </div>
-           <div className="h-4 w-px bg-white/10" />
-           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-aura-muted">Encryption Protocol: AES-256V2</p>
-        </div>
-        <div className="flex items-center gap-6">
-           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-aura-muted tracking-tighter">Terminal v1.1.0-RC</p>
-        </div>
-      </div>
+      {/* Footer Status hidden per user request */}
 
       {/* Platform Guide Preview Card */}
       <div className="w-full max-w-5xl mx-auto px-1 mt-6">

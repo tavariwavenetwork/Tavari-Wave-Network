@@ -9,7 +9,7 @@ import { useAuth, isLegacyUser } from '../contexts/AuthContext';
 import { toast } from 'sonner';
 
 export default function LegacyUpgradeModal() {
-  const { user, profile } = useAuth();
+  const { user, profile, refreshAuth } = useAuth();
   const navigate = useNavigate();
   
   const [isOpen, setIsOpen] = useState(false);
@@ -88,7 +88,8 @@ export default function LegacyUpgradeModal() {
       toast.error("User profile record not found. Please refresh.");
       return;
     }
-    if (profile.uid !== user.uid) {
+    const profileUid = profile.uid || profile.user_id || user.uid;
+    if (profileUid !== user.uid) {
       toast.error("Account ownership mismatch detected. Safe state update declined.");
       return;
     }
@@ -139,6 +140,9 @@ export default function LegacyUpgradeModal() {
         });
       });
 
+      if (refreshAuth) {
+        await refreshAuth();
+      }
       setIsOpen(false);
       toast.info(`You declined the premium Asset Multiplier Upgrade. Your asset balance has been adjusted to ${formatCurrency(remainingAssets)} and will deplete as daily ROI generates.`);
     } catch (err: any) {
@@ -162,11 +166,23 @@ export default function LegacyUpgradeModal() {
       toast.error("User profile record not found. Please refresh.");
       return;
     }
-    if (profile.uid !== user.uid) {
+    const profileUid = profile.uid || profile.user_id || user.uid;
+    if (profileUid !== user.uid) {
       toast.error("Account ownership mismatch detected. Upgrade rejected.");
       return;
     }
-    if (!isCalculated) return;
+
+    // Dynamic on-the-fly metrics computation fallback
+    let finalValue = finalUpgradedValue;
+    let fallbackOriginal = originalAssets;
+    if (!isCalculated || finalValue <= 0) {
+      const currentAssets = profile.original_assets_before_upgrade !== undefined 
+        ? profile.original_assets_before_upgrade 
+        : (profile.total_invested || 0);
+      fallbackOriginal = currentAssets;
+      const timesThree = currentAssets * 3;
+      finalValue = Math.max(0, timesThree - withdrawn);
+    }
     
     setIsMigrating(true);
     try {
@@ -192,13 +208,10 @@ export default function LegacyUpgradeModal() {
           // If transaction exists and user was declined, we allow re-migrating
         }
 
-        // Setup correct upgraded values
-        const finalValue = finalUpgradedValue;
-
         // Update the user profile
         transaction.update(userRef, {
           migration_status: 'accepted',
-          original_assets_before_upgrade: originalAssets,
+          original_assets_before_upgrade: fallbackOriginal,
           remaining_upgraded_assets: finalValue,
           total_invested: finalValue, // sets Assets to Final Upgraded Asset Value
           roi_cycle_start: new Date().toISOString() // Start fresh ROI cycle
@@ -210,10 +223,10 @@ export default function LegacyUpgradeModal() {
           type: 'migration_upgrade',
           status: 'approved',
           amount: finalValue,
-          original_amount: originalAssets,
+          original_amount: fallbackOriginal,
           historical_withdrawals: withdrawn,
           created_at: new Date().toISOString(),
-          description: `Legacy Asset Multiplier executed: scaled $${originalAssets.toFixed(2)} to 300% ($${(originalAssets * 3).toFixed(2)}) less withdrawals ($${withdrawn.toFixed(2)})`
+          description: `Legacy Asset Multiplier executed: scaled $${fallbackOriginal.toFixed(2)} to 300% ($${(fallbackOriginal * 3).toFixed(2)}) less withdrawals ($${withdrawn.toFixed(2)})`
         });
 
         // Save notification
@@ -226,6 +239,10 @@ export default function LegacyUpgradeModal() {
           created_at: new Date().toISOString()
         });
       });
+
+      if (refreshAuth) {
+        await refreshAuth();
+      }
 
       toast.success("Congratulations! Your VIP Asset Multiplier Upgrade is now fully active.");
       
