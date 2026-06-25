@@ -658,7 +658,7 @@ export default function Layout() {
 
   // Determine if we should show a back button
   const showBackButton = !['/home', '/dashboard'].includes(location.pathname) && !(isMobile && location.pathname === '/token');
-  const isFullBleedPage = ['/about', '/how-it-works', '/faq', '/rewards', '/token', '/mining'].includes(location.pathname);
+  const isFullBleedPage = ['/about', '/how-it-works', '/faq', '/rewards', '/token', '/mining', '/ai-marketplace'].includes(location.pathname);
 
   // Real-time notifications
   useEffect(() => {
@@ -902,6 +902,7 @@ export default function Layout() {
                       { label: 'Guide', path: '/guide', icon: <HelpCircle size={14} /> },
                       { label: 'Join Us', path: '/join-us', icon: <Share2 size={14} /> },
                       { label: 'Mining', path: '/mining', icon: <Cpu size={14} /> },
+                      { label: 'AI Marketplace', path: '/ai-marketplace', icon: <Bot size={14} /> },
                     ].map((subItem) => (
                       <button
                         key={subItem.path}
@@ -1569,6 +1570,12 @@ export default function Layout() {
                   label="Mining" 
                   active={activeTab === 'mining'}
                   onClick={() => handleNavigation('/mining')}
+                />
+                <SidebarItem 
+                  icon={<Bot size={20} className="text-cyan-400" />} 
+                  label="AI Marketplace" 
+                  active={activeTab === 'ai-marketplace'}
+                  onClick={() => handleNavigation('/ai-marketplace')}
                 />
                 <SidebarItem 
                   icon={<MessageSquarePlus size={20} />} 

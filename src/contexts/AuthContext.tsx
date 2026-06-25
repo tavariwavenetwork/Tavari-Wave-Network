@@ -122,15 +122,29 @@ export function getRoiByAmountDynamic(amount: number, livePlans: any[]): number 
   return getRoiByAmount(amount); // fallback
 }
 
+export function getRobotRoiRate(robotName?: string): number | null {
+  if (!robotName) return null;
+  switch (robotName) {
+    case 'AI 1.8': return 0.005;
+    case 'AI 2.0': return 0.01;
+    case 'AI 2.5': return 0.015;
+    case 'AI 3.0': return 0.025;
+    default: return null;
+  }
+}
+
 export function calculateExpectedDailyRoi(
   activeInvestments: any[],
   compoundedAmounts: number[] | undefined,
   plans: any[],
   profile?: any
 ): number {
+  const robotRate = getRobotRoiRate(profile?.active_robot);
+
   if (profile?.migration_status === 'accepted') {
     const remaining = profile.remaining_upgraded_assets ?? 0;
-    return Math.floor((remaining * 0.005) * 100) / 100;
+    const rate = robotRate !== null ? robotRate : 0.005;
+    return Math.floor((remaining * rate) * 100) / 100;
   }
 
   if (activeInvestments.length === 0) return 0;
@@ -140,7 +154,7 @@ export function calculateExpectedDailyRoi(
   let originalRoi = 0;
   activeInvestments.forEach((inv) => {
     const amount = inv.amount;
-    const roiRate = isNew ? 0.005 : getRoiByAmountDynamic(amount, plans);
+    const roiRate = robotRate !== null ? robotRate : (isNew ? 0.005 : getRoiByAmountDynamic(amount, plans));
     originalRoi += amount * roiRate;
   });
 
@@ -148,7 +162,7 @@ export function calculateExpectedDailyRoi(
   const compounds = compoundedAmounts || [];
   compounds.forEach(compAmount => {
     if (compAmount > 0) {
-      const roiRate = isNew ? 0.005 : getRoiByAmountDynamic(compAmount, plans);
+      const roiRate = robotRate !== null ? robotRate : (isNew ? 0.005 : getRoiByAmountDynamic(compAmount, plans));
       compoundedRoi += compAmount * roiRate;
     }
   });
@@ -439,8 +453,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (invSnapInTx.exists()) {
               const invData = invSnapInTx.data();
               if (invData.status === 'active') {
-                let roiRate = getRoiByAmountDynamic(invData.amount, plansRef.current);
-                if (isNewUser(currentProfile)) {
+                const robotRate = getRobotRoiRate(currentProfile?.active_robot);
+                let roiRate = robotRate !== null ? robotRate : getRoiByAmountDynamic(invData.amount, plansRef.current);
+                if (isNewUser(currentProfile) && robotRate === null) {
                   roiRate = 0.005; // 0.5% force for new users
                 }
                 let currentAmount = invData.amount || 0;
@@ -480,8 +495,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let compoundsProfit = 0;
           compounds.forEach((compAmount: number) => {
             if (compAmount > 0) {
-              let roiRate = getRoiByAmountDynamic(compAmount, plansRef.current);
-              if (isNewUser(currentProfile)) {
+              const robotRate = getRobotRoiRate(currentProfile?.active_robot);
+              let roiRate = robotRate !== null ? robotRate : getRoiByAmountDynamic(compAmount, plansRef.current);
+              if (isNewUser(currentProfile) && robotRate === null) {
                 roiRate = 0.005; // 0.5% force for new users
               }
               const profitPerCycle = compAmount * roiRate;

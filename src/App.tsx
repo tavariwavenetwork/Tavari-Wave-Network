@@ -43,6 +43,7 @@ import SpinAndWin from './components/SpinAndWin';
 import SpinAndWinGuidelines from './components/SpinAndWinGuidelines';
 import JoinUs from './components/JoinUs';
 import AssetMultiplierPage from './components/AssetMultiplierPage';
+import AIMarketplace from './components/AIMarketplace';
 import { Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LanguageProvider } from './contexts/LanguageContext';
@@ -153,6 +154,7 @@ export default function App() {
                 <Route path="/guide" element={<Guide />} />
                 <Route path="/token" element={<TWNTokenPortal />} />
                 <Route path="/mining" element={<MiningPortal />} />
+                <Route path="/ai-marketplace" element={<AIMarketplace />} />
                 <Route path="/daily-points" element={<DailyPointsHub />} />
                 <Route path="/spin" element={<SpinAndWin />} />
                 <Route path="/spin-guidelines" element={<SpinAndWinGuidelines />} />

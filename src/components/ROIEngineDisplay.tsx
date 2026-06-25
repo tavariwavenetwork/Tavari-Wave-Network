@@ -6,6 +6,13 @@ import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi } from '../co
 import { DynamicBalance } from './DynamicBalance';
 import { CandlestickChart, TradingActivity } from './ROIEngineVisuals';
 
+const ROBOT_IMAGES: Record<string, string> = {
+  'AI 1.8': 'https://i.imgur.com/993Snvu.png',
+  'AI 2.0': 'https://i.imgur.com/HDpGc2J.png',
+  'AI 2.5': 'https://i.imgur.com/UyBLFhX.png',
+  'AI 3.0': 'https://i.imgur.com/ODgrFKl.png',
+};
+
 interface ROIEngineStatsProps {
   investments: any[];
   profile: any;
@@ -19,6 +26,11 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
   const [timeLeft, setTimeLeft] = useState("24:00:00");
   const [liveEarnings, setLiveEarnings] = useState(0);
   const [isBlinking, setIsBlinking] = useState(false);
+
+  const activeRobotName = profile?.active_robot || 'Default Bot';
+  const activeRobotImage = profile?.active_robot && ROBOT_IMAGES[profile.active_robot]
+    ? ROBOT_IMAGES[profile.active_robot]
+    : 'https://i.imgur.com/swuDIvl.png';
 
   useEffect(() => {
     let timeoutId: any;
@@ -230,7 +242,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                 <CandlestickChart count={25} />
             </div>
             
-            <div className="absolute top-4 left-4 lg:top-6 lg:left-6 flex flex-col items-start lg:translate-y-0">
+            <div className="absolute top-4 left-4 lg:top-6 lg:left-6 flex flex-row items-center gap-2.5 lg:translate-y-0">
                 <div className="relative group/bot">
                   {/* Small robot card */}
                   <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-[#00ffff] shadow-xl overflow-hidden relative">
@@ -246,39 +258,19 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                       className="w-9 h-9 lg:w-14 lg:h-14 relative flex items-center justify-center"
                     >
                       <img 
-                        src="https://i.imgur.com/swuDIvl.png" 
-                        alt="Premium AI Bot Active" 
+                        src={activeRobotImage} 
+                        alt={`${activeRobotName} Active`} 
                         referrerPolicy="no-referrer"
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)]"
+                        className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] animate-pulse"
                       />
-                      {/* Blinking eyes overlay */}
-                      <div className="absolute top-[42%] left-[34%] right-[34%] flex justify-between pointer-events-none z-20">
-                        <motion.div 
-                          animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                          transition={{ duration: 0.08, ease: "easeInOut" }}
-                          className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff] rounded-full shadow-[0_0_8px_rgba(0,255,255,0.9),0_0_15px_rgba(0,255,255,0.6)]"
-                        />
-                        <motion.div 
-                          animate={{ scaleY: isBlinking ? 0.08 : 1 }}
-                          transition={{ duration: 0.08, ease: "easeInOut" }}
-                          className="w-1 h-1 lg:w-1.5 lg:h-1.5 bg-[#00ffff] rounded-full shadow-[0_0_8px_rgba(0,255,255,0.9),0_0_15px_rgba(0,255,255,0.6)]"
-                        />
-                      </div>
                     </motion.div>
                   </div>
                   {/* Glowing Green/Emerald Indicator sitting across top right edge of small card */}
                   <div className="absolute -top-1 -right-1 lg:-top-1.5 lg:-right-1.5 w-3 h-3 lg:w-4 lg:h-4 bg-emerald-500 rounded-full shadow-[0_0_14px_#10b981] z-50 pointer-events-none">
                     <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
                   </div>
-                </div>
-
-                {/* Mobile ONLY: Expected Daily Returns directly under the trading robot */}
-                <div className="lg:hidden mt-1.5 text-left">
-                  <span className="text-[8px] font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap">
-                    {formatCurrency(yieldSum)}/
-                  </span>
                 </div>
             </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   PlusCircle, 
@@ -281,6 +281,10 @@ export default function Fund() {
   const { user, profile } = useAuth();
   const { tab } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const [isRobotUpgrade, setIsRobotUpgrade] = useState<boolean>(false);
+  const [robotName, setRobotName] = useState<string>('');
 
   // Shared UI States
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -322,6 +326,14 @@ export default function Fund() {
     }
     loadDetectedLocation();
   }, []);
+
+  useEffect(() => {
+    if (location.state && location.state.prefillAmount) {
+      setDepositAmount(String(location.state.prefillAmount));
+      setIsRobotUpgrade(location.state.isRobotUpgrade || false);
+      setRobotName(location.state.robotName || '');
+    }
+  }, [location.state]);
 
   // --- DEPOSIT STATES ---
   const [depositAmount, setDepositAmount] = useState('');
@@ -508,6 +520,8 @@ export default function Fund() {
     setDepositMethod(null);
     setDepositTxId('');
     setDepositStep('input');
+    setIsRobotUpgrade(false);
+    setRobotName('');
     navigate('/dashboard#history');
   };
 
@@ -524,6 +538,7 @@ export default function Fund() {
         reference: depositTxId,
         status: 'pending',
         created_at: new Date().toISOString(),
+        ...(isRobotUpgrade ? { is_robot_upgrade: true, robot_name: robotName } : {})
       };
       await addDoc(collection(db, 'deposits'), newDeposit);
       setShowDepositSuccess(true);
@@ -531,7 +546,7 @@ export default function Fund() {
       
       broadcastActivity(
         profile.name || "Client",
-        "Initiated Deposit",
+        isRobotUpgrade ? `Upgraded to ${robotName}` : "Initiated Deposit",
         `$${amount.toLocaleString()}`,
         true,
         "💳"
