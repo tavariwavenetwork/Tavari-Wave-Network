@@ -101,6 +101,13 @@ service cloud.firestore {
                         !isSuspended(existing()) && 
                         !isBanned(incoming()) && 
                         !isBanned(existing()) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['active_robot']) &&
+                        (!incoming().keys().hasAny(['active_robot']) || (incoming().active_robot in existing().get('unlocked_robots', [])))) ||
+                       (isOwner(userId) && 
+                        !isSuspended(incoming()) && 
+                        !isSuspended(existing()) && 
+                        !isBanned(incoming()) && 
+                        !isBanned(existing()) && 
                         incoming().diff(existing()).affectedKeys().hasOnly([
                           'name', 'username', 'email', 'phone', 'photoURL', 'transfer_pin', 'transaction_pin', 
                           'push_notifications', 'available_balance', 'funding_balance', 'total_earnings', 

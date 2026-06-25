@@ -381,7 +381,7 @@ export default function Fund() {
   useEffect(() => {
     if (tab === 'deposit') {
       const hasSeen = sessionStorage.getItem('nexus_has_seen_deposit_popup') === 'true';
-      if (hasSeen) {
+      if (isRobotUpgrade || hasSeen) {
         setIsDepositContinued(true);
         setShowContinueDepositPopup(false);
       } else if (selectedCountry === 'Nigeria') {
@@ -402,7 +402,7 @@ export default function Fund() {
     } else {
       setShowContinueWithdrawPopup(false);
     }
-  }, [tab, selectedCountry]);
+  }, [tab, selectedCountry, isRobotUpgrade]);
 
   useEffect(() => {
     if (!user || !profile) return;
@@ -836,7 +836,7 @@ export default function Fund() {
                         className="w-full bg-aura-black border border-white/10 rounded-2xl py-4 pl-12 pr-6 text-base md:text-xl font-bold outline-none focus:border-aura-lime/50 transition-all text-white"
                       />
                     </div>
-                    {depositAmount && parseFloat(depositAmount) < 10 && (
+                    {depositAmount && parseFloat(depositAmount) < 10 && !isRobotUpgrade && (
                       <p className="text-red-500 text-[10px] font-black uppercase tracking-widest mt-2 text-center animate-pulse">
                         Minimum deposit amount is $10.
                       </p>
@@ -944,7 +944,7 @@ export default function Fund() {
               </div>
 
               <button 
-                disabled={!depositTxId || !depositAmount || parseFloat(depositAmount) < 10 || isSubmitting}
+                disabled={!depositTxId || !depositAmount || (!isRobotUpgrade && parseFloat(depositAmount) < 10) || isSubmitting}
                 onClick={submitDeposit}
                 className="w-full py-5 bg-aura-lime text-aura-black font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl shadow-xl disabled:opacity-30 transition-all"
               >
