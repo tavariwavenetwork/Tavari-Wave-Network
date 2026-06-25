@@ -497,11 +497,32 @@ export default function Fund() {
     };
   }, [user, profile]);
 
+  // Auto-routing based on location detection
   useEffect(() => {
-    if (tab === 'deposit' && !selectedCountry) {
-      setShowCountryModal(true);
+    if (tab === 'deposit') {
+      // 1. Stored user country from profile
+      let country = profile?.country || profile?.countryName;
+      if (!country && profile?.country_code) {
+        const found = COUNTRIES.find(c => c.code.toUpperCase() === profile.country_code.toUpperCase());
+        if (found) country = found.name;
+      }
+      // 2. Geolocation / IP fallback
+      if (!country) {
+        country = detectedCountry || 'Nigeria';
+      }
+      
+      setSelectedCountry(country);
+      
+      if (country === 'Nigeria') {
+        setDepositMethod('bank');
+      } else {
+        setDepositMethod('crypto');
+      }
+      
+      // Force hide country modal
+      setShowCountryModal(false);
     }
-  }, [tab, selectedCountry]);
+  }, [tab, detectedCountry, profile]);
 
   const filteredTransactions = transactions.filter(tx => {
     const matchesType = filterType === 'all' || tx.type.toLowerCase() === filterType.toLowerCase();
@@ -734,40 +755,17 @@ export default function Fund() {
   // --- RENDER LOGIC ---
 
   const renderDeposit = () => {
-    if (selectedCountry !== 'Nigeria') {
-      return (
-        <div className="h-full min-h-[350px] flex flex-col items-center justify-center border border-white/5 bg-[#11141b] rounded-[32px] text-center p-10 space-y-6">
-          <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center text-aura-muted border border-white/5">
-            <Globe size={28} className="animate-pulse" />
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-lg font-bold uppercase tracking-tight text-white mb-2">Region Assignment Required</h3>
-            <p className="text-xs text-aura-muted uppercase tracking-widest max-w-sm mx-auto leading-relaxed">
-              Please select your country or region to verify support and assign the correct settlement bridge.
-            </p>
-          </div>
-          <button 
-            onClick={() => setShowCountryModal(true)}
-            className="px-6 py-4 bg-aura-lime text-aura-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:scale-105 transition-all mt-4"
-          >
-            Select Region
-          </button>
-        </div>
-      );
-    }
-
     return (
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Payment Methods */}
         <div className="lg:col-span-4 space-y-4">
           <div className="flex items-center justify-between mb-4 px-2">
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-aura-muted">Payment Channels</h3>
-            <button 
-              onClick={() => setShowCountryModal(true)}
-              className="text-[9px] font-black uppercase tracking-widest text-aura-lime hover:underline flex items-center gap-1 font-mono"
+            <div 
+              className="text-[9px] font-black uppercase tracking-widest text-aura-muted flex items-center gap-1 font-mono cursor-default"
             >
               <Globe size={12} /> {selectedCountry}
-            </button>
+            </div>
           </div>
           
           {selectedCountry === 'Nigeria' && (
@@ -789,22 +787,24 @@ export default function Fund() {
             </button>
           )}
 
-          <button 
-            onClick={() => setDepositMethod('crypto')}
-            className={cn(
-              "w-full p-6 flex items-center justify-between rounded-2xl border transition-all group",
-              depositMethod === 'crypto' ? "bg-aura-lime/10 border-aura-lime text-aura-lime" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
-            )}
-          >
-            <div className="flex items-center gap-4">
-              <Bitcoin size={24} className={cn(depositMethod === 'crypto' ? "text-aura-lime" : "text-aura-muted")} />
-              <div className="text-left">
-                <p className="text-sm font-bold uppercase tracking-tight">Crypto Payment</p>
-                <p className="text-[10px] opacity-60 font-medium">USDT / BTC / ETH</p>
+          {selectedCountry !== 'Nigeria' && (
+            <button 
+              onClick={() => setDepositMethod('crypto')}
+              className={cn(
+                "w-full p-6 flex items-center justify-between rounded-2xl border transition-all group",
+                depositMethod === 'crypto' ? "bg-aura-lime/10 border-aura-lime text-aura-lime" : "bg-white/5 border-white/5 text-white hover:bg-white/10"
+              )}
+            >
+              <div className="flex items-center gap-4">
+                <Bitcoin size={24} className={cn(depositMethod === 'crypto' ? "text-aura-lime" : "text-aura-muted")} />
+                <div className="text-left">
+                  <p className="text-sm font-bold uppercase tracking-tight">Crypto Payment</p>
+                  <p className="text-[10px] opacity-60 font-medium">USDT / BTC / ETH</p>
+                </div>
               </div>
-            </div>
-            {depositMethod === 'crypto' && <div className="w-2 h-2 rounded-full bg-aura-lime animate-pulse" />}
-          </button>
+              {depositMethod === 'crypto' && <div className="w-2 h-2 rounded-full bg-aura-lime animate-pulse" />}
+            </button>
+          )}
         </div>
 
         {/* Right Column: Details + Amount */}

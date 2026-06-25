@@ -7,10 +7,10 @@ import { DynamicBalance } from './DynamicBalance';
 import { CandlestickChart, TradingActivity } from './ROIEngineVisuals';
 
 const ROBOT_IMAGES: Record<string, string> = {
-  'AI 1.8': 'https://i.imgur.com/993Snvu.png',
-  'AI 2.0': 'https://i.imgur.com/HDpGc2J.png',
-  'AI 2.5': 'https://i.imgur.com/UyBLFhX.png',
-  'AI 3.0': 'https://i.imgur.com/ODgrFKl.png',
+  'AI 1.8': 'https://i.imgur.com/qkFHhDR.png',
+  'AI 2.0': 'https://i.imgur.com/JGTKlCJ.png',
+  'AI 2.5': 'https://i.imgur.com/3DpE79P.png',
+  'AI 3.0': 'https://i.imgur.com/dZqi2MZ.png',
 };
 
 interface ROIEngineStatsProps {
@@ -242,7 +242,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                 <CandlestickChart count={25} />
             </div>
             
-            <div className="absolute top-4 left-4 lg:top-6 lg:left-6 flex flex-row items-center gap-2.5 lg:translate-y-0">
+            <div className="absolute top-4 left-4 lg:top-6 lg:left-6 flex flex-col items-center gap-1.5 lg:translate-y-0">
                 <div className="relative group/bot">
                   {/* Small robot card */}
                   <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-[#00ffff] shadow-xl overflow-hidden relative">
@@ -273,15 +273,10 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                   </div>
                 </div>
 
-                {/* Info block next to image */}
-                <div className="flex flex-col items-start text-left">
-                  <span className="text-[7px] lg:text-[8px] font-black uppercase tracking-widest text-emerald-400">ACTIVE SYSTEM</span>
-                  <span className="text-[10px] lg:text-xs font-bold text-white uppercase tracking-wider">{activeRobotName}</span>
-                  {/* Mobile ONLY: Expected Daily Returns directly under the trading robot */}
-                  <span className="lg:hidden text-[8px] font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap mt-0.5">
-                    {formatCurrency(yieldSum)}/Day
-                  </span>
-                </div>
+                {/* Expected Daily Returns directly under the trading robot on all devices */}
+                <span className="text-[8px] lg:text-[11px] font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap">
+                  {formatCurrency(yieldSum)}/Day
+                </span>
             </div>
 
             <div className="absolute top-1 right-1 lg:top-4 lg:right-6 flex items-center gap-2">

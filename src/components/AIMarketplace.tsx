@@ -69,7 +69,7 @@ const ROBOTS: Robot[] = [
     roi: '0.5%',
     roiRate: 0.005,
     upgradePrice: 3,
-    image: 'https://i.imgur.com/993Snvu.png',
+    image: 'https://i.imgur.com/qkFHhDR.png',
     description: 'Entry-level institutional high-frequency trading algorithm with microsecond arbitrage execution.',
     speed: '0.4ms latency',
     accuracy: '94.8% success rate',
@@ -96,7 +96,7 @@ const ROBOTS: Robot[] = [
     roi: '1.0%',
     roiRate: 0.01,
     upgradePrice: 5,
-    image: 'https://i.imgur.com/HDpGc2J.png',
+    image: 'https://i.imgur.com/JGTKlCJ.png',
     description: 'Neural-network based trading engine optimized for G10 currency liquidity and spread arbitrage.',
     speed: '0.2ms latency',
     accuracy: '97.2% success rate',
@@ -123,7 +123,7 @@ const ROBOTS: Robot[] = [
     roi: '1.5%',
     roiRate: 0.015,
     upgradePrice: 9,
-    image: 'https://i.imgur.com/UyBLFhX.png',
+    image: 'https://i.imgur.com/3DpE79P.png',
     description: 'Advanced multi-agent deep learning model optimized for cross-border treasury swaps and volatility tracking.',
     speed: '0.1ms latency',
     accuracy: '98.9% success rate',
@@ -150,7 +150,7 @@ const ROBOTS: Robot[] = [
     roi: '2.5%',
     roiRate: 0.025,
     upgradePrice: 15,
-    image: 'https://i.imgur.com/ODgrFKl.png',
+    image: 'https://i.imgur.com/dZqi2MZ.png',
     description: 'The pinnacle of automated trading technology. Employs quantum-resistant predictive analysis and sovereign hedging pools.',
     speed: '0.05ms latency',
     accuracy: '99.7% success rate',
@@ -232,7 +232,18 @@ export default function AIMarketplace() {
   const activeRobotName = profile?.active_robot;
 
   return (
-    <div className="min-h-screen bg-[#06080c] pb-24 text-white relative overflow-hidden">
+    <div className="min-h-screen text-white relative overflow-hidden bg-[#06080c]">
+      {/* 1. BACKGROUND IMAGE REFINEMENT: Reduce background image opacity/visibility to approximately 50% */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed pointer-events-none z-0" 
+        style={{ 
+          backgroundImage: "url('https://i.imgur.com/4PGuFdH.png')",
+          opacity: 0.5
+        }} 
+      />
+      {/* Subtle white overlay above background image to create a lighter appearance behind content and elevate contrast */}
+      <div className="absolute inset-0 bg-white/[0.04] pointer-events-none z-0" />
+
       {/* CSS style injection for continuous, hardware-accelerated marquee */}
       <style>{`
         @keyframes marquee {
@@ -260,34 +271,32 @@ export default function AIMarketplace() {
           className="w-full h-full object-cover object-center filter brightness-[0.7] contrast-[1.05]"
         />
         {/* Cinema shadow gradients to isolate content */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#06080c] via-transparent to-black/45" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#06080c]/80 via-transparent to-black/50" />
 
-        {/* Premium scrolling message banner overlays the hero */}
-        <div className="absolute bottom-6 left-0 right-0 w-full px-4 sm:px-6 z-20 flex justify-center">
-          <div className="w-full max-w-5xl bg-black/40 backdrop-blur-xl border border-white/15 rounded-full py-2.5 px-4 sm:px-6 shadow-[0_12px_40px_rgba(0,0,0,0.65)] overflow-hidden flex items-center">
-            {/* Pulsing indicator */}
-            <div className="flex items-center gap-2 mr-3 sm:mr-4 border-r border-white/15 pr-3 shrink-0">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
-              </span>
-              <span className="text-[8px] sm:text-[9px] font-black tracking-widest text-cyan-400 uppercase font-mono">SYSTEM LOG</span>
-            </div>
+        {/* Subtle full-width glassmorphism strip spanning horizontally floating over the bottom area of the Hero Section */}
+        <div className="absolute bottom-4 left-0 right-0 w-full bg-black/45 backdrop-blur-[8px] border-y border-white/10 py-2.5 px-4 sm:px-8 z-20 flex items-center shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+          {/* Pulsing indicator */}
+          <div className="flex items-center gap-1.5 mr-3 sm:mr-4 border-r border-white/10 pr-3 shrink-0">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-500"></span>
+            </span>
+            <span className="text-[7.5px] sm:text-[8.5px] font-black tracking-widest text-cyan-400 uppercase font-mono">SYSTEM LOG</span>
+          </div>
 
-            {/* Marquee Text */}
-            <div className="flex-1 overflow-hidden relative w-full h-5">
-              <div className="animate-marquee whitespace-nowrap text-[10px] sm:text-xs font-semibold text-white/95 tracking-wider inline-block">
-                Deploy ultra-high-frequency algorithmic trading robots powered by recurrent neural networks. Upgrade to unlock faster, higher-yield execution layers. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Deploy ultra-high-frequency algorithmic trading robots powered by recurrent neural networks. Upgrade to unlock faster, higher-yield execution layers.
-              </div>
+          {/* Marquee Text */}
+          <div className="flex-1 overflow-hidden relative w-full h-4 sm:h-5">
+            <div className="animate-marquee whitespace-nowrap text-[9px] sm:text-xs font-semibold text-white/90 tracking-wider inline-block">
+              Deploy ultra-high-frequency algorithmic trading robots powered by recurrent neural networks. Upgrade to unlock faster, higher-yield execution layers. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Deploy ultra-high-frequency algorithmic trading robots powered by recurrent neural networks. Upgrade to unlock faster, higher-yield execution layers.
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main cards layout */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 relative z-10">
+      {/* Main cards layout - sit beautifully below Hero with proper spacing on desktop and starting directly below scrolling bar on mobile */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-3 sm:mt-0 pt-0 sm:pt-12 pb-24 relative z-10">
         {/* Compact 2x2 on Mobile / 4-column on Desktop Grid Layout */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 lg:gap-8">
           {ROBOTS.map((robot) => {
             const isUnlocked = unlockedRobots.includes(robot.name);
             const isActive = activeRobotName === robot.name;
@@ -296,119 +305,118 @@ export default function AIMarketplace() {
             const theme = robot.colorTheme;
 
             return (
-              <motion.div
-                key={robot.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, ease: 'easeOut' }}
-                className={cn(
-                  "relative group rounded-[20px] sm:rounded-[36px] border transition-all duration-500 flex flex-col justify-between overflow-hidden backdrop-blur-xl p-2 sm:p-6 aspect-square lg:aspect-auto lg:min-h-[390px] h-full select-none hover:-translate-y-2",
-                  theme.bg,
-                  theme.border,
-                  theme.borderHover,
-                  isActive ? cn(theme.activeBorder, theme.activeShadow) : "shadow-2xl bg-[#0c0f17]/50"
-                )}
-              >
-                {/* Visual Status Indicator / Pulse effect */}
-                {isActive && (
-                  <div className={cn("absolute inset-0 border rounded-[20px] sm:rounded-[36px] pointer-events-none animate-[pulse_2s_infinite]", theme.activeBorder)} />
-                )}
+              <div key={robot.id} className="flex flex-col gap-3.5 sm:gap-4 h-full">
+                {/* Square Card */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: 'easeOut' }}
+                  className={cn(
+                    "relative group rounded-[20px] sm:rounded-[36px] border transition-all duration-500 flex flex-col justify-between overflow-hidden backdrop-blur-2xl p-3 sm:p-5 aspect-square select-none hover:-translate-y-1.5 shadow-[0_20px_45px_rgba(0,0,0,0.85)] hover:shadow-[0_30px_60px_rgba(0,0,0,0.95)] bg-gradient-to-b from-[#0c0e14]/98 to-[#06080c]/98 w-full",
+                    theme.border,
+                    theme.borderHover,
+                    isActive ? cn(theme.activeBorder, theme.activeShadow, "shadow-[0_0_35px_rgba(255,255,255,0.08)]") : ""
+                  )}
+                >
+                  {/* Visual Status Indicator / Pulse effect */}
+                  {isActive && (
+                    <div className={cn("absolute inset-0 border rounded-[20px] sm:rounded-[36px] pointer-events-none animate-[pulse_2s_infinite]", theme.activeBorder)} />
+                  )}
 
-                {/* Top Bar with Name & Learn More */}
-                <div className="flex justify-between items-center z-10 w-full mb-0.5 sm:mb-2">
-                  <span className={cn("text-[8px] sm:text-xs font-black tracking-wider uppercase", theme.primary)}>
-                    {robot.name}
-                  </span>
-                  
-                  <button
-                    onClick={() => setSelectedRobot(robot)}
-                    className="px-1.5 py-0.5 sm:px-3 sm:py-1 bg-white/5 hover:bg-white/10 text-[6px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-300 hover:text-white border border-white/10 rounded-full transition-all duration-300 cursor-pointer"
-                  >
-                    Learn More
-                  </button>
-                </div>
-
-                {/* Centered Robot Image Area - Significantly enlarged images */}
-                <div className="relative flex-1 flex flex-col items-center justify-center my-0.5 sm:my-5">
-                  {/* Glowing Aura Behind Robot */}
-                  <div className={cn(
-                    "absolute w-14 h-14 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-35 transition-all duration-500",
-                    isActive ? theme.glow : "bg-gray-700/30"
-                  )} />
-                  
-                  {/* Robot Image Wrapper with precise aspect ratio and responsive size */}
-                  <div className="relative z-10 w-[58%] sm:w-[72%] lg:w-[72%] aspect-square flex items-center justify-center">
-                    <img 
-                      src={robot.image} 
-                      alt={robot.name} 
-                      className={cn(
-                        "w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 filter drop-shadow-[0_12px_16px_rgba(0,0,0,0.6)]",
-                        isLocked && "grayscale opacity-40"
-                      )}
-                      referrerPolicy="no-referrer"
-                    />
-
-                    {/* Lock Overlay (icon floating overlay on the top left of the robot image) */}
-                    {isLocked && !isPending && (
-                      <div className="absolute top-0 left-0 -translate-x-1 -translate-y-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] text-gray-300 w-[16%] h-[16%] min-w-[18px] min-h-[18px] max-w-[28px] max-h-[28px] flex items-center justify-center z-20">
-                        <Lock className="w-[60%] h-[60%]" />
-                      </div>
-                    )}
+                  {/* Top Bar with Name & Learn More */}
+                  <div className="flex justify-between items-center z-10 w-full mb-1 sm:mb-1.5">
+                    <span className={cn("text-[9px] sm:text-xs font-black tracking-wider uppercase", theme.primary)}>
+                      {robot.name}
+                    </span>
+                    
+                    <button
+                      onClick={() => setSelectedRobot(robot)}
+                      className="px-1.5 py-0.5 sm:px-2.5 sm:py-1 bg-white/5 hover:bg-white/10 text-[6px] sm:text-[8px] font-black uppercase tracking-widest text-gray-300 hover:text-white border border-white/10 rounded-full transition-all duration-300 cursor-pointer"
+                    >
+                      Learn More
+                    </button>
                   </div>
-                </div>
 
-                {/* Bottom Stats & Button Panel */}
-                <div className="flex flex-col items-center gap-0.5 sm:gap-3 z-10 w-full mt-auto">
-                  <div className="text-center mb-0.5 sm:mb-0">
-                    <span className="text-[8px] sm:text-xs font-black tracking-wide text-white/95">
+                  {/* Centered Robot Image Area - Display each robot image at 80–85% of its card area */}
+                  <div className="relative flex-1 flex flex-col items-center justify-center my-1 sm:my-2 w-full min-h-0">
+                    {/* Glowing Aura Behind Robot */}
+                    <div className={cn(
+                      "absolute w-16 h-16 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-40 transition-all duration-500",
+                      isActive ? theme.glow : "bg-gray-800/20"
+                    )} />
+                    
+                    {/* Robot Image Wrapper perfectly centered and scaled to occupy 80-85% */}
+                    <div className="relative z-10 w-[82%] h-[82%] flex items-center justify-center">
+                      <img 
+                        src={robot.image} 
+                        alt={robot.name} 
+                        className={cn(
+                          "w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 filter drop-shadow-[0_16px_24px_rgba(0,0,0,0.7)]",
+                          isLocked && "grayscale opacity-40"
+                        )}
+                        referrerPolicy="no-referrer"
+                      />
+
+                      {/* Lock Overlay (icon floating overlay on the top left of the robot image) */}
+                      {isLocked && !isPending && (
+                        <div className="absolute top-0.5 left-0.5 bg-black/75 backdrop-blur-md rounded-lg border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] text-gray-300 w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center z-20">
+                          <Lock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bottom Stats - Only ROI percentage inside the card */}
+                  <div className="flex flex-col items-center z-10 w-full mt-auto">
+                    <span className="text-[9px] sm:text-xs font-black tracking-wide text-white/95">
                       {robot.roi} Daily ROI
                     </span>
                   </div>
+                </motion.div>
 
-                  {/* Fully responsive, non-clipping button layout */}
-                  <div className="w-full flex justify-center">
-                    {isActive ? (
-                      <span 
-                        className="w-full py-1 sm:py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-xl text-[8px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1"
-                      >
-                        <Check size={10} className="sm:w-3 sm:h-3" />
-                        Active
-                      </span>
-                    ) : isPending ? (
-                      <span 
-                        className="w-full py-1 sm:py-2 bg-yellow-400/10 text-yellow-500 border border-yellow-400/25 rounded-xl text-[8px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1"
-                      >
-                        <Clock size={10} className="animate-spin sm:w-3 sm:h-3" />
-                        Pending
-                      </span>
-                    ) : isUnlocked ? (
-                      <button 
-                        onClick={() => handleActivate(robot)}
-                        disabled={isActivating !== null}
-                        className="w-full py-1 sm:py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-[8px] sm:text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer flex items-center justify-center gap-1 hover:scale-[1.02] active:scale-95"
-                      >
-                        {isActivating === robot.id ? (
-                          <div className="w-2.5 h-2.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Play size={10} fill="currentColor" className="sm:w-3 sm:h-3" />
-                        )}
-                        Activate
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => handleUpgrade(robot)}
-                        className={cn(
-                          "w-full py-1 sm:py-2.5 bg-gradient-to-r text-white font-black rounded-xl text-[8px] sm:text-xs uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-1 hover:scale-[1.02] active:scale-95",
-                          theme.btnGrad
-                        )}
-                      >
-                        <Zap size={10} className="sm:w-3 sm:h-3" />
-                        Unlock {formatCurrency(robot.upgradePrice)}
-                      </button>
-                    )}
-                  </div>
+                {/* Unlock / Upgrade / Activate button placed outside and centered horizontally below each card */}
+                <div className="w-full flex justify-center">
+                  {isActive ? (
+                    <span 
+                      className="w-full py-3 sm:py-4 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-2xl text-[9px] sm:text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(16,185,129,0.1)]"
+                    >
+                      <Check size={14} className="sm:w-4 sm:h-4" />
+                      Active
+                    </span>
+                  ) : isPending ? (
+                    <span 
+                      className="w-full py-3 sm:py-4 bg-yellow-400/15 text-yellow-500 border border-yellow-400/30 rounded-2xl text-[9px] sm:text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-[0_4px_12px_rgba(234,179,8,0.1)]"
+                    >
+                      <Clock size={14} className="animate-spin sm:w-4 sm:h-4" />
+                      Pending
+                    </span>
+                  ) : isUnlocked ? (
+                    <button 
+                      onClick={() => handleActivate(robot)}
+                      disabled={isActivating !== null}
+                      className="w-full py-3 sm:py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-2xl text-[9px] sm:text-[11px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.03] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isActivating === robot.id ? (
+                        <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Play size={14} fill="currentColor" className="sm:w-4 sm:h-4" />
+                      )}
+                      Activate
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleUpgrade(robot)}
+                      className={cn(
+                        "w-full py-3 sm:py-4 bg-gradient-to-r text-white font-black rounded-2xl text-[9px] sm:text-[11px] uppercase tracking-widest transition-all shadow-xl cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.03] active:scale-95",
+                        theme.btnGrad
+                      )}
+                    >
+                      <Zap size={14} className="sm:w-4 sm:h-4" />
+                      Unlock {formatCurrency(robot.upgradePrice)}
+                    </button>
+                  )}
                 </div>
-              </motion.div>
+              </div>
             );
           })}
         </div>
