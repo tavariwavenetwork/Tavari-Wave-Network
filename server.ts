@@ -548,6 +548,26 @@ async function startServer() {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
+      try {
+        const indexPath = path.join(distPath, "index.html");
+        if (fs.existsSync(indexPath)) {
+          let html = fs.readFileSync(indexPath, "utf8");
+          
+          // Construct the fully-qualified absolute URL dynamically
+          const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          const host = req.get('host') || 'tavariwave.online';
+          const baseUrl = `${protocol}://${host}`;
+          const imageUrl = `${baseUrl}/share-preview.jpg?v=2`;
+          
+          // Replace placeholders with dynamic absolute image URL
+          html = html.replace(/__SOCIAL_SHARE_IMAGE_URL__/g, imageUrl);
+          
+          res.setHeader("Content-Type", "text/html");
+          return res.send(html);
+        }
+      } catch (err) {
+        console.error("Error serving dynamic index.html:", err);
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
