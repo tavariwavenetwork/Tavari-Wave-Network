@@ -543,6 +543,40 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: "spa",
     });
+
+    // Custom middleware to serve index.html dynamically in development too,
+    // so the social share image works correctly in preview/dev containers.
+    app.get("*", async (req, res, next) => {
+      // Avoid intercepting API routes or specific assets
+      if (req.originalUrl.startsWith("/api") || req.originalUrl.includes(".")) {
+        return next();
+      }
+      try {
+        const indexPath = path.join(process.cwd(), "index.html");
+        if (fs.existsSync(indexPath)) {
+          let html = fs.readFileSync(indexPath, "utf8");
+          
+          // Let Vite transform the HTML (inject client script, HMR config, etc.)
+          html = await vite.transformIndexHtml(req.originalUrl, html);
+          
+          // Construct the fully-qualified absolute URL dynamically
+          const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+          const host = req.get('host') || 'tavariwave.online';
+          const baseUrl = `${protocol}://${host}`;
+          const imageUrl = `${baseUrl}/share-preview.jpg?v=2`;
+          
+          // Replace placeholders with dynamic absolute image URL
+          html = html.replace(/__SOCIAL_SHARE_IMAGE_URL__/g, imageUrl);
+          
+          res.setHeader("Content-Type", "text/html");
+          return res.send(html);
+        }
+      } catch (err) {
+        console.error("Error serving dev dynamic index.html:", err);
+      }
+      next();
+    });
+
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
