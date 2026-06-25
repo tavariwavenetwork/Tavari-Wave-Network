@@ -179,19 +179,19 @@ export default function AIMarketplace() {
   const [isActivating, setIsActivating] = useState<string | null>(null);
   const [selectedRobot, setSelectedRobot] = useState<Robot | null>(null);
 
-  // Subscribe to pending upgrade deposit requests for the current user
+  // Subscribe to pending upgrade transaction requests for the current user
   useEffect(() => {
     if (!user) return;
 
     const q = query(
-      collection(db, 'deposits'),
+      collection(db, 'transactions'),
       where('user_id', '==', user.uid),
-      where('is_robot_upgrade', '==', true),
-      where('status', '==', 'pending')
+      where('type', '==', 'ai_upgrade'),
+      where('status', '==', 'Pending')
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const pendingNames = snapshot.docs.map(doc => doc.data().robot_name);
+      const pendingNames = snapshot.docs.map(doc => doc.data().robot_name || doc.data().selected_bot);
       setPendingUpgrades(pendingNames);
     }, (error) => {
       console.error("Error subscribing to pending robot upgrades:", error);
@@ -302,7 +302,7 @@ export default function AIMarketplace() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: 'easeOut' }}
                 className={cn(
-                  "relative group rounded-[28px] sm:rounded-[36px] border transition-all duration-500 flex flex-col justify-between overflow-hidden backdrop-blur-xl p-3 sm:p-6 min-h-[290px] sm:min-h-[390px] h-full select-none hover:-translate-y-2",
+                  "relative group rounded-[20px] sm:rounded-[36px] border transition-all duration-500 flex flex-col justify-between overflow-hidden backdrop-blur-xl p-2 sm:p-6 aspect-square lg:aspect-auto lg:min-h-[390px] h-full select-none hover:-translate-y-2",
                   theme.bg,
                   theme.border,
                   theme.borderHover,
@@ -311,56 +311,56 @@ export default function AIMarketplace() {
               >
                 {/* Visual Status Indicator / Pulse effect */}
                 {isActive && (
-                  <div className={cn("absolute inset-0 border rounded-[28px] sm:rounded-[36px] pointer-events-none animate-[pulse_2s_infinite]", theme.activeBorder)} />
+                  <div className={cn("absolute inset-0 border rounded-[20px] sm:rounded-[36px] pointer-events-none animate-[pulse_2s_infinite]", theme.activeBorder)} />
                 )}
 
                 {/* Top Bar with Name & Learn More */}
-                <div className="flex justify-between items-center z-10 w-full mb-2">
-                  <span className={cn("text-[10px] sm:text-xs font-black tracking-wider uppercase", theme.primary)}>
+                <div className="flex justify-between items-center z-10 w-full mb-0.5 sm:mb-2">
+                  <span className={cn("text-[8px] sm:text-xs font-black tracking-wider uppercase", theme.primary)}>
                     {robot.name}
                   </span>
                   
                   <button
                     onClick={() => setSelectedRobot(robot)}
-                    className="px-2 py-0.5 sm:px-3 sm:py-1 bg-white/5 hover:bg-white/10 text-[7px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-300 hover:text-white border border-white/10 rounded-full transition-all duration-300 cursor-pointer"
+                    className="px-1.5 py-0.5 sm:px-3 sm:py-1 bg-white/5 hover:bg-white/10 text-[6px] sm:text-[9px] font-bold uppercase tracking-widest text-gray-300 hover:text-white border border-white/10 rounded-full transition-all duration-300 cursor-pointer"
                   >
                     Learn More
                   </button>
                 </div>
 
                 {/* Centered Robot Image Area - Significantly enlarged images */}
-                <div className="relative flex-1 flex flex-col items-center justify-center my-3 sm:my-5">
+                <div className="relative flex-1 flex flex-col items-center justify-center my-0.5 sm:my-5">
                   {/* Glowing Aura Behind Robot */}
                   <div className={cn(
-                    "absolute w-16 h-16 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-35 transition-all duration-500",
+                    "absolute w-14 h-14 sm:w-28 sm:h-28 rounded-full blur-2xl opacity-35 transition-all duration-500",
                     isActive ? theme.glow : "bg-gray-700/30"
                   )} />
                   
-                  {/* Robot Image */}
-                  <img 
-                    src={robot.image} 
-                    alt={robot.name} 
-                    className={cn(
-                      "w-20 h-20 sm:w-32 sm:h-32 object-contain relative z-10 transition-transform duration-500 group-hover:scale-105 filter drop-shadow-[0_12px_16px_rgba(0,0,0,0.6)]",
-                      isLocked && "grayscale opacity-40"
-                    )}
-                    referrerPolicy="no-referrer"
-                  />
+                  {/* Robot Image Wrapper with precise aspect ratio and responsive size */}
+                  <div className="relative z-10 w-[58%] sm:w-[72%] lg:w-[72%] aspect-square flex items-center justify-center">
+                    <img 
+                      src={robot.image} 
+                      alt={robot.name} 
+                      className={cn(
+                        "w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 filter drop-shadow-[0_12px_16px_rgba(0,0,0,0.6)]",
+                        isLocked && "grayscale opacity-40"
+                      )}
+                      referrerPolicy="no-referrer"
+                    />
 
-                  {/* Lock Overlay (icon only on image, clean locked state) */}
-                  {isLocked && !isPending && (
-                    <div className="absolute inset-0 flex items-center justify-center z-20">
-                      <div className="bg-black/80 p-2 sm:p-3 rounded-full border border-white/10 shadow-lg text-gray-300">
-                        <Lock size={12} className="sm:w-4 sm:h-4" />
+                    {/* Lock Overlay (icon floating overlay on the top left of the robot image) */}
+                    {isLocked && !isPending && (
+                      <div className="absolute top-0 left-0 -translate-x-1 -translate-y-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.5)] text-gray-300 w-[16%] h-[16%] min-w-[18px] min-h-[18px] max-w-[28px] max-h-[28px] flex items-center justify-center z-20">
+                        <Lock className="w-[60%] h-[60%]" />
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
 
                 {/* Bottom Stats & Button Panel */}
-                <div className="flex flex-col items-center gap-2 sm:gap-3 z-10 w-full mt-auto">
-                  <div className="text-center">
-                    <span className="text-[10px] sm:text-xs font-black tracking-wide text-white/95">
+                <div className="flex flex-col items-center gap-0.5 sm:gap-3 z-10 w-full mt-auto">
+                  <div className="text-center mb-0.5 sm:mb-0">
+                    <span className="text-[8px] sm:text-xs font-black tracking-wide text-white/95">
                       {robot.roi} Daily ROI
                     </span>
                   </div>
@@ -369,14 +369,14 @@ export default function AIMarketplace() {
                   <div className="w-full flex justify-center">
                     {isActive ? (
                       <span 
-                        className="w-full py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-xl text-[9px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                        className="w-full py-1 sm:py-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 rounded-xl text-[8px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1"
                       >
                         <Check size={10} className="sm:w-3 sm:h-3" />
                         Active
                       </span>
                     ) : isPending ? (
                       <span 
-                        className="w-full py-2 bg-yellow-400/10 text-yellow-500 border border-yellow-400/25 rounded-xl text-[9px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1.5"
+                        className="w-full py-1 sm:py-2 bg-yellow-400/10 text-yellow-500 border border-yellow-400/25 rounded-xl text-[8px] sm:text-xs font-black uppercase tracking-widest flex items-center justify-center gap-1"
                       >
                         <Clock size={10} className="animate-spin sm:w-3 sm:h-3" />
                         Pending
@@ -385,10 +385,10 @@ export default function AIMarketplace() {
                       <button 
                         onClick={() => handleActivate(robot)}
                         disabled={isActivating !== null}
-                        className="w-full py-2 sm:py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-[9px] sm:text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-95"
+                        className="w-full py-1 sm:py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black rounded-xl text-[8px] sm:text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer flex items-center justify-center gap-1 hover:scale-[1.02] active:scale-95"
                       >
                         {isActivating === robot.id ? (
-                          <div className="w-3 h-3 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                          <div className="w-2.5 h-2.5 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <Play size={10} fill="currentColor" className="sm:w-3 sm:h-3" />
                         )}
@@ -398,7 +398,7 @@ export default function AIMarketplace() {
                       <button 
                         onClick={() => handleUpgrade(robot)}
                         className={cn(
-                          "w-full py-2 sm:py-2.5 bg-gradient-to-r text-white font-black rounded-xl text-[9px] sm:text-xs uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-1.5 hover:scale-[1.02] active:scale-95",
+                          "w-full py-1 sm:py-2.5 bg-gradient-to-r text-white font-black rounded-xl text-[8px] sm:text-xs uppercase tracking-widest transition-all shadow-lg cursor-pointer flex items-center justify-center gap-1 hover:scale-[1.02] active:scale-95",
                           theme.btnGrad
                         )}
                       >

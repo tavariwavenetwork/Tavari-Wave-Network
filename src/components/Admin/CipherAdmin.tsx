@@ -366,6 +366,7 @@ export default function CipherAdmin() {
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
   const [investments, setInvestments] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  const [aiUpgrades, setAiUpgrades] = useState<any[]>([]);
   const [subscribers, setSubscribers] = useState<any[]>([]);
   const [supportTickets, setSupportTickets] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
@@ -585,8 +586,8 @@ export default function CipherAdmin() {
   }, [deposits, seenDepositIds]);
 
   const pendingRobotUpgradesCount = useMemo(() => {
-    return deposits.filter((dep: any) => dep.is_robot_upgrade && dep.status === 'pending').length;
-  }, [deposits]);
+    return aiUpgrades.filter((tx: any) => (tx.status || '').toLowerCase() === 'pending').length;
+  }, [aiUpgrades]);
 
   const pendingMiningCount = useMemo(() => {
     return miningUpgrades.filter((upgrade: any) => upgrade.status === 'pending').length;
@@ -743,6 +744,12 @@ export default function CipherAdmin() {
         setTransactions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       },
       (err) => console.error("Transactions sync failed:", err.message)
+    );
+    const unsubscribeAiUpgrades = onSnapshot(query(collection(db, 'transactions'), where('type', '==', 'ai_upgrade'), orderBy('created_at', 'desc')), 
+      (snap) => {
+        setAiUpgrades(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      },
+      (err) => console.error("AI Upgrades sync failed:", err.message)
     );
     const unsubscribeSettings = onSnapshot(doc(db, 'settings', 'system'), 
       (doc) => {
@@ -919,6 +926,7 @@ export default function CipherAdmin() {
       unsubscribeUIVersions();
       unsubscribeAdverts();
       unsubscribeTransactions();
+      unsubscribeAiUpgrades();
       if (unsubscribeNewsletterSubscribers) unsubscribeNewsletterSubscribers();
       if (intervalId) clearInterval(intervalId);
     };
@@ -1236,6 +1244,76 @@ export default function CipherAdmin() {
       toast.success("Deposit Declined");
     } catch (error) {
       toast.error("Process failed");
+    }
+  };
+
+  const approveAiUpgrade = async (tx: any) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const txRef = doc(db, 'transactions', tx.id);
+        const userRef = doc(db, 'users', tx.user_id);
+
+        const txDoc = await transaction.get(txRef);
+        if (!txDoc.exists()) throw new Error("Transaction missing");
+
+        const txData = txDoc.data();
+        if ((txData.status || '').toLowerCase() !== 'pending') throw new Error("Already processed");
+
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User missing");
+
+        const currentProfile = userDoc.data();
+        const unlocked = currentProfile.unlocked_robots || [];
+        const robotName = txData.robot_name || txData.selected_bot || 'AI 1.8';
+        const updatedUnlocked = unlocked.includes(robotName) ? unlocked : [...unlocked, robotName];
+
+        transaction.update(userRef, { 
+          unlocked_robots: updatedUnlocked
+        });
+
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: tx.user_id,
+          title: 'AI Trading Robot Unlocked! 🤖',
+          message: `Your payment of $${parseFloat(txData.amount || 0)} for ${robotName} has been verified and approved. You can now activate this robot in the AI Marketplace.`,
+          type: 'success',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+
+        transaction.update(txRef, { 
+          status: 'Active', 
+          updated_at: new Date().toISOString() 
+        });
+      });
+
+      toast.success("AI Bot Upgrade Approved!");
+    } catch (error: any) {
+      console.error("AI APPROVAL ERROR:", error);
+      toast.error("Process failed: " + error.message);
+    }
+  };
+
+  const rejectAiUpgrade = async (txId: string) => {
+    try {
+      await runTransaction(db, async (transaction) => {
+        const txRef = doc(db, 'transactions', txId);
+        const txDoc = await transaction.get(txRef);
+        if (!txDoc.exists()) throw new Error("Transaction missing");
+
+        const txData = txDoc.data();
+        if ((txData.status || '').toLowerCase() !== 'pending') throw new Error("Already processed");
+
+        transaction.update(txRef, { 
+          status: 'Rejected', 
+          updated_at: new Date().toISOString() 
+        });
+      });
+
+      toast.success("AI Bot Upgrade Rejected!");
+    } catch (error: any) {
+      console.error("AI REJECTION ERROR:", error);
+      toast.error("Process failed: " + error.message);
     }
   };
 
@@ -2436,63 +2514,82 @@ export default function CipherAdmin() {
               <table className="w-full text-left min-w-[1000px] border-collapse">
                 <thead>
                   <tr className="border-b border-white/5 bg-white/[0.01]">
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">User</th>
                     <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">User ID</th>
-                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Full Name</th>
-                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Username</th>
-                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Email</th>
-                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Selected Robot</th>
-                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Upgrade Price</th>
-                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Date/Time</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Selected AI Bot</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Amount</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Transaction ID</th>
+                    <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Date</th>
                     <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted">Status</th>
                     <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-aura-muted text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.02]">
-                  {deposits
-                    .filter((dep: any) => dep.is_robot_upgrade)
-                    .filter((dep: any) => {
+                  {aiUpgrades
+                    .filter((tx: any) => {
+                      const statusLower = (tx.status || '').toLowerCase();
                       if (aiMarketplaceFilter === 'all') return true;
-                      if (aiMarketplaceFilter === 'pending') return dep.status === 'pending';
-                      if (aiMarketplaceFilter === 'approved') return dep.status === 'approved';
-                      if (aiMarketplaceFilter === 'rejected') return dep.status === 'declined' || dep.status === 'rejected';
+                      if (aiMarketplaceFilter === 'pending') return statusLower === 'pending';
+                      if (aiMarketplaceFilter === 'approved') return statusLower === 'active' || statusLower === 'approved';
+                      if (aiMarketplaceFilter === 'rejected') return statusLower === 'rejected' || statusLower === 'declined';
                       return true;
                     })
-                    .map((dep: any) => {
-                      const u = getUserDetails(dep.user_id, dep.user_name);
-                      const matchedUser = users.find((usr: any) => usr?.id === dep.user_id);
+                    .map((tx: any) => {
+                      const u = getUserDetails(tx.user_id, tx.user_name);
+                      const matchedUser = users.find((usr: any) => usr?.id === tx.user_id);
                       const usernameVal = matchedUser?.username || 'n/a';
-                      const isApproved = dep.status === 'approved';
+                      const statusLower = (tx.status || '').toLowerCase();
+                      const isPending = statusLower === 'pending';
+                      const isActive = statusLower === 'active' || statusLower === 'approved';
+                      const isRejected = statusLower === 'rejected' || statusLower === 'declined';
+                      
+                      let statusBadge = "Pending";
+                      let statusBadgeColor = "bg-orange-500/10 text-orange-500 border border-orange-500/20";
+                      if (isActive) {
+                        statusBadge = "Active";
+                        statusBadgeColor = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                      } else if (isRejected) {
+                        statusBadge = "Rejected";
+                        statusBadgeColor = "bg-red-500/10 text-red-400 border border-red-500/20";
+                      }
+
                       return (
                         <tr 
-                          key={dep.id} 
+                          key={tx.id} 
                           className="group hover:bg-white/[0.02] transition-colors cursor-pointer text-white"
-                          onClick={() => { setSelectedTicket(dep); setTicketType('deposit'); }}
                         >
-                          <td className="px-6 py-4 font-mono text-[10px] text-gray-400">
-                            <span className="truncate max-w-[80px] block" title={dep.user_id}>{dep.user_id}</span>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold uppercase">{u.name}</span>
+                              <span className="text-[10px] text-aura-lime font-mono">@{usernameVal}</span>
+                            </div>
                           </td>
-                          <td className="px-6 py-4 text-xs font-bold uppercase truncate max-w-[120px]">{u.name}</td>
-                          <td className="px-6 py-4 text-xs text-aura-lime font-mono truncate max-w-[100px]">@{usernameVal}</td>
-                          <td className="px-6 py-4 text-xs text-aura-muted truncate max-w-[150px]">{u.email}</td>
-                          <td className="px-6 py-4 text-xs font-black uppercase tracking-wider text-cyan-400 truncate max-w-[180px]">{dep.robot_name || 'AI Robot'}</td>
-                          <td className="px-6 py-4 text-sm font-black font-serif italic">{formatCurrency(dep.amount || 0)}</td>
+                          <td className="px-6 py-4 font-mono text-[10px] text-gray-400">
+                            <span className="truncate max-w-[80px] block" title={tx.user_id}>{tx.user_id}</span>
+                          </td>
+                          <td className="px-6 py-4 text-xs font-black uppercase tracking-wider text-cyan-400 truncate max-w-[180px]">
+                            {tx.robot_name || tx.selected_bot || 'AI Bot'}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-black font-serif italic">{formatCurrency(tx.amount || 0)}</td>
+                          <td className="px-6 py-4 font-mono text-[10px] text-gray-400">
+                            <span className="truncate max-w-[100px] block" title={tx.reference || tx.id}>{tx.reference || tx.id}</span>
+                          </td>
                           <td className="px-6 py-4 text-[10px] text-gray-400">
-                            {dep.created_at ? new Date(dep.created_at).toLocaleString() : 'N/A'}
+                            {tx.created_at ? new Date(tx.created_at).toLocaleString() : 'N/A'}
                           </td>
                           <td className="px-6 py-4">
-                            <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded", 
-                              dep.status === 'pending' ? "bg-yellow-400/10 text-yellow-500" :
-                              isApproved ? "bg-aura-lime/10 text-aura-lime" : "bg-red-400/10 text-red-100"
-                            )}>{dep.status}</span>
+                            <span className={cn("text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded", statusBadgeColor)}>
+                              {statusBadge}
+                            </span>
                           </td>
                           <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                            {dep.status === 'pending' ? (
+                            {isPending ? (
                               <div className="flex gap-2 justify-end">
-                                <button onClick={() => declineDeposit(dep.id)} className="p-2 bg-red-400/10 text-red-400 hover:bg-red-400/10 rounded-lg transition-all" title="Decline"><X size={16} /></button>
-                                <button onClick={() => approveDeposit(dep)} className="p-2 bg-aura-lime/10 text-aura-lime hover:bg-aura-lime/10 rounded-lg transition-all" title="Approve"><CheckCircle size={16} /></button>
+                                <button onClick={() => rejectAiUpgrade(tx.id)} className="p-2 bg-red-400/10 text-red-400 hover:bg-red-500/20 rounded-lg transition-all" title="Reject"><X size={16} /></button>
+                                <button onClick={() => approveAiUpgrade(tx)} className="p-2 bg-aura-lime/10 text-aura-lime hover:bg-emerald-500/20 rounded-lg transition-all" title="Approve"><CheckCircle size={16} /></button>
                               </div>
                             ) : (
-                              <span className="text-[10px] font-bold text-gray-500 uppercase">Processed</span>
+                              <span className="text-[10px] font-bold text-gray-500 uppercase text-aura-muted">Processed</span>
                             )}
                           </td>
                         </tr>

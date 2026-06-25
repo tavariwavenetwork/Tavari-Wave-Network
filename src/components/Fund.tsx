@@ -530,27 +530,55 @@ export default function Fund() {
     setIsSubmitting(true);
     try {
       const amount = parseFloat(depositAmount);
-      const newDeposit = {
-        user_id: user.uid,
-        user_name: profile.name,
-        amount,
-        method: depositMethod,
-        reference: depositTxId,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-        ...(isRobotUpgrade ? { is_robot_upgrade: true, robot_name: robotName } : {})
-      };
-      await addDoc(collection(db, 'deposits'), newDeposit);
-      setShowDepositSuccess(true);
-      toast.success("Deposit request logged");
-      
-      broadcastActivity(
-        profile.name || "Client",
-        isRobotUpgrade ? `Upgraded to ${robotName}` : "Initiated Deposit",
-        `$${amount.toLocaleString()}`,
-        true,
-        "💳"
-      );
+      if (isRobotUpgrade) {
+        // Create an AI Bot Upgrade transaction in the transactions collection
+        const newTransaction = {
+          user_id: user.uid,
+          user_name: profile.name || user.email,
+          type: 'ai_upgrade',
+          amount,
+          method: depositMethod,
+          reference: depositTxId,
+          status: 'Pending',
+          created_at: new Date().toISOString(),
+          robot_name: robotName,
+          selected_bot: robotName,
+          selectedBot: robotName,
+          description: `AI Bot Upgrade — ${robotName}`
+        };
+        await addDoc(collection(db, 'transactions'), newTransaction);
+        setShowDepositSuccess(true);
+        toast.success("AI Bot Upgrade request submitted");
+        
+        broadcastActivity(
+          profile.name || "Client",
+          `Upgraded to ${robotName}`,
+          `$${amount.toLocaleString()}`,
+          true,
+          "🤖"
+        );
+      } else {
+        const newDeposit = {
+          user_id: user.uid,
+          user_name: profile.name,
+          amount,
+          method: depositMethod,
+          reference: depositTxId,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        };
+        await addDoc(collection(db, 'deposits'), newDeposit);
+        setShowDepositSuccess(true);
+        toast.success("Deposit request logged");
+        
+        broadcastActivity(
+          profile.name || "Client",
+          "Initiated Deposit",
+          `$${amount.toLocaleString()}`,
+          true,
+          "💳"
+        );
+      }
     } catch (error) {
        toast.error("Failed to submit request");
     } finally {

@@ -272,6 +272,16 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                     <div className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-75" />
                   </div>
                 </div>
+
+                {/* Info block next to image */}
+                <div className="flex flex-col items-start text-left">
+                  <span className="text-[7px] lg:text-[8px] font-black uppercase tracking-widest text-emerald-400">ACTIVE SYSTEM</span>
+                  <span className="text-[10px] lg:text-xs font-bold text-white uppercase tracking-wider">{activeRobotName}</span>
+                  {/* Mobile ONLY: Expected Daily Returns directly under the trading robot */}
+                  <span className="lg:hidden text-[8px] font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap mt-0.5">
+                    {formatCurrency(yieldSum)}/Day
+                  </span>
+                </div>
             </div>
 
             <div className="absolute top-1 right-1 lg:top-4 lg:right-6 flex items-center gap-2">

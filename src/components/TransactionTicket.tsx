@@ -85,6 +85,8 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
     displayType = 'Signup Welcome Bonus';
   } else if (tx.type === 'fee') {
     displayType = tx.description || 'System Protocol Fee';
+  } else if (tx.type === 'ai_upgrade' || tx.type === 'ai_bot_upgrade') {
+    displayType = 'AI Bot Upgrade';
   }
 
   // Determine status display and behavior
@@ -95,11 +97,11 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
   else if (statusLower === 'pending') statusText = 'Pending';
   else if (statusLower === 'completed') statusText = 'Completed';
   else if (statusLower === 'active') {
-    statusText = tx.type === 'investment' ? 'Active' : 'Approved';
+    statusText = (tx.type === 'investment' || tx.type === 'ai_upgrade' || tx.type === 'ai_bot_upgrade') ? 'Active' : 'Approved';
   } else if (statusLower === 'inactive') {
     statusText = 'Inactive';
-  } else if (statusLower === 'declined') {
-    statusText = 'Declined';
+  } else if (statusLower === 'declined' || statusLower === 'rejected') {
+    statusText = 'Rejected';
   } else if (statusLower === 'terminated') {
     statusText = 'Terminated';
   }
@@ -164,6 +166,9 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
   } else if (tx.type === 'fee') {
     iconComponent = <MinusCircle size={18} />;
     iconBg = 'bg-red-500/10 text-red-500';
+  } else if (tx.type === 'ai_upgrade' || tx.type === 'ai_bot_upgrade') {
+    iconComponent = <Zap size={18} />;
+    iconBg = 'bg-amber-500/10 text-amber-400';
   }
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -317,6 +322,20 @@ export const TransactionTicket: React.FC<TransactionTicketProps> = ({ tx, curren
                 <div id={`tx-conv-type-group-${tx.id}`}>
                   <p className="text-[8px] font-black uppercase tracking-widest text-[#a855f7] flex items-center gap-1"><Tag size={8} /> Exchange Protocol</p>
                   <p className="text-[11px] font-bold text-white mt-0.5 uppercase">PTS → USD Converter</p>
+                </div>
+              </>
+            )}
+
+            {/* AI BOT UPGRADE DETAILS */}
+            {(tx.type === 'ai_upgrade' || tx.type === 'ai_bot_upgrade') && (
+              <>
+                <div id={`tx-ai-upgrade-amount-group-${tx.id}`}>
+                  <p className="text-[8px] font-black uppercase tracking-widest text-aura-muted flex items-center gap-1"><DollarSign size={8} /> Upgrade Fee</p>
+                  <p className="text-[11px] font-bold text-white mt-0.5">{displayAmount}</p>
+                </div>
+                <div id={`tx-ai-upgrade-bot-group-${tx.id}`}>
+                  <p className="text-[8px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1"><Tag size={8} /> Selected Bot</p>
+                  <p className="text-[11px] font-bold text-white uppercase mt-0.5">{tx.plan_name || tx.robot_name || tx.selected_bot || 'Robot'}</p>
                 </div>
               </>
             )}
