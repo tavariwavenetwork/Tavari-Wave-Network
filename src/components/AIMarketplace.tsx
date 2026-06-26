@@ -79,7 +79,7 @@ const ROBOTS: Robot[] = [
     version: 'v1.8.4-alpha',
     roi: '0.5%',
     roiRate: 0.005,
-    upgradePrice: 5,
+    upgradePrice: 7.5,
     image: 'https://i.imgur.com/qkFHhDR.png',
     description: 'Entry-level institutional high-frequency trading algorithm with microsecond arbitrage execution.',
     speed: '0.4ms latency',
@@ -106,7 +106,7 @@ const ROBOTS: Robot[] = [
     version: 'v2.0.1-stable',
     roi: '1.0%',
     roiRate: 0.01,
-    upgradePrice: 7,
+    upgradePrice: 12,
     image: 'https://i.imgur.com/JGTKlCJ.png',
     description: 'Neural-network based trading engine optimized for G10 currency liquidity and spread arbitrage.',
     speed: '0.2ms latency',
@@ -133,7 +133,7 @@ const ROBOTS: Robot[] = [
     version: 'v2.5.0-beta',
     roi: '1.5%',
     roiRate: 0.015,
-    upgradePrice: 12,
+    upgradePrice: 15,
     image: 'https://i.imgur.com/3DpE79P.png',
     description: 'Advanced multi-agent deep learning model optimized for cross-border treasury swaps and volatility tracking.',
     speed: '0.1ms latency',
@@ -160,7 +160,7 @@ const ROBOTS: Robot[] = [
     version: 'v3.0.0-enterprise',
     roi: '2.5%',
     roiRate: 0.025,
-    upgradePrice: 15,
+    upgradePrice: 20,
     image: 'https://i.imgur.com/dZqi2MZ.png',
     description: 'The pinnacle of automated trading technology. Employs quantum-resistant predictive analysis and sovereign hedging pools.',
     speed: '0.05ms latency',
@@ -611,8 +611,8 @@ Thank you.`;
                         readOnly 
                         value={
                           isNigeria 
-                            ? `$${selectedRobot.upgradePrice}.00 (₦${(selectedRobot.upgradePrice * exchangeRate).toLocaleString()})`
-                            : `$${selectedRobot.upgradePrice}.00`
+                            ? `${formatCurrency(selectedRobot.upgradePrice)} (₦${(selectedRobot.upgradePrice * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                            : formatCurrency(selectedRobot.upgradePrice)
                         }
                         className="w-full bg-[#030406]/90 border border-white/10 rounded-2xl py-4 px-5 text-sm sm:text-base font-bold text-gray-300 outline-none select-none cursor-not-allowed"
                       />
@@ -799,7 +799,7 @@ Thank you.`;
                   </div>
                   <div className="flex justify-between border-b border-white/5 pb-2">
                     <span className="text-aura-muted uppercase font-bold">AMOUNT:</span>
-                    <span className="text-white font-black">${selectedRobot.upgradePrice}.00</span>
+                    <span className="text-white font-black">{formatCurrency(selectedRobot.upgradePrice)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-aura-muted uppercase font-bold">STATUS:</span>

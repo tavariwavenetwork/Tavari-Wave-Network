@@ -495,160 +495,280 @@ function AdminROIEngineCard({ userValue, userInvestments, plans, onSaveOverride,
     return () => clearInterval(interval);
   }, [userValue.roi_cycle_start, userValue.created_at, activeCount, yieldSum, plans, userInvestments]);
 
+  // Modal control state
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
   if (activeCount === 0) return null;
 
   return (
-    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4 hover:border-aura-lime/20 hover:bg-white/[0.03] transition-all relative overflow-hidden flex flex-col justify-between">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-aura-lime/5 blur-2xl rounded-full pointer-events-none" />
+    <>
+      {/* Compact Collapsible Card */}
+      <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4 hover:border-aura-lime/20 hover:bg-white/[0.03] transition-all relative overflow-hidden flex flex-col justify-between">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-aura-lime/5 blur-2xl rounded-full pointer-events-none" />
 
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-aura-lime flex items-center justify-center text-black shrink-0 shadow-[0_0_15px_rgba(168,251,60,0.2)]">
-              <Zap size={14} className="animate-pulse" />
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-aura-lime flex items-center justify-center text-black shrink-0 shadow-[0_0_15px_rgba(168,251,60,0.2)]">
+                <Zap size={14} className="animate-pulse" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-black uppercase text-white truncate max-w-[150px]">{userValue.name}</h4>
+                <span className="text-[8px] text-aura-lime font-black uppercase tracking-wider block">
+                  {activeCount} active node{activeCount > 1 ? 's' : ''} • {userValue.email}
+                </span>
+              </div>
             </div>
-            <div className="min-w-0">
-              <h4 className="text-xs font-black uppercase text-white truncate max-w-[150px]">{userValue.name}</h4>
-              <span className="text-[8px] text-aura-lime font-black uppercase tracking-wider block">
-                {activeCount} active node{activeCount > 1 ? 's' : ''} • {userValue.email}
+            <div className="text-left sm:text-right">
+              <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Time Remaining</p>
+              <p className="text-xs font-black font-mono text-white mt-0.5">{timeLeft}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-[9px] font-bold text-white bg-white/[0.01] px-3 py-1.5 rounded-xl border border-white/5">
+            <div className="flex items-center gap-1">
+              <span className="text-aura-muted uppercase text-[8px] font-black">Bot:</span>
+              <span className="text-white uppercase font-black">
+                {(() => {
+                  const activeBot = userValue?.active_robot || "Free AI Bot";
+                  return activeBot.startsWith('AI ') ? `AI Bot ${activeBot.slice(3)}` : activeBot;
+                })()}
               </span>
             </div>
-          </div>
-          <div className="text-left sm:text-right">
-            <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Time Remaining</p>
-            <p className="text-xs font-black font-mono text-white mt-0.5">{timeLeft}</p>
-          </div>
-        </div>
-
-        <div className="space-y-2 bg-white/[0.01] p-3 rounded-xl border border-white/5">
-          <div className="flex justify-between items-center text-[9px] font-bold text-white">
-            <span className="text-emerald-400 font-black">{formatCurrency(liveEarnings)} / {formatCurrency(yieldSum)} Day</span>
-            <span className="font-mono text-aura-muted">({progress.toFixed(1)}%)</span>
-          </div>
-          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-            <div 
-              style={{ width: `${progress}%` }}
-              className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-1">
-          {userInvestments.map(inv => (
-            <div key={inv.id} className="text-[8px] font-bold uppercase px-2 py-0.5 bg-white/5 text-gray-300 border border-white/5 rounded">
-              {inv.plan_name}: <span className="text-white font-black">{formatCurrency(inv.amount)}</span>
+            <div className="flex items-center gap-1">
+              <span className="text-aura-muted uppercase text-[8px] font-black">Est:</span>
+              <span className="text-emerald-400 font-black">{formatCurrency(yieldSum)} / Day</span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Individual ROI Override Panel */}
-      <div className="pt-4 border-t border-white/5 space-y-4">
-        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-aura-muted">
-          <Sliders size={12} className="text-aura-lime" />
-          <span>Individual ROI Override</span>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 bg-white/[0.01] p-3 rounded-2xl border border-white/5">
-          <div>
-            <span className="text-[8px] text-aura-muted font-bold uppercase tracking-wider block">Current Effective ROI</span>
-            <span className="text-sm font-black text-aura-lime mt-1 block">
-              {(getEffectiveRoiRate(userValue, userInvestments[0]?.amount || 0, plans, globalRoiConfig) * 100).toFixed(2)}%
-            </span>
           </div>
-          <div>
-            <span className="text-[8px] text-aura-muted font-bold uppercase tracking-wider block">Active AI Bot</span>
-            <span className="text-sm font-black text-white mt-1 block">
-              {(() => {
-                const activeBot = userValue?.active_robot || "Free AI Bot";
-                return activeBot.startsWith('AI ') ? `AI Bot ${activeBot.slice(3)}` : activeBot;
-              })()}
-            </span>
-          </div>
-        </div>
 
-        <div className="flex items-center justify-between bg-white/[0.01] p-3 rounded-2xl border border-white/5">
-          <div className="space-y-0.5">
-            <span className="text-[9px] text-white font-black uppercase tracking-wider block">Use Global ROI</span>
-            <span className="text-[8px] text-aura-muted font-semibold block">
-              {useGlobal ? "Using Global AI Bot ROI" : "Using Custom Individual ROI"}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setUseGlobal(!useGlobal)}
-            className={cn(
-              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
-              useGlobal ? "bg-aura-lime" : "bg-white/10"
-            )}
-          >
-            <span
-              className={cn(
-                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
-                useGlobal ? "translate-x-5" : "translate-x-0"
-              )}
-            />
-          </button>
-        </div>
-
-        {/* Override controls */}
-        <div className={cn("space-y-3 transition-all duration-300", useGlobal ? "opacity-50 pointer-events-none" : "opacity-100")}>
-          <div className="flex justify-between items-center">
-            <span className="text-[9px] text-white font-black uppercase tracking-wider">Override ROI (%)</span>
-            <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg border border-white/5 w-20">
-              <input
-                type="text"
-                disabled={useGlobal}
-                value={overridePct}
-                onChange={handleTextChange}
-                onBlur={handleBlur}
-                className="w-full bg-transparent text-right font-mono text-xs font-black text-white focus:outline-none"
+          <div className="space-y-1.5 bg-white/[0.01] p-3 rounded-xl border border-white/5">
+            <div className="flex justify-between items-center text-[9px] font-bold text-white">
+              <span className="text-emerald-400 font-black">{formatCurrency(liveEarnings)} / {formatCurrency(yieldSum)} Day</span>
+              <span className="font-mono text-aura-muted">({progress.toFixed(1)}%)</span>
+            </div>
+            <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+              <div 
+                style={{ width: `${progress}%` }}
+                className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
               />
-              <span className="text-[10px] text-aura-muted font-bold">%</span>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <input
-              type="range"
-              min="0.00"
-              max="2.50"
-              step="0.01"
-              disabled={useGlobal}
-              value={useGlobal ? "0.00" : overridePct}
-              onChange={handleSliderChange}
-              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-aura-lime focus:outline-none"
-            />
-            <div className="flex justify-between text-[8px] font-bold text-aura-muted uppercase tracking-wider">
-              <span>0.00%</span>
-              <span>1.25%</span>
-              <span>2.50%</span>
             </div>
           </div>
         </div>
 
-        {/* Save changes button */}
         <button
-          onClick={handleSaveClick}
-          disabled={isSaving}
-          className={cn(
-            "w-full py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 border",
-            isSaving
-              ? "bg-white/5 border-white/5 text-aura-muted cursor-not-allowed"
-              : "bg-white/5 hover:bg-aura-lime hover:text-aura-black hover:border-aura-lime border-white/10 text-white shadow-lg"
-          )}
+          onClick={() => setIsOpen(true)}
+          className="w-full py-2 bg-white/5 hover:bg-aura-lime hover:text-aura-black border border-white/10 hover:border-aura-lime text-[9px] font-black uppercase tracking-widest text-white transition-all duration-300 rounded-2xl shadow-lg flex items-center justify-center gap-1.5"
         >
-          {isSaving ? (
-            <>
-              <div className="w-3 h-3 border-2 border-aura-lime border-t-transparent rounded-full animate-spin" />
-              <span>Saving...</span>
-            </>
-          ) : (
-            <span>Save Changes</span>
-          )}
+          <Sliders size={12} />
+          <span>View Details & Override</span>
         </button>
       </div>
-    </div>
+
+      {/* Premium Modal Popup */}
+      <AnimatePresence>
+        {isOpen && (
+          <div 
+            className="fixed inset-0 bg-[#020202]/90 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto"
+            onClick={() => setIsOpen(false)}
+          >
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="bg-[#0c0c0e] border border-white/10 rounded-[40px] w-full max-w-2xl p-6 sm:p-8 space-y-6 relative my-8 overflow-hidden text-left shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Close Button */}
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="absolute top-6 right-6 p-2 text-aura-muted hover:text-white hover:bg-white/5 rounded-full transition-all border border-white/5"
+              >
+                <X size={20} />
+              </button>
+
+              {/* Header */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 bg-aura-lime/10 text-aura-lime rounded-full border border-aura-lime/20">
+                    Individual ROI Override Protocol
+                  </span>
+                  <span className="text-[10px] font-mono text-aura-muted">
+                    ID: {userValue.id?.substring(0, 16)}...
+                  </span>
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+                  <Sliders className="text-aura-lime" size={20} />
+                  <span>{userValue.name}</span>
+                </h3>
+                <p className="text-xs text-aura-muted uppercase tracking-wider font-bold">
+                  Active node management for {userValue.email}
+                </p>
+              </div>
+
+              {/* Node Status Summary */}
+              <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[8px] text-aura-lime font-black uppercase tracking-wider block">
+                      Node Network Lifecycle
+                    </span>
+                    <span className="text-xs font-black text-white uppercase mt-1 block">
+                      {activeCount} active node{activeCount > 1 ? 's' : ''} configured
+                    </span>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Time Remaining</p>
+                    <p className="text-xs font-black font-mono text-white mt-0.5">{timeLeft}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 bg-white/[0.01] p-3 rounded-xl border border-white/5">
+                  <div className="flex justify-between items-center text-[9px] font-bold text-white">
+                    <span className="text-emerald-400 font-black">{formatCurrency(liveEarnings)} / {formatCurrency(yieldSum)} Day</span>
+                    <span className="font-mono text-aura-muted">({progress.toFixed(1)}%)</span>
+                  </div>
+                  <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div 
+                      style={{ width: `${progress}%` }}
+                      className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {userInvestments.map(inv => (
+                    <div key={inv.id} className="text-[8px] font-bold uppercase px-2.5 py-1 bg-white/5 text-gray-300 border border-white/5 rounded-lg">
+                      {inv.plan_name}: <span className="text-white font-black">{formatCurrency(inv.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Individual ROI Override Panel */}
+              <div className="pt-4 border-t border-white/5 space-y-4">
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-aura-muted">
+                  <Sliders size={12} className="text-aura-lime" />
+                  <span>Individual ROI Settings</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 bg-white/[0.01] p-3 rounded-2xl border border-white/5">
+                  <div>
+                    <span className="text-[8px] text-aura-muted font-bold uppercase tracking-wider block">Current Effective ROI</span>
+                    <span className="text-sm font-black text-aura-lime mt-1 block">
+                      {(getEffectiveRoiRate(userValue, userInvestments[0]?.amount || 0, plans, globalRoiConfig) * 100).toFixed(2)}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[8px] text-aura-muted font-bold uppercase tracking-wider block">Active AI Bot</span>
+                    <span className="text-sm font-black text-white mt-1 block">
+                      {(() => {
+                        const activeBot = userValue?.active_robot || "Free AI Bot";
+                        return activeBot.startsWith('AI ') ? `AI Bot ${activeBot.slice(3)}` : activeBot;
+                      })()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-white/[0.01] p-4 rounded-2xl border border-white/5">
+                  <div className="space-y-0.5">
+                    <span className="text-[9px] text-white font-black uppercase tracking-wider block">Use Global ROI</span>
+                    <span className="text-[8px] text-aura-muted font-semibold block">
+                      {useGlobal ? "Using Global AI Bot ROI" : "Using Custom Individual ROI"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setUseGlobal(!useGlobal)}
+                    className={cn(
+                      "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+                      useGlobal ? "bg-aura-lime" : "bg-white/10"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                        useGlobal ? "translate-x-5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {/* Override controls */}
+                <div className={cn("space-y-3 transition-all duration-300", useGlobal ? "opacity-40 pointer-events-none" : "opacity-100")}>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] text-white font-black uppercase tracking-wider">Override ROI (%)</span>
+                    <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg border border-white/5 w-20">
+                      <input
+                        type="text"
+                        disabled={useGlobal}
+                        value={overridePct}
+                        onChange={handleTextChange}
+                        onBlur={handleBlur}
+                        className="w-full bg-transparent text-right font-mono text-xs font-black text-white focus:outline-none"
+                      />
+                      <span className="text-[10px] text-aura-muted font-bold">%</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <input
+                      type="range"
+                      min="0.00"
+                      max="2.50"
+                      step="0.01"
+                      disabled={useGlobal}
+                      value={useGlobal ? "0.00" : overridePct}
+                      onChange={handleSliderChange}
+                      className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-aura-lime focus:outline-none"
+                    />
+                    <div className="flex justify-between text-[8px] font-bold text-aura-muted uppercase tracking-wider">
+                      <span>0.00%</span>
+                      <span>1.25%</span>
+                      <span>2.50%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Save changes button */}
+                <button
+                  onClick={handleSaveClick}
+                  disabled={isSaving}
+                  className={cn(
+                    "w-full py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 border",
+                    isSaving
+                      ? "bg-white/5 border-white/5 text-aura-muted cursor-not-allowed"
+                      : "bg-white/5 hover:bg-aura-lime hover:text-aura-black hover:border-aura-lime border-white/10 text-white shadow-lg"
+                  )}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-aura-lime border-t-transparent rounded-full animate-spin" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <span>Save Changes</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
   );
 }
 
