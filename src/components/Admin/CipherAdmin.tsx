@@ -21,6 +21,7 @@ import {
   Building2,
   ArrowDownLeft,
   Settings,
+  Sliders,
   Lock,
   Shield,
   Ban,
@@ -69,7 +70,7 @@ import {
   limit
 } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi, isLegacyUser } from '../../contexts/AuthContext';
+import { useAuth, getRoiByAmountDynamic, calculateExpectedDailyRoi, isLegacyUser, getEffectiveRoiRate } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { logAudit } from '../../lib/auth_security';
 
@@ -104,14 +105,289 @@ const AdminNotificationItem = ({ email, username, date, type }: { email: string,
   );
 };
 
+interface GlobalRoiControlsProps {
+  roiConfig: any;
+  onSave: (botKey: string, percentage: number) => Promise<void>;
+}
+
+function GlobalRoiControls({ roiConfig, onSave }: GlobalRoiControlsProps) {
+  const bots = [
+    { name: 'Free AI Bot', key: 'free_bot', defaultVal: 0.005 },
+    { name: 'AI Bot 1.8', key: 'ai_1_8', defaultVal: 0.005 },
+    { name: 'AI Bot 2.0', key: 'ai_2_0', defaultVal: 0.01 },
+    { name: 'AI Bot 2.5', key: 'ai_2_5', defaultVal: 0.015 },
+    { name: 'AI Bot 3.0', key: 'ai_3_0', defaultVal: 0.025 }
+  ];
+
+  return (
+    <div className="p-6 bg-white/5 border border-white/5 rounded-[40px] space-y-6 relative overflow-hidden backdrop-blur-xl">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl rounded-full pointer-events-none" />
+      <div>
+        <h3 className="text-sm font-black uppercase tracking-[0.2em] text-white flex items-center gap-2">
+          <Cpu size={16} className="text-aura-lime animate-pulse" /> Global AI ROI Controls
+        </h3>
+        <p className="text-[10px] text-aura-muted uppercase tracking-widest mt-1">
+          Adjust the daily ROI rates for all active users running each specific bot
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        {bots.map((bot) => {
+          const currentValDecimal = roiConfig?.[bot.key] !== undefined ? roiConfig[bot.key] : bot.defaultVal;
+          // Percentage is decimal * 100
+          const currentPercentage = currentValDecimal * 100;
+
+          return (
+            <SingleBotControl 
+              key={bot.key}
+              name={bot.name}
+              botKey={bot.key}
+              currentPercentage={currentPercentage}
+              onSave={onSave}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function SingleBotControl({ name, botKey, currentPercentage, onSave }: { name: string, botKey: string, currentPercentage: number, onSave: (botKey: string, percentage: number) => Promise<void>, key?: any }) {
+  const [val, setVal] = useState<string>(currentPercentage.toFixed(2));
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setVal(currentPercentage.toFixed(2));
+  }, [currentPercentage]);
+
+  const numericVal = parseFloat(val) || 0;
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sliderVal = parseFloat(e.target.value);
+    setVal(sliderVal.toFixed(2));
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value;
+    raw = raw.replace(/[^0-9.]/g, '');
+    setVal(raw);
+  };
+
+  const handleBlur = () => {
+    let parsed = parseFloat(val);
+    if (isNaN(parsed)) parsed = 0;
+    parsed = Math.max(0, Math.min(2.5, parsed));
+    setVal(parsed.toFixed(2));
+  };
+
+  const handleSaveClick = async () => {
+    let parsed = parseFloat(val);
+    if (isNaN(parsed)) parsed = 0;
+    parsed = Math.max(0, Math.min(2.5, parsed));
+    setIsSaving(true);
+    try {
+      await onSave(botKey, parsed);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl flex flex-col justify-between space-y-4 relative overflow-hidden group">
+      <div className="space-y-1">
+        <h4 className="text-xs font-black uppercase text-white tracking-wider">{name}</h4>
+        <div className="flex justify-between items-center text-[10px] text-aura-muted">
+          <span>Current ROI</span>
+          <span className="font-mono text-white font-black bg-white/5 px-2 py-0.5 rounded text-xs">{currentPercentage.toFixed(2)}%</span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <input 
+            type="range"
+            min="0.00"
+            max="2.50"
+            step="0.01"
+            value={numericVal}
+            onChange={handleSliderChange}
+            className="w-full accent-aura-lime bg-white/10 h-1 rounded-lg cursor-pointer"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <input 
+              type="text"
+              value={val}
+              onChange={handleTextChange}
+              onBlur={handleBlur}
+              className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-2 px-3 text-xs font-black transition-all outline-none text-white focus:border-aura-lime/50 text-right pr-6"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-aura-muted">%</span>
+          </div>
+          <button
+            onClick={handleSaveClick}
+            disabled={isSaving}
+            className="px-3 py-2 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-wider text-[9px] rounded-xl disabled:opacity-30 transition-all flex items-center justify-center min-w-[50px] cursor-pointer"
+          >
+            {isSaving ? (
+              <RefreshCw size={12} className="animate-spin" />
+            ) : (
+              'Save'
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface IndividualRoiOverrideProps {
+  userValue: any;
+  onSaveOverride: (userId: string, enabled: boolean, percentage: number) => Promise<void>;
+}
+
+function IndividualRoiOverride({ userValue, onSaveOverride }: IndividualRoiOverrideProps) {
+  const isEnabled = userValue.roi_override_enabled === true;
+  const currentOverrideDecimal = typeof userValue.roi_override === 'number' ? userValue.roi_override : 0.005;
+  const currentPercentage = currentOverrideDecimal * 100;
+
+  const [enabled, setEnabled] = useState(isEnabled);
+  const [val, setVal] = useState<string>(currentPercentage.toFixed(2));
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setEnabled(userValue.roi_override_enabled === true);
+    const ovDecimal = typeof userValue.roi_override === 'number' ? userValue.roi_override : 0.005;
+    setVal((ovDecimal * 100).toFixed(2));
+  }, [userValue.roi_override_enabled, userValue.roi_override]);
+
+  const numericVal = parseFloat(val) || 0;
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sliderVal = parseFloat(e.target.value);
+    setVal(sliderVal.toFixed(2));
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value;
+    raw = raw.replace(/[^0-9.]/g, '');
+    setVal(raw);
+  };
+
+  const handleBlur = () => {
+    let parsed = parseFloat(val);
+    if (isNaN(parsed)) parsed = 0;
+    parsed = Math.max(0, Math.min(2.5, parsed));
+    setVal(parsed.toFixed(2));
+  };
+
+  const handleSaveClick = async () => {
+    let parsed = parseFloat(val);
+    if (isNaN(parsed)) parsed = 0;
+    parsed = Math.max(0, Math.min(2.5, parsed));
+    setIsSaving(true);
+    try {
+      await onSaveOverride(userValue.id, enabled, parsed);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="p-6 bg-white/5 border border-white/5 rounded-3xl space-y-4 relative overflow-hidden backdrop-blur-xl">
+      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 blur-2xl rounded-full pointer-events-none" />
+      <div>
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2">
+          <Zap size={12} className="text-blue-400" /> Individual ROI Override
+        </h4>
+        <p className="text-[8px] text-aura-muted uppercase tracking-widest mt-1">
+          Override the global bot ROI for this specific user only
+        </p>
+      </div>
+
+      <div className="space-y-4 pt-2">
+        <div className="flex justify-between items-center bg-white/[0.01] border border-white/5 p-3 rounded-xl">
+          <span className="text-[10px] font-bold text-white/80 uppercase">Enable Override</span>
+          <button
+            type="button"
+            onClick={() => setEnabled(!enabled)}
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+              enabled ? "bg-blue-500" : "bg-white/10"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                enabled ? "translate-x-5" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
+
+        {enabled && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-[10px] text-aura-muted">
+              <span>Override ROI Value</span>
+              <span className="font-mono text-white font-black bg-white/5 px-2 py-0.5 rounded text-xs">
+                {numericVal.toFixed(2)}%
+              </span>
+            </div>
+
+            <input 
+              type="range"
+              min="0.00"
+              max="2.50"
+              step="0.01"
+              value={numericVal}
+              onChange={handleSliderChange}
+              className="w-full accent-blue-500 bg-white/10 h-1 rounded-lg cursor-pointer"
+            />
+
+            <div className="relative">
+              <input 
+                type="text"
+                value={val}
+                onChange={handleTextChange}
+                onBlur={handleBlur}
+                className="w-full bg-white/[0.02] border border-white/10 rounded-xl py-3 px-3 text-xs font-black transition-all outline-none text-white focus:border-blue-500/50 text-right pr-8"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-aura-muted">%</span>
+            </div>
+          </div>
+        )}
+
+        <button
+          onClick={handleSaveClick}
+          disabled={isSaving}
+          className="w-full py-3 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-[9px] rounded-xl disabled:opacity-30 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:shadow-primary/10"
+        >
+          {isSaving ? (
+            <>
+              <RefreshCw size={12} className="animate-spin" />
+              <span>Saving Override...</span>
+            </>
+          ) : (
+            <span>Save Override</span>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface AdminROIEngineCardProps {
   userValue: any;
   userInvestments: any[];
   plans: any[];
+  onSaveOverride: (userId: string, enabled: boolean, percentage: number) => Promise<void>;
+  globalRoiConfig?: any;
   key?: any;
 }
 
-function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngineCardProps) {
+function AdminROIEngineCard({ userValue, userInvestments, plans, onSaveOverride, globalRoiConfig }: AdminROIEngineCardProps) {
   const activeCount = userInvestments.length;
   const lastValidRoiRef = React.useRef<number>(0);
 
@@ -119,7 +395,9 @@ function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngin
     const rawRoi = calculateExpectedDailyRoi(
       userInvestments,
       userValue?.withdraw_methods?.compounded_amounts || userValue?.compounded_amounts,
-      plans || []
+      plans || [],
+      userValue,
+      globalRoiConfig
     );
     if (rawRoi > 0) {
       lastValidRoiRef.current = rawRoi;
@@ -129,11 +407,55 @@ function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngin
       return 0;
     }
     return lastValidRoiRef.current || 0;
-  }, [userInvestments, userValue?.withdraw_methods?.compounded_amounts, userValue?.compounded_amounts, plans, activeCount]);
+  }, [userInvestments, userValue?.withdraw_methods?.compounded_amounts, userValue?.compounded_amounts, plans, activeCount, userValue, globalRoiConfig]);
 
   const [progress, setProgress] = useState(0);
   const [timeLeft, setTimeLeft] = useState("24:00:00");
   const [liveEarnings, setLiveEarnings] = useState(0);
+
+  // Individual override state
+  const isOverrideEnabled = userValue?.roi_override_enabled === true;
+  const [useGlobal, setUseGlobal] = useState(!isOverrideEnabled);
+  const initialOverrideVal = typeof userValue?.roi_override === 'number' ? userValue.roi_override * 100 : 0.50;
+  const [overridePct, setOverridePct] = useState<string>(initialOverrideVal.toFixed(2));
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const isOverride = userValue?.roi_override_enabled === true;
+    setUseGlobal(!isOverride);
+    const valDecimal = typeof userValue?.roi_override === 'number' ? userValue.roi_override : 0.005;
+    setOverridePct((valDecimal * 100).toFixed(2));
+  }, [userValue?.roi_override_enabled, userValue?.roi_override]);
+
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sliderVal = parseFloat(e.target.value);
+    setOverridePct(sliderVal.toFixed(2));
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value;
+    raw = raw.replace(/[^0-9.]/g, '');
+    setOverridePct(raw);
+  };
+
+  const handleBlur = () => {
+    let parsed = parseFloat(overridePct);
+    if (isNaN(parsed)) parsed = 0;
+    parsed = Math.max(0, Math.min(2.5, parsed));
+    setOverridePct(parsed.toFixed(2));
+  };
+
+  const handleSaveClick = async () => {
+    let parsed = parseFloat(overridePct);
+    if (isNaN(parsed)) parsed = 0;
+    parsed = Math.max(0, Math.min(2.5, parsed));
+    setIsSaving(true);
+    try {
+      await onSaveOverride(userValue.id, !useGlobal, parsed);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     if (activeCount === 0) return;
@@ -176,46 +498,155 @@ function AdminROIEngineCard({ userValue, userInvestments, plans }: AdminROIEngin
   if (activeCount === 0) return null;
 
   return (
-    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4 hover:border-aura-lime/20 hover:bg-white/[0.03] transition-all relative overflow-hidden">
+    <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-4 hover:border-aura-lime/20 hover:bg-white/[0.03] transition-all relative overflow-hidden flex flex-col justify-between">
       <div className="absolute top-0 right-0 w-24 h-24 bg-aura-lime/5 blur-2xl rounded-full pointer-events-none" />
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-aura-lime flex items-center justify-center text-black shrink-0 shadow-[0_0_15px_rgba(168,251,60,0.2)]">
-            <Zap size={14} className="animate-pulse" />
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-aura-lime flex items-center justify-center text-black shrink-0 shadow-[0_0_15px_rgba(168,251,60,0.2)]">
+              <Zap size={14} className="animate-pulse" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-black uppercase text-white truncate max-w-[150px]">{userValue.name}</h4>
+              <span className="text-[8px] text-aura-lime font-black uppercase tracking-wider block">
+                {activeCount} active node{activeCount > 1 ? 's' : ''} • {userValue.email}
+              </span>
+            </div>
           </div>
-          <div className="min-w-0">
-            <h4 className="text-xs font-black uppercase text-white truncate max-w-[150px]">{userValue.name}</h4>
-            <span className="text-[8px] text-aura-lime font-black uppercase tracking-wider block">
-              {activeCount} active node{activeCount > 1 ? 's' : ''} • {userValue.email}
+          <div className="text-left sm:text-right">
+            <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Time Remaining</p>
+            <p className="text-xs font-black font-mono text-white mt-0.5">{timeLeft}</p>
+          </div>
+        </div>
+
+        <div className="space-y-2 bg-white/[0.01] p-3 rounded-xl border border-white/5">
+          <div className="flex justify-between items-center text-[9px] font-bold text-white">
+            <span className="text-emerald-400 font-black">{formatCurrency(liveEarnings)} / {formatCurrency(yieldSum)} Day</span>
+            <span className="font-mono text-aura-muted">({progress.toFixed(1)}%)</span>
+          </div>
+          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+            <div 
+              style={{ width: `${progress}%` }}
+              className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-1">
+          {userInvestments.map(inv => (
+            <div key={inv.id} className="text-[8px] font-bold uppercase px-2 py-0.5 bg-white/5 text-gray-300 border border-white/5 rounded">
+              {inv.plan_name}: <span className="text-white font-black">{formatCurrency(inv.amount)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Individual ROI Override Panel */}
+      <div className="pt-4 border-t border-white/5 space-y-4">
+        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-aura-muted">
+          <Sliders size={12} className="text-aura-lime" />
+          <span>Individual ROI Override</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 bg-white/[0.01] p-3 rounded-2xl border border-white/5">
+          <div>
+            <span className="text-[8px] text-aura-muted font-bold uppercase tracking-wider block">Current Effective ROI</span>
+            <span className="text-sm font-black text-aura-lime mt-1 block">
+              {(getEffectiveRoiRate(userValue, userInvestments[0]?.amount || 0, plans, globalRoiConfig) * 100).toFixed(2)}%
+            </span>
+          </div>
+          <div>
+            <span className="text-[8px] text-aura-muted font-bold uppercase tracking-wider block">Active AI Bot</span>
+            <span className="text-sm font-black text-white mt-1 block">
+              {(() => {
+                const activeBot = userValue?.active_robot || "Free AI Bot";
+                return activeBot.startsWith('AI ') ? `AI Bot ${activeBot.slice(3)}` : activeBot;
+              })()}
             </span>
           </div>
         </div>
-        <div className="text-left sm:text-right">
-          <p className="text-[8px] text-aura-muted font-bold uppercase tracking-widest">Time Remaining</p>
-          <p className="text-xs font-black font-mono text-white mt-0.5">{timeLeft}</p>
-        </div>
-      </div>
 
-      <div className="space-y-2 bg-white/[0.01] p-3 rounded-xl border border-white/5">
-        <div className="flex justify-between items-center text-[9px] font-bold text-white">
-          <span className="text-emerald-400 font-black">{formatCurrency(liveEarnings)} / {formatCurrency(yieldSum)} Day</span>
-          <span className="font-mono text-aura-muted">({progress.toFixed(1)}%)</span>
-        </div>
-        <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-          <div 
-            style={{ width: `${progress}%` }}
-            className="h-full bg-gradient-to-r from-emerald-400 to-green-500 rounded-full"
-          />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1">
-        {userInvestments.map(inv => (
-          <div key={inv.id} className="text-[8px] font-bold uppercase px-2 py-0.5 bg-white/5 text-gray-300 border border-white/5 rounded">
-            {inv.plan_name}: <span className="text-white font-black">{formatCurrency(inv.amount)}</span>
+        <div className="flex items-center justify-between bg-white/[0.01] p-3 rounded-2xl border border-white/5">
+          <div className="space-y-0.5">
+            <span className="text-[9px] text-white font-black uppercase tracking-wider block">Use Global ROI</span>
+            <span className="text-[8px] text-aura-muted font-semibold block">
+              {useGlobal ? "Using Global AI Bot ROI" : "Using Custom Individual ROI"}
+            </span>
           </div>
-        ))}
+          <button
+            type="button"
+            onClick={() => setUseGlobal(!useGlobal)}
+            className={cn(
+              "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none",
+              useGlobal ? "bg-aura-lime" : "bg-white/10"
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out",
+                useGlobal ? "translate-x-5" : "translate-x-0"
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Override controls */}
+        <div className={cn("space-y-3 transition-all duration-300", useGlobal ? "opacity-50 pointer-events-none" : "opacity-100")}>
+          <div className="flex justify-between items-center">
+            <span className="text-[9px] text-white font-black uppercase tracking-wider">Override ROI (%)</span>
+            <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1 rounded-lg border border-white/5 w-20">
+              <input
+                type="text"
+                disabled={useGlobal}
+                value={overridePct}
+                onChange={handleTextChange}
+                onBlur={handleBlur}
+                className="w-full bg-transparent text-right font-mono text-xs font-black text-white focus:outline-none"
+              />
+              <span className="text-[10px] text-aura-muted font-bold">%</span>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <input
+              type="range"
+              min="0.00"
+              max="2.50"
+              step="0.01"
+              disabled={useGlobal}
+              value={useGlobal ? "0.00" : overridePct}
+              onChange={handleSliderChange}
+              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-aura-lime focus:outline-none"
+            />
+            <div className="flex justify-between text-[8px] font-bold text-aura-muted uppercase tracking-wider">
+              <span>0.00%</span>
+              <span>1.25%</span>
+              <span>2.50%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Save changes button */}
+        <button
+          onClick={handleSaveClick}
+          disabled={isSaving}
+          className={cn(
+            "w-full py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all duration-300 flex items-center justify-center gap-2 border",
+            isSaving
+              ? "bg-white/5 border-white/5 text-aura-muted cursor-not-allowed"
+              : "bg-white/5 hover:bg-aura-lime hover:text-aura-black hover:border-aura-lime border-white/10 text-white shadow-lg"
+          )}
+        >
+          {isSaving ? (
+            <>
+              <div className="w-3 h-3 border-2 border-aura-lime border-t-transparent rounded-full animate-spin" />
+              <span>Saving...</span>
+            </>
+          ) : (
+            <span>Save Changes</span>
+          )}
+        </button>
       </div>
     </div>
   );
@@ -290,6 +721,7 @@ export default function CipherAdmin() {
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [userDevices, setUserDevices] = useState<any[]>([]);
   const [securityLogs, setSecurityLogs] = useState<any[]>([]);
+
   const [isDetailView, setIsDetailView] = useState(false);
   const [expandedActivityUserId, setExpandedActivityUserId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -308,6 +740,7 @@ export default function CipherAdmin() {
   // UI History System
   const [uiVersions, setUiVersions] = useState<any[]>([]);
   const [uiConfig, setUiConfig] = useState<any>({});
+  const [roiConfig, setRoiConfig] = useState<any>(null);
   const [selectedVersion, setSelectedVersion] = useState<any>(null);
 
   // Adverts System State
@@ -361,6 +794,10 @@ export default function CipherAdmin() {
   }, [logout, navigate]);
 
   const [users, setUsers] = useState<any[]>([]);
+  const liveUser = useMemo(() => {
+    if (!selectedUser) return null;
+    return users.find((u: any) => u.id === selectedUser.id) || selectedUser;
+  }, [selectedUser, users]);
   const [deposits, setDeposits] = useState<any[]>([]);
   const [miningUpgrades, setMiningUpgrades] = useState<any[]>([]);
   const [withdrawals, setWithdrawals] = useState<any[]>([]);
@@ -830,6 +1267,13 @@ export default function CipherAdmin() {
       (err) => console.error("UI Config sync failed:", err.message)
     );
 
+    const unsubscribeRoiConfig = onSnapshot(doc(db, 'settings', 'roi_config'),
+      (snap) => {
+        if (snap.exists()) setRoiConfig(snap.data());
+      },
+      (err) => console.error("ROI Config sync failed:", err.message)
+    );
+
     const unsubscribeUIVersions = onSnapshot(query(collection(db, 'ui_versions'), orderBy('timestamp', 'desc'), limit(50)), 
       (snap) => {
         setUiVersions(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -923,6 +1367,7 @@ export default function CipherAdmin() {
       unsubscribeSupportTickets();
       unsubscribeAudit();
       unsubscribeUI();
+      unsubscribeRoiConfig();
       unsubscribeUIVersions();
       unsubscribeAdverts();
       unsubscribeTransactions();
@@ -1554,6 +1999,54 @@ export default function CipherAdmin() {
       toast.success("Investment Stopped");
     } catch (error) {
        toast.error("Process failed");
+    }
+  };
+
+  const handleSaveGlobalRoi = async (botKey: string, percentage: number) => {
+    const decimalValue = percentage / 100;
+    try {
+      const docRef = doc(db, 'settings', 'roi_config');
+      await setDoc(docRef, { [botKey]: decimalValue }, { merge: true });
+      const displayBotName = botKey === 'free_bot' ? 'Free AI Bot' : botKey.replace('ai_', 'AI ').replace('_', '.');
+      toast.success(`Successfully updated global ROI rate for ${displayBotName} to ${percentage.toFixed(2)}%`);
+      
+      await logAudit(
+        user?.uid || 'system',
+        'UPDATE_GLOBAL_ROI',
+        { details: `Updated ${displayBotName} global ROI to ${percentage.toFixed(2)}%` }
+      );
+    } catch (error: any) {
+      console.error("Failed to save global ROI:", error);
+      toast.error(`Failed to save global ROI: ${error.message}`);
+    }
+  };
+
+  const handleSaveUserOverride = async (userId: string, enabled: boolean, percentage: number) => {
+    const decimalValue = percentage / 100;
+    try {
+      const userRef = doc(db, 'users', userId);
+      await updateDoc(userRef, {
+        roi_override_enabled: enabled,
+        roi_override: decimalValue
+      });
+      toast.success(`Successfully updated ROI override for user to ${enabled ? `${percentage.toFixed(2)}%` : 'Disabled (using global)'}`);
+      
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser(prev => ({
+          ...prev,
+          roi_override_enabled: enabled,
+          roi_override: decimalValue
+        }));
+      }
+
+      await logAudit(
+        user?.uid || 'system',
+        'UPDATE_USER_ROI_OVERRIDE',
+        { details: `Updated override for user ${userId} to ${enabled ? `${percentage.toFixed(2)}%` : 'Disabled'}` }
+      );
+    } catch (error: any) {
+      console.error("Failed to save individual ROI override:", error);
+      toast.error(`Failed to save individual ROI override: ${error.message}`);
     }
   };
 
@@ -3453,6 +3946,8 @@ export default function CipherAdmin() {
                       <span className="text-[9px] font-black uppercase text-aura-muted tracking-widest bg-white/5 px-2.5 py-1 rounded">Accumulator Matrix</span>
                     </div>
 
+                    <GlobalRoiControls roiConfig={roiConfig} onSave={handleSaveGlobalRoi} />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {users.filter(u => investments.some(inv => inv.user_id === u.id && inv.status === 'active')).length === 0 ? (
                         <div className="col-span-full p-12 text-center text-xs font-bold uppercase text-aura-muted tracking-widest bg-white/[0.01] border border-white/5 rounded-3xl">
@@ -3469,6 +3964,8 @@ export default function CipherAdmin() {
                                 userValue={u}
                                 userInvestments={userActiveInvestments}
                                 plans={plans}
+                                onSaveOverride={handleSaveUserOverride}
+                                globalRoiConfig={roiConfig}
                               />
                             );
                           })
@@ -3565,6 +4062,11 @@ export default function CipherAdmin() {
 
                        <div className="p-6 bg-white/5 border border-white/5 rounded-3xl space-y-4">
                           <h4 className="text-[10px] font-black uppercase tracking-widest text-aura-muted flex items-center gap-2"><MapPin size={12} /> Geographic Metadata</h4>
+                        </div>
+
+                        <IndividualRoiOverride userValue={liveUser} onSaveOverride={handleSaveUserOverride} />
+
+                        <div className="p-6 bg-white/5 border border-white/5 rounded-3xl space-y-4">
                           <div className="space-y-3">
                              <div className="flex justify-between items-center text-[10px] font-bold uppercase text-white/60">
                                 <span>Country</span>

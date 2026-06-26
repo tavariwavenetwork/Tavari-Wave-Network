@@ -133,28 +133,63 @@ export function getRobotRoiRate(robotName?: string): number | null {
   }
 }
 
+export function getEffectiveRoiRate(
+  profile: any,
+  amount: number,
+  plans: any[],
+  globalRoiConfig?: any
+): number {
+  // 1. Individual Override (if enabled)
+  if (profile?.roi_override_enabled === true && typeof profile?.roi_override === 'number') {
+    return profile.roi_override;
+  }
+
+  // Determine active robot name
+  const robotName = profile?.active_robot;
+
+  // Map robot name to key in settings/roi_config
+  let robotKey: string | null = null;
+  if (robotName === 'AI 1.8') robotKey = 'ai_1_8';
+  else if (robotName === 'AI 2.0') robotKey = 'ai_2_0';
+  else if (robotName === 'AI 2.5') robotKey = 'ai_2_5';
+  else if (robotName === 'AI 3.0') robotKey = 'ai_3_0';
+  else if (robotName === 'Free AI Bot' || !robotName) robotKey = 'free_bot';
+
+  // 2. Global Bot ROI
+  if (robotKey && globalRoiConfig && typeof globalRoiConfig[robotKey] === 'number') {
+    return globalRoiConfig[robotKey];
+  }
+
+  // 3. Existing default ROI (fallback)
+  const isNew = isNewUser(profile);
+  if (robotName) {
+    if (robotName === 'AI 1.8') return 0.005;
+    if (robotName === 'AI 2.0') return 0.01;
+    if (robotName === 'AI 2.5') return 0.015;
+    if (robotName === 'AI 3.0') return 0.025;
+  }
+  return isNew ? 0.005 : getRoiByAmountDynamic(amount, plans);
+}
+
 export function calculateExpectedDailyRoi(
   activeInvestments: any[],
   compoundedAmounts: number[] | undefined,
   plans: any[],
-  profile?: any
+  profile?: any,
+  globalRoiConfig?: any
 ): number {
-  const robotRate = getRobotRoiRate(profile?.active_robot);
-
   if (profile?.migration_status === 'accepted') {
     const remaining = profile.remaining_upgraded_assets ?? 0;
-    const rate = robotRate !== null ? robotRate : 0.005;
+    const rate = getEffectiveRoiRate(profile, remaining, plans, globalRoiConfig);
     return Math.floor((remaining * rate) * 100) / 100;
   }
 
   if (activeInvestments.length === 0) return 0;
 
-  const isNew = isNewUser(profile);
-
   let originalRoi = 0;
   activeInvestments.forEach((inv) => {
     const amount = inv.amount;
-    const roiRate = robotRate !== null ? robotRate : (isNew ? 0.005 : getRoiByAmountDynamic(amount, plans));
+    const roiRate = getEffectiveRoiRate(profile, amount, plans, globalRoiConfig);
     originalRoi += amount * roiRate;
   });
 
@@ -162,7 +197,7 @@ export function calculateExpectedDailyRoi(
   const compounds = compoundedAmounts || [];
   compounds.forEach(compAmount => {
     if (compAmount > 0) {
-      const roiRate = robotRate !== null ? robotRate : (isNew ? 0.005 : getRoiByAmountDynamic(compAmount, plans));
+      const roiRate = getEffectiveRoiRate(profile, compAmount, plans, globalRoiConfig);
       compoundedRoi += compAmount * roiRate;
     }
   });
@@ -255,9 +290,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const unsubscribeProfileRef = useRef<(() => void) | null>(null);
   const [activeInvestments, setActiveInvestments] = useState<any[]>([]);
   const [compoundTransactions, setCompoundTransactions] = useState<any[]>([]);
+  const [globalRoiConfig, setGlobalRoiConfig] = useState<any>(null);
 
   const isProcessingRoiRef = useRef(false);
   const lastProcessedCycleRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'roi_config'), (snap) => {
+      if (snap.exists()) {
+        setGlobalRoiConfig(snap.data());
+      }
+    });
+    return unsub;
+  }, []);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'investment_plans'), async (snapshot) => {
@@ -443,6 +488,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (currentCompletedCycles <= 0) return;
 
+          // Fetch global ROI config centrally inside transaction
+          const roiConfigDoc = await transaction.get(doc(db, 'settings', 'roi_config'));
+          const txGlobalRoiConfig = roiConfigDoc.exists() ? roiConfigDoc.data() : null;
+
           let totalCredit = 0;
           let stdInvestmentsProfit = 0;
           const investmentUpdates: { id: string, docRef: any, data: any }[] = [];
@@ -453,11 +502,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (invSnapInTx.exists()) {
               const invData = invSnapInTx.data();
               if (invData.status === 'active') {
-                const robotRate = getRobotRoiRate(currentProfile?.active_robot);
-                let roiRate = robotRate !== null ? robotRate : getRoiByAmountDynamic(invData.amount, plansRef.current);
-                if (isNewUser(currentProfile) && robotRate === null) {
-                  roiRate = 0.005; // 0.5% force for new users
-                }
+                const roiRate = getEffectiveRoiRate(currentProfile, invData.amount, plansRef.current, txGlobalRoiConfig);
                 let currentAmount = invData.amount || 0;
                 let accumulatedProfit = 0;
 
@@ -495,11 +540,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let compoundsProfit = 0;
           compounds.forEach((compAmount: number) => {
             if (compAmount > 0) {
-              const robotRate = getRobotRoiRate(currentProfile?.active_robot);
-              let roiRate = robotRate !== null ? robotRate : getRoiByAmountDynamic(compAmount, plansRef.current);
-              if (isNewUser(currentProfile) && robotRate === null) {
-                roiRate = 0.005; // 0.5% force for new users
-              }
+              const roiRate = getEffectiveRoiRate(currentProfile, compAmount, plansRef.current, txGlobalRoiConfig);
               const profitPerCycle = compAmount * roiRate;
               const rawCompProfit = currentCompletedCycles * profitPerCycle;
               compoundsProfit += Math.floor(rawCompProfit * 100) / 100;
@@ -1127,7 +1168,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       activeInvestments, 
       derivedCompoundedAmounts, 
       dynamicPlans,
-      profile
+      profile,
+      globalRoiConfig
     );
     if (rawRoi > 0) {
       lastValidRoiRef.current = rawRoi;
@@ -1140,7 +1182,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return 0;
     }
     return lastValidRoiRef.current || 0;
-  }, [activeInvestments, derivedCompoundedAmounts, dynamicPlans, profile]);
+  }, [activeInvestments, derivedCompoundedAmounts, dynamicPlans, profile, globalRoiConfig]);
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, logout, refreshAuth, plans: dynamicPlans, expectedDailyRoi }}>
