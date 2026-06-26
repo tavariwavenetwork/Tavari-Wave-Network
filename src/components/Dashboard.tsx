@@ -37,6 +37,13 @@ import { useUI } from '../contexts/UIContext';
 import { ROIEngineStats } from './ROIEngineDisplay';
 import { DynamicBalance } from './DynamicBalance';
 
+const ROBOT_IMAGES: Record<string, string> = {
+  'AI 1.8': 'https://i.imgur.com/qkFHhDR.png',
+  'AI 2.0': 'https://i.imgur.com/JGTKlCJ.png',
+  'AI 2.5': 'https://i.imgur.com/3DpE79P.png',
+  'AI 3.0': 'https://i.imgur.com/dZqi2MZ.png',
+};
+
 const DashboardCard = React.memo(({ icon: Icon, label, value, subtext, color, highlight, action }: { icon: any, label: string, value: string, subtext?: string, color: string, highlight?: boolean, action?: React.ReactNode }) => {
   return (
     <div 
@@ -355,25 +362,42 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       {activeList.map(inv => (
-                         <div key={inv.id} className="p-8 bg-white/5 border border-white/5 rounded-3xl relative overflow-hidden group">
-                           <div className="absolute top-0 right-0 p-6 opacity-5"><Activity size={40} /></div>
-                           <p className="text-[9px] font-black text-aura-muted uppercase tracking-widest mb-2">{inv.plan_name} Node</p>
-                           <div className="h-10 lg:h-12 w-full">
-                            <DynamicBalance 
-                                value={formatCurrency(inv.amount)} 
-                                containerClassName="justify-start"
-                                className="text-left"
-                                baseSizeMobile="text-3xl"
-                                baseSizeDesktop="lg:text-4xl"
-                            />
+                       {activeList.map(inv => {
+                         const botName = profile?.active_robot || 'Free AI Bot';
+                         const botImage = profile?.active_robot && ROBOT_IMAGES[profile.active_robot] 
+                           ? ROBOT_IMAGES[profile.active_robot] 
+                           : 'https://i.imgur.com/swuDIvl.png';
+                         return (
+                           <div key={inv.id} className="p-8 bg-white/5 border border-white/5 rounded-3xl relative overflow-hidden group flex flex-col md:flex-row md:items-center justify-between gap-6">
+                             <div className="space-y-4 flex-1">
+                               <p className="text-[9px] font-black text-aura-muted uppercase tracking-widest mb-2">{inv.plan_name} Node</p>
+                               <div className="h-10 lg:h-12 w-full">
+                                <DynamicBalance 
+                                    value={formatCurrency(inv.amount)} 
+                                    containerClassName="justify-start"
+                                    className="text-left"
+                                    baseSizeMobile="text-3xl"
+                                    baseSizeDesktop="lg:text-4xl"
+                                />
+                               </div>
+                               <div className="mt-4 flex items-center gap-2">
+                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                 <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Collecting Yield</span>
+                               </div>
+                             </div>
+                             <div className="flex flex-col items-center gap-2 p-4 bg-white/[0.02] border border-white/5 rounded-2xl min-w-[120px] self-stretch md:self-auto justify-center">
+                               <img 
+                                 src={botImage} 
+                                 alt={botName} 
+                                 className="w-12 h-12 object-contain drop-shadow-[0_0_10px_rgba(59,130,246,0.15)]"
+                                 referrerPolicy="no-referrer"
+                                />
+                               <span className="text-[8px] font-black text-white uppercase tracking-widest text-center">{botName}</span>
+                               <span className="text-[7px] font-bold text-emerald-400 uppercase tracking-widest">Active</span>
+                             </div>
                            </div>
-                           <div className="mt-8 flex items-center gap-2">
-                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                             <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Collecting Yield</span>
-                           </div>
-                         </div>
-                       ))}
+                         );
+                       })}
                     </div>
                   )}
                </div>
@@ -417,28 +441,43 @@ export default function Dashboard() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                       {inactiveList.map(inv => (
-                         <div key={inv.id} className="p-8 bg-white/5 border border-white/5 rounded-3xl relative overflow-hidden group">
-                           <div className="absolute top-0 right-0 p-6 opacity-5"><Zap size={40} /></div>
-                           <p className="text-[9px] font-black text-aura-muted uppercase tracking-widest mb-2">{inv.plan_name} Node</p>
-                           <div className="h-10 lg:h-12 w-full mb-8">
-                            <DynamicBalance 
-                                value={formatCurrency(inv.amount)} 
-                                containerClassName="justify-start"
-                                className="text-left"
-                                baseSizeMobile="text-3xl"
-                                baseSizeDesktop="lg:text-4xl"
-                            />
+                       {inactiveList.map(inv => {
+                         const botName = 'Free AI Bot';
+                         const botImage = 'https://i.imgur.com/swuDIvl.png';
+                         return (
+                           <div key={inv.id} className="p-8 bg-white/5 border border-white/5 rounded-3xl relative overflow-hidden group flex flex-col md:flex-row md:items-center justify-between gap-6">
+                             <div className="space-y-4 flex-1">
+                               <p className="text-[9px] font-black text-aura-muted uppercase tracking-widest mb-2">{inv.plan_name} Node</p>
+                               <div className="h-10 lg:h-12 w-full mb-4">
+                                <DynamicBalance 
+                                    value={formatCurrency(inv.amount)} 
+                                    containerClassName="justify-start"
+                                    className="text-left"
+                                    baseSizeMobile="text-3xl"
+                                    baseSizeDesktop="lg:text-4xl"
+                                />
+                               </div>
+                               <button 
+                                 onClick={() => activateInvestment(inv.id)}
+                                 disabled={isActivating === inv.id}
+                                 className="w-full py-4 bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-lg hover:shadow-primary/20 cursor-pointer"
+                               >
+                                 {isActivating === inv.id ? 'Syncing...' : 'Activate Investment'}
+                               </button>
+                             </div>
+                             <div className="flex flex-col items-center gap-2 p-4 bg-white/[0.02] border border-white/5 rounded-2xl min-w-[120px] self-stretch md:self-auto justify-center">
+                               <img 
+                                 src={botImage} 
+                                 alt={botName} 
+                                 className="w-12 h-12 object-contain opacity-60 drop-shadow-[0_0_10px_rgba(255,255,255,0.05)] animate-pulse"
+                                 referrerPolicy="no-referrer"
+                                />
+                               <span className="text-[8px] font-black text-aura-muted uppercase tracking-widest text-center">{botName}</span>
+                               <span className="text-[7px] font-bold text-yellow-500 uppercase tracking-widest">Waiting for Activation</span>
+                             </div>
                            </div>
-                           <button 
-                             onClick={() => activateInvestment(inv.id)}
-                             disabled={isActivating === inv.id}
-                             className="w-full py-4 bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-xl disabled:opacity-50 transition-all shadow-lg hover:shadow-primary/20"
-                           >
-                             {isActivating === inv.id ? 'Syncing...' : 'Activate Investment'}
-                           </button>
-                         </div>
-                       ))}
+                         );
+                       })}
                     </div>
                   )}
                </div>
@@ -511,7 +550,7 @@ export default function Dashboard() {
           value={formatCurrency(profile?.total_invested || 0)} 
           color="text-orange-400" 
           action={
-            profile && profile.migration_status !== 'accepted' && profile.migration_status !== 'completed' ? (
+            profile && !['AI 1.8', 'AI 2.0', 'AI 2.5', 'AI 3.0'].includes(profile.active_robot || '') && investments.some(i => i.status === 'active') && (profile.total_invested || 0) > 0 ? (
               <>
                 <style dangerouslySetInnerHTML={{__html: `
                   @keyframes premiumPulse {
@@ -531,7 +570,7 @@ export default function Dashboard() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    window.dispatchEvent(new CustomEvent('open-legacy-upgrade-modal'));
+                    navigate('/ai-marketplace');
                   }}
                   className="animate-premium-pulse relative px-2.5 py-1 text-[8px] lg:text-[9px] font-black uppercase tracking-wider rounded-full bg-primary hover:bg-[#8b5cf6] text-white cursor-pointer select-none border border-white/10 flex items-center justify-center gap-1 transition-all"
                   style={{ willChange: 'transform' }}

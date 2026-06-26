@@ -544,7 +544,7 @@ export default function Homepage() {
         <div 
           className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-blue-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(59,130,246,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-blue-500/50 hover:shadow-[0_22px_50px_rgba(59,130,246,0.08),inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-500 relative overflow-hidden gpu-accelerate"
         >
-          {profile && isLegacyUser(profile) && profile.migration_status !== 'accepted' && profile.migration_status !== 'completed' && (
+          {profile && !['AI 1.8', 'AI 2.0', 'AI 2.5', 'AI 3.0'].includes(profile.active_robot || '') && investments.some(i => i.status === 'active') && (profile.total_invested || 0) > 0 && (
             <>
               <style dangerouslySetInnerHTML={{__html: `
                 @keyframes premiumPulse {
@@ -564,7 +564,7 @@ export default function Homepage() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  window.dispatchEvent(new CustomEvent('open-legacy-upgrade-modal'));
+                  navigate('/ai-marketplace');
                 }}
                 className="animate-premium-pulse absolute top-3 right-3 lg:top-5 lg:right-5 px-2.5 py-1 text-[8px] lg:text-[9px] font-black uppercase tracking-wider rounded-full bg-[#7c3aed] hover:bg-[#8b5cf6] text-white cursor-pointer select-none border border-white/10 flex items-center justify-center gap-1 transition-all z-10"
                 style={{ willChange: 'transform' }}

@@ -31,7 +31,6 @@ import { useUIConfig } from '../contexts/UIConfigContext';
 import { useNavigate, Link } from 'react-router-dom';
 import { COUNTRIES } from '../constants/countries';
 import { detectUserLocation } from '../utils/geo';
-import investmentHeaderImage from '../assets/images/investment_header_1779476124204.png';
 import { DynamicBalance } from './DynamicBalance';
 import SuccessModal from './SuccessModal';
 import { 
@@ -208,7 +207,7 @@ const RealisticCardIcon = () => (
   </svg>
 );
 
-export default function Invest() {
+export default function Booster() {
   const { user, profile, plans } = useAuth();
   const { 
     setDistractionFree, 
@@ -217,7 +216,6 @@ export default function Invest() {
     setIsViewingProcessingScreen,
     processingInvestmentId,
     setProcessingInvestmentId,
-    isWelcomeBonusDeductedPopupOpen,
     setIsWelcomeBonusDeductedPopupOpen
   } = useUI();
   const { config: uiConfig } = useUIConfig();
@@ -229,8 +227,6 @@ export default function Invest() {
     : (profile?.[selectedWallet] || 0);
   const [view, setView] = useState<'plans' | 'summary' | 'payment' | 'processing'>('plans');
   const [amounts, setAmounts] = useState<Record<string, string>>({});
-  const [amountInput, setAmountInput] = useState<string>('');
-  const [isPresetSelected, setIsPresetSelected] = useState(false);
   const [confirmedAmount, setConfirmedAmount] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'crypto' | 'bank' | 'card' | null>(null);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -245,7 +241,6 @@ export default function Invest() {
   const [showCardUnavailable, setShowCardUnavailable] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [detectedCountry, setDetectedCountry] = useState<string | null>(() => {
-    // Initial sync detection via timezone so we have a reliable fallback instantly!
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.toLowerCase();
       if (tz.includes('lagos')) return 'Nigeria';
@@ -265,10 +260,9 @@ export default function Invest() {
       try {
         const result = await detectUserLocation();
         setDetectedCountry(result.country);
-        console.log("[Invest] Detected geographic location:", result.country, result.code, result.method);
+        console.log("[Booster] Detected geographic location:", result.country, result.code, result.method);
       } catch (err) {
-        console.error("[Invest] Failed to run dynamic geolocation protocol:", err);
-        // Fallback already handled during state setup
+        console.error("[Booster] Failed to run dynamic geolocation protocol:", err);
       }
     }
     loadDetectedLocation();
@@ -291,12 +285,12 @@ export default function Invest() {
     });
     return () => unsubscribeRate();
   }, [user, profile]);
+  
   const [cryptoType, setCryptoType] = useState<'usdt' | 'erc20' | 'btc'>('usdt');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
-    // Enable distraction-free mode when entering the steps
     if (view !== 'plans') {
       setDistractionFree(true);
     } else {
@@ -308,7 +302,6 @@ export default function Invest() {
     }
 
     return () => {
-      // Ensure it's disabled when leaving the page entirely
       setDistractionFree(false);
       setIsViewingProcessingScreen(false);
     };
@@ -318,116 +311,6 @@ export default function Invest() {
     navigator.clipboard.writeText(text);
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const activateInvestment = async (inv: any) => {
-    if (!user || !profile) return;
-    if (isSubmitting) return;
-    
-    if (profile.suspended || profile.banned) {
-      toast.error("Account access restricted by System Protocol.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const now = new Date().toISOString();
-      
-      // Ensure stable and race-condition free checking of previous investments
-      const q = query(collection(db, 'investments'), where('user_id', '==', user.uid));
-      const invsSnap = await getDocs(q);
-      
-      const userInvs = invsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      const isFirstActivation = !userInvs.some((i: any) => 
-        i.id !== inv.id && (i.status === 'active' || i.status === 'completed' || i.referral_bonus_processed === true)
-      );
-      const dynamicActiveCount = userInvs.filter((i: any) => i.status === 'active').length;
-
-      await runTransaction(db, async (transaction) => {
-        const invRef = doc(db, 'investments', inv.id);
-        const invSnap = await transaction.get(invRef);
-        
-        if (!invSnap.exists()) throw new Error("Investment document not found in system databases.");
-        const invData = invSnap.data();
-        
-        if (invData.status !== 'inactive') throw new Error("Investment has already been activated or is in an invalid state.");
-
-        // Update Investment
-        transaction.update(invRef, {
-          status: 'active',
-          activated_at: now,
-          last_sync: now,
-          total_earned: 0,
-          referral_bonus_processed: true
-        });
-
-        const userRef = doc(db, 'users', user.uid);
-
-        // Start user's ROI cycle timestamp if they have no other active investments
-        if (dynamicActiveCount === 0) {
-          transaction.update(userRef, {
-            roi_cycle_start: now
-          });
-        }
-
-        // Referral Bonus Logic (only first investment activated)
-        if (profile.referred_by && isFirstActivation && !invData.referral_bonus_processed) {
-          const bonusAmount = invData.amount * 0.05;
-          const referrerRef = doc(db, 'users', profile.referred_by);
-
-          // Increment referrer's active referral count
-          transaction.update(referrerRef, {
-            active_referrals: increment(1)
-          });
-
-          // Create pending claim document for User A (referrer)
-          const claimRef1 = doc(collection(db, 'referral_claims'));
-          transaction.set(claimRef1, {
-            user_id: profile.referred_by, // User A (referrer)
-            type: 'referrer',
-            amount: bonusAmount,
-            partner_uid: user.uid, // User B
-            partner_name: profile.username || 'Partner',
-            status: 'pending',
-            created_at: now
-          });
-
-          const notificationRef2 = doc(collection(db, 'notifications'));
-          transaction.set(notificationRef2, {
-            user_id: profile.referred_by,
-            sender_id: user.uid,
-            title: 'Referral Reward Pending',
-            message: `Your referral ${profile.username} has activated an investment. Claim your referral reward now.`,
-            type: 'success',
-            read: false,
-            created_at: now
-          });
-        }
-      });
-
-      // Trigger the $5 welcome bonus deduction popup if it was first activation
-      if (isFirstActivation && !profile.welcome_bonus_deducted) {
-        setIsWelcomeBonusDeductedPopupOpen({
-          planName: inv.plan_name,
-          amount: inv.amount
-        });
-      } else {
-        // Trigger the 2% activation bonus popup for Mr. B directly
-        if (setMrBActivationPopup) {
-          setMrBActivationPopup({
-            planName: inv.plan_name,
-            amount: inv.amount
-          });
-        }
-      }
-
-      toast.success("Node Pulse Detected. Core Cycle Initiated + Referral Bonuses Dispersed.");
-    } catch (error: any) {
-      console.error("Activation failed:", error);
-      toast.error(`Activation failed: ${error.message || String(error)}`);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleStartInvestment = (plan: any) => {
@@ -457,7 +340,6 @@ export default function Invest() {
       return;
     }
 
-    // 1. OFFLINE PROTECTION
     if (!navigator.onLine) {
       toast.error("Connection unstable. Please retry when online.");
       return;
@@ -466,7 +348,6 @@ export default function Invest() {
     setIsSubmitting(true);
 
     try {
-      // 1.1 DUPLICATE PENDING INVESTMENT PREVENTION
       const qDup = query(
         collection(db, 'investments'),
         where('user_id', '==', user.uid),
@@ -486,7 +367,6 @@ export default function Invest() {
         return;
       }
 
-      // Pre-declare reference to capture generated ID for tracking on success
       const invRef = doc(collection(db, 'investments'));
       const newInvestmentId = invRef.id;
 
@@ -500,7 +380,6 @@ export default function Invest() {
 
         const userData = userSnap.data();
         
-        // 2. SERVER-SIDE BALANCE VALIDATION
         const currentWalletBalance = selectedWallet === 'reward_dollar_balance'
           ? (userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0)
           : (userData[selectedWallet] || 0);
@@ -509,7 +388,6 @@ export default function Invest() {
           throw new Error(`Insufficient ${selectedWallet.replace(/_/g, ' ')}. Please fund your wallet.`);
         }
 
-        // 3. LOG INVESTMENT
         const isEnrolled = userData.migration_status === 'accepted' || !isLegacyUser(userData);
         const finalInvAmount = paymentMethod === 'wallet' 
           ? confirmedAmount * 3 
@@ -530,7 +408,6 @@ export default function Invest() {
           created_at: new Date().toISOString(),
         });
 
-        // 4. ATOMIC BALANCE UPDATE
         if (paymentMethod === 'wallet') {
           const userUpdates: any = {
             total_invested: increment(finalInvAmount)
@@ -553,7 +430,6 @@ export default function Invest() {
           transaction.update(userRef, userUpdates);
         }
 
-        // 5. TRANSACTION RECORD
         const txRef = doc(collection(db, 'transactions'));
         transaction.set(txRef, {
           user_id: user.uid,
@@ -579,7 +455,6 @@ export default function Invest() {
         "⚙️"
       );
 
-      // Trigger the premium processing screen layout transition
       setProcessingInvestmentId(newInvestmentId);
       setIsViewingProcessingScreen(true);
       setView('processing');
@@ -617,7 +492,7 @@ export default function Invest() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="space-y-10 w-full animate-fade-in"
+            className="space-y-10 w-full"
           >
             {/* Edge-to-Edge Premium Header Banner with Image Background */}
             <div className="-mx-6 -mt-8 mb-4 relative h-[180px] sm:h-[200px] md:h-[220px] overflow-hidden">
@@ -631,146 +506,134 @@ export default function Invest() {
               
               <div className="absolute bottom-6 left-6 right-6 z-10 flex flex-col md:flex-row md:items-end justify-between gap-4 max-w-5xl mx-auto w-full">
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold font-serif italic text-white tracking-tight drop-shadow-md">Investment Plans</h1>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold font-serif italic text-white tracking-tight drop-shadow-md">Booster Plans</h1>
                 </div>
               </div>
             </div>
 
-            <div className="max-w-xl mx-auto px-4 space-y-6">
-              {isPresetSelected ? (
-                /* Selected Amount Display when Preset chosen */
-                <div className="bg-gradient-to-b from-blue-500/10 to-indigo-500/15 border border-blue-500/30 rounded-3xl p-6 text-center space-y-4 shadow-[0_12px_24px_rgba(59,130,246,0.15)] animate-fade-in">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Selected Investment Amount</p>
-                  <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight">${parseFloat(amountInput).toLocaleString()}</h2>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPresetSelected(false);
-                      setAmountInput('');
-                    }}
-                    className="text-[10px] font-bold uppercase tracking-wider text-aura-muted hover:text-white underline transition-colors cursor-pointer"
+            {/* Subtitle positioned beautifully between header and cards */}
+            <div className="max-w-5xl mx-auto px-4 lg:px-0 text-left -mt-4 mb-2">
+              <p className="text-gray-400 text-xs md:text-sm font-medium tracking-wide leading-relaxed max-w-2xl bg-white/[0.02] border border-white/5 rounded-2xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
+                Choose the best booster plan that suits your goals and start earning daily rewards.
+              </p>
+            </div>
+
+            <div className="flex overflow-x-auto lg:grid lg:grid-cols-3 gap-5 lg:gap-8 max-w-5xl mx-auto py-2 md:py-4 px-4 lg:px-0 scrollbar-hide snap-x snap-mandatory">
+              {plans.filter((p: any) => p.active_status !== false).map((plan: any) => {
+                const customCardStyle: React.CSSProperties = {};
+                if (plan.card_background) {
+                  customCardStyle.backgroundColor = plan.card_background;
+                }
+                if (plan.card_border) {
+                  customCardStyle.borderColor = plan.card_border;
+                }
+                if (plan.accent_color) {
+                  customCardStyle.boxShadow = `0 10px 40px -10px ${plan.accent_color}66`;
+                }
+
+                return (
+                  <div 
+                    key={plan.id}
+                    className={cn(
+                      "border rounded-[2rem] flex flex-col p-5 md:p-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)] transition-all duration-500 relative overflow-hidden group min-h-[200px] lg:min-h-[440px] w-[85%] md:w-[280px] lg:w-full max-w-[300px] mx-auto flex-shrink-0 snap-center",
+                      !plan.card_border && plan.borderColor,
+                      !plan.card_background && plan.bgColor
+                    )}
+                    style={customCardStyle}
                   >
-                    Change Amount
-                  </button>
-                </div>
-              ) : (
-                /* Standard Selection UI with Preset Grid & Manual Input */
-                <>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-5 gap-2 sm:gap-3">
-                      {[10, 20, 50, 80, 100, 200, 350, 500, 800, 1000, 1500, 2000, 3500, 5000, 8000, 10000, 15000, 25000, 50000, 100000].map((val) => {
-                        const isSelected = parseFloat(amountInput) === val;
-                        return (
-                          <button
-                            key={val}
-                            onClick={() => {
-                              setAmountInput(val.toString());
-                              setIsPresetSelected(true);
-                            }}
-                            className={cn(
-                              "h-11 sm:h-14 rounded-xl sm:rounded-2xl text-center flex items-center justify-center transition-all duration-300 cursor-pointer select-none border text-[9px] xs:text-[10px] sm:text-xs font-bold",
-                              isSelected
-                                ? "bg-gradient-to-b from-blue-500/20 to-indigo-500/30 border-blue-500/50 text-white font-black shadow-[0_8px_20px_rgba(59,130,246,0.35),inset_0_1px_0_rgba(255,255,255,0.15)] -translate-y-0.5"
-                                : "bg-white/[0.03] border-white/10 text-gray-300 shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-white/20 hover:bg-white/[0.06] hover:-translate-y-0.5 active:translate-y-0"
-                            )}
-                          >
-                            ${val >= 1000 ? `${(val / 1000).toLocaleString()}k` : val}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Manual input block */}
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted ml-1">Enter Amount ($)</label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-extrabold text-sm">$</span>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        step="0.01"
-                        placeholder="0.00"
-                        value={amountInput}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9.]/g, '');
-                          setAmountInput(val);
-                          setIsPresetSelected(false);
-                        }}
-                        className="w-full bg-white/[0.02] border border-white/10 rounded-2xl py-4 pl-9 pr-4 text-sm font-black transition-all outline-none focus:bg-white/[0.05] focus:border-blue-500/50 text-white"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Dynamic summary of the chosen plan based on entered amount */}
-                  {(() => {
-                    const parsedVal = parseFloat(amountInput);
-                    if (isNaN(parsedVal) || parsedVal <= 0) return null;
-                    const mappedPlan = plans.find((p: any) => parsedVal >= p.min && parsedVal <= p.max);
-                    if (!mappedPlan) {
-                      return (
-                        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
-                          <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">
-                            Amount outside investment limits ($10 - $10,000,000)
-                          </p>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="p-5 bg-white/[0.02] border border-white/5 rounded-3xl space-y-3">
-                        <div className="flex justify-between items-center">
-                          <p className="text-[9px] font-black uppercase text-aura-muted tracking-widest">Target Node Plan</p>
-                          <p className="text-xs font-black text-white italic font-serif">{mappedPlan.name}</p>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <p className="text-[9px] font-black uppercase text-aura-muted tracking-widest">Daily Yield ROI</p>
-                          <p className="text-xs font-black text-emerald-400 italic font-serif">{(mappedPlan.roi * 100).toFixed(1)}%</p>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <p className="text-[9px] font-black uppercase text-aura-muted tracking-widest">Daily Profit Projection</p>
-                          <p className="text-xs font-black text-white font-sans">{formatCurrency(parsedVal * mappedPlan.roi)}</p>
+                    <div className={cn("absolute top-0 right-0 w-32 h-32 bg-gradient-to-br opacity-10 blur-xl -z-0", plan.gradient)} />
+                    
+                    <div className="relative z-10 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between mb-0">
+                        <h3 
+                          className={cn("text-lg lg:text-2xl font-black italic font-serif", !plan.accent_color && plan.color)}
+                          style={plan.accent_color ? { color: plan.accent_color } : {}}
+                        >
+                          {plan.name}
+                        </h3>
+                        <div 
+                          className={cn("inline-flex items-center justify-center p-2 rounded-xl shadow-inner", !plan.accent_color && plan.buttonColor)}
+                          style={plan.accent_color ? { backgroundColor: `${plan.accent_color}22`, border: `1px solid ${plan.accent_color}33` } : {}}
+                        >
+                          {getPlanIcon(plan.id)}
                         </div>
                       </div>
-                    );
-                  })()}
-                </>
-              )}
-
-              {/* Action Button */}
-              <button
-                onClick={() => {
-                  const parsedVal = parseFloat(amountInput);
-                  if (isNaN(parsedVal) || parsedVal <= 0) {
-                    toast.error("Please enter or select a valid amount.");
-                    return;
-                  }
-                  const mappedPlan = plans.find((p: any) => parsedVal >= p.min && parsedVal <= p.max);
-                  if (!mappedPlan) {
-                    toast.error(`Investment amount must be between ${formatCurrency(10)} and ${formatCurrency(10000000)}.`);
-                    return;
-                  }
-                  
-                  // Setup amount mapping to standard amounts record to preserve sub-logic
-                  setAmounts({ [mappedPlan.id]: amountInput });
-                  setSelectedPlan(mappedPlan);
-                  setConfirmedAmount(parsedVal);
-                  setView('summary');
-                }}
-                disabled={!amountInput || isNaN(parseFloat(amountInput)) || parseFloat(amountInput) <= 0}
-                className="w-full py-5 bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-[0.3em] text-[10px] rounded-2xl disabled:opacity-20 transition-all shadow-lg shadow-primary/20 cursor-pointer"
-              >
-                Proceed to Invest
-              </button>
-
-              {/* Subtle Hyperlink text: Booster */}
-              <div className="pt-8 pb-4 text-center">
-                <Link
-                  to="/booster"
-                  className="text-[9px] font-black tracking-[0.25em] text-white/20 hover:text-white/60 uppercase transition-all duration-300 underline underline-offset-4 cursor-pointer"
-                >
-                  Booster
-                </Link>
-              </div>
+                      
+                      <p className="text-aura-muted text-[8px] lg:text-[9px] font-medium lowercase tracking-wide leading-tight max-w-[180px] mb-3 lg:mb-4 opacity-70 mt-0.5">
+                        {plan.description}
+                      </p>
+    
+                      <div className="my-1 lg:my-3 border-t border-white/5 pt-3 lg:pt-4">
+                        <div className="flex items-center justify-between">
+                           <span className="text-[7px] lg:text-[9px] font-black text-aura-muted uppercase tracking-[0.2em] leading-none">Daily Yield</span>
+                           <span 
+                             className={cn("text-xl lg:text-3xl font-black italic font-serif", !plan.accent_color && plan.color)}
+                             style={plan.accent_color ? { color: plan.accent_color } : {}}
+                           >
+                             {(plan.roi * 100).toFixed(1)}%
+                           </span>
+                        </div>
+                      </div>
+    
+                      <div className="space-y-3 lg:space-y-4 mb-6">
+                        <div className="space-y-1.5">
+                           <span className="text-[7px] lg:text-[8px] font-bold text-aura-muted uppercase tracking-widest block ml-1 leading-none">Threshold</span>
+                           <div 
+                             className={cn("flex items-center gap-2.5 p-2.5 lg:p-3 rounded-xl border bg-white/5", !plan.card_border && plan.borderColor)}
+                             style={plan.card_border ? { borderColor: `${plan.card_border}33` } : {}}
+                           >
+                              <CreditCard size={12} className={!plan.accent_color ? plan.color : undefined} style={plan.accent_color ? { color: plan.accent_color } : {}} />
+                              <span className="text-[9px] lg:text-[10px] font-bold text-white tracking-widest">
+                                {formatCurrency(plan.min)} - {formatCurrency(plan.max)}
+                              </span>
+                           </div>
+                        </div>
+    
+                        <div className="space-y-1.5">
+                          <span className="text-[7px] lg:text-[8px] font-bold text-aura-muted uppercase tracking-widest block ml-1 leading-none">Amount ($)</span>
+                          <div className="relative">
+                            <span className={cn(
+                              "absolute left-3 top-1/2 -translate-y-1/2 font-bold text-[10px] uppercase",
+                              amounts[plan.id] && (parseFloat(amounts[plan.id]) < plan.min || parseFloat(amounts[plan.id]) > plan.max) ? "text-red-500" : "text-white/40"
+                            )}>$</span>
+                            <input 
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={amounts[plan.id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9.]/g, '');
+                                setAmounts({ [plan.id]: val }); 
+                              }}
+                              className={cn(
+                                "w-full bg-white/5 border rounded-xl py-2.5 lg:py-3.5 pl-7 pr-3 text-[10px] font-black transition-all outline-none",
+                                amounts[plan.id] && (parseFloat(amounts[plan.id]) < plan.min || parseFloat(amounts[plan.id]) > plan.max) 
+                                  ? "border-red-500 text-red-500 focus:bg-red-500/10" 
+                                  : "border-white/5 text-white focus:bg-white/10"
+                              )}
+                              style={(!amounts[plan.id] || parseFloat(amounts[plan.id]) >= plan.min && parseFloat(amounts[plan.id]) <= plan.max) && plan.card_border ? { borderColor: `${plan.card_border}40` } : {}}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+    
+                    <button 
+                      disabled={!amounts[plan.id] || parseFloat(amounts[plan.id]) < plan.min || parseFloat(amounts[plan.id]) > plan.max}
+                      onClick={() => handleStartInvestment(plan)}
+                      className={cn(
+                        "w-full py-3.5 lg:py-4 rounded-xl text-white font-black text-[8px] lg:text-[9px] uppercase tracking-[0.2em] transition-all shadow-lg active:scale-[0.98]",
+                        !plan.accent_color && plan.buttonColor,
+                        (!amounts[plan.id] || parseFloat(amounts[plan.id]) < plan.min || parseFloat(amounts[plan.id]) > plan.max) && "opacity-20 cursor-not-allowed grayscale"
+                      )}
+                      style={(!amounts[plan.id] || parseFloat(amounts[plan.id]) >= plan.min && parseFloat(amounts[plan.id]) <= plan.max) && plan.accent_color ? { backgroundColor: plan.accent_color, shadowColor: plan.accent_color } : {}}
+                    >
+                      Initialize Node
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </motion.div>
         )}
@@ -795,31 +658,14 @@ export default function Invest() {
  
                 <div className="space-y-1">
                   <h3 className="text-3xl font-black text-white italic font-serif">Confirm Investment</h3>
-                  <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Reviewing your investment details</p>
+                  <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Reviewing details for {selectedPlan.name} plan</p>
                 </div>
-
-                <div className="space-y-6">
-                  {/* Investment Amount */}
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted">Investment Amount</p>
-                    <p className="text-3xl font-black text-white mt-1">{formatCurrency(confirmedAmount)}</p>
-                  </div>
-
-                  {/* Large Image of the Free AI Bot */}
-                  <div className="flex flex-col items-center justify-center p-6 bg-white/[0.01] border border-white/5 rounded-3xl relative overflow-hidden">
-                    <div className="absolute inset-0 bg-blue-500/5 blur-[80px] rounded-full pointer-events-none -translate-y-1/2" />
-                    <img 
-                      src="https://i.imgur.com/swuDIvl.png" 
-                      alt="Free AI Bot" 
-                      className="w-32 h-32 md:w-36 md:h-36 object-contain drop-shadow-[0_0_25px_rgba(59,130,246,0.25)] animate-pulse"
-                      style={{ animationDuration: '3s' }}
-                      referrerPolicy="no-referrer"
-                    />
-                    <h4 className="text-sm font-black text-white uppercase tracking-[0.15em] mt-4">Free AI Robot</h4>
-                    <p className="text-[11px] font-semibold text-aura-muted mt-2 text-center max-w-xs leading-relaxed">
-                      Proceed to activate your Free AI Robot.
-                    </p>
-                  </div>
+ 
+                <div className="grid grid-cols-2 gap-4">
+                  <SummaryItem label="Allocation" value={formatCurrency(confirmedAmount)} />
+                  <SummaryItem label="Plan Type" value={selectedPlan.name} />
+                  <SummaryItem label="Daily ROI" value={`${(selectedPlan.roi * 100).toFixed(1)}%`} highlight />
+                  <SummaryItem label="Daily Profit" value={formatCurrency(confirmedAmount * selectedPlan.roi)} highlight />
                 </div>
  
                 <div className="p-5 bg-white/5 border border-white/5 rounded-2xl space-y-3">
@@ -887,9 +733,6 @@ export default function Invest() {
                   <ArrowLeft size={14} /> Back to Summary
                 </button>
  
-                <AnimatePresence>
-                </AnimatePresence>
- 
                 <div className="space-y-1">
                   <h3 className="text-3xl font-black text-white italic font-serif">Payment Method</h3>
                   <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Total cost: <span className="text-white font-black">{formatCurrency(confirmedAmount)}</span></p>
@@ -916,10 +759,6 @@ export default function Invest() {
                         if (b.id === paymentMethod) return -1;
                         return 0;
                       });
-
-
-
-
 
                      return sortedOptions.map((opt) => (
                        <motion.div layout key={opt.id} className="flex flex-col gap-4">
@@ -958,7 +797,6 @@ export default function Invest() {
                                     const balance = walletBalanceToShow;
                                     const cleanBalance = parseFloat(balance.toFixed(2));
                                     
-                                    // Validation and Plan Switch Logic
                                     const appropriatePlan = (plans || []).filter((p: any) => p.active_status !== false).find((p: any) => cleanBalance >= p.min && cleanBalance <= p.max);
                                     
                                     if (appropriatePlan) {
@@ -968,7 +806,6 @@ export default function Invest() {
                                       }
                                       setConfirmedAmount(cleanBalance);
                                     } else {
-                                      // Fallback: update amount anyway but check if it's too high for all or too low for all
                                       setConfirmedAmount(cleanBalance);
                                       const activePlans = (plans || []).filter((p: any) => p.active_status !== false);
                                       if (activePlans.length > 0) {
@@ -1129,7 +966,7 @@ export default function Invest() {
                   Secure Neural Link Encryption Active
                 </p>
              </div>
-            </div>
+             </div>
           </motion.div>
         )}
 
@@ -1274,7 +1111,6 @@ export default function Invest() {
               exit={{ scale: 0.95, y: 15 }}
               className="bg-[#11141b] border border-red-500/20 rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-[0_25px_60px_rgba(0,0,0,0.9)] text-center p-8 space-y-6 relative"
             >
-              {/* Globe Icon representation */}
               <div className="mx-auto w-16 h-16 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400">
                 <Globe size={28} className="animate-pulse" />
               </div>

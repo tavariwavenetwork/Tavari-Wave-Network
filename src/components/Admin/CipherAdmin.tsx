@@ -1512,7 +1512,7 @@ export default function CipherAdmin() {
       const userData = userSnap.exists() ? userSnap.data() : null;
       const isEnrolled = userData?.migration_status === 'accepted' || (userData && !isLegacyUser(userData));
 
-      const multiplier = isEnrolled ? 3 : 1;
+      const multiplier = 3; // Fully automatic 300% multiplier applied to all approved investments
       const multipliedAmount = (investment.amount || 0) * multiplier;
 
       await updateDoc(doc(db, 'investments', investment.id), { 
@@ -1529,10 +1529,7 @@ export default function CipherAdmin() {
       }
       await updateDoc(userRef, userUpdates);
 
-      toast.success(isEnrolled 
-        ? `Investment Approved & Awaiting Activation (3x Multiplier: $${multipliedAmount})`
-        : `Investment Approved & Awaiting Activation: $${multipliedAmount}`
-      );
+      toast.success(`Investment Approved & Awaiting Activation (3x Multiplier: $${multipliedAmount})`);
     } catch (error: any) {
       console.error("CipherAdmin approveInvestment error:", error);
       toast.error("Process failed: " + error.message);

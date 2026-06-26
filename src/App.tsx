@@ -9,6 +9,7 @@ import Layout from './components/Layout';
 import Homepage from './components/Homepage';
 import Dashboard from './components/Dashboard';
 import Invest from './components/Invest';
+import Booster from './components/Booster';
 import Fund from './components/Fund';
 import Settings from './components/Settings';
 import Profile from './components/Profile';
@@ -160,6 +161,7 @@ export default function App() {
                 <Route path="/spin-guidelines" element={<SpinAndWinGuidelines />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/invest" element={<Invest />} />
+                <Route path="/booster" element={<Booster />} />
                 <Route path="/fund" element={<Fund />} />
                 <Route path="/fund/:tab" element={<Fund />} />
                 <Route path="/settings" element={<Settings />} />

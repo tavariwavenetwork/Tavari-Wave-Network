@@ -248,7 +248,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                   <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/90 backdrop-blur-sm rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center text-[#00ffff] shadow-xl overflow-hidden relative">
                     <motion.div 
                       animate={{
-                        scale: [1.75, 2.05, 1.75]
+                        scale: [0.85, 0.95, 0.85]
                       }}
                       transition={{
                         duration: 3.5,
