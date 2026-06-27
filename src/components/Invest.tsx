@@ -222,6 +222,7 @@ export default function Invest() {
   } = useUI();
   const { config: uiConfig } = useUIConfig();
   const navigate = useNavigate();
+  const [selectedCurrency, setSelectedCurrency] = useState<'usd' | 'ngn' | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<any | null>(null);
   const [selectedWallet, setSelectedWallet] = useState<'funding_balance' | 'available_balance' | 'referral_earnings' | 'reward_dollar_balance'>('funding_balance');
   const walletBalanceToShow = selectedWallet === 'reward_dollar_balance'
@@ -237,6 +238,17 @@ export default function Invest() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transactionId, setTransactionId] = useState('');
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
+
+  const formatNaira = (amount: number): string => {
+    return '₦' + Math.round(amount).toLocaleString('en-US');
+  };
+
+  const formatValue = (amountInUsd: number): string => {
+    if (selectedCurrency === 'ngn') {
+      return formatNaira(amountInUsd * exchangeRate);
+    }
+    return formatCurrency(amountInUsd);
+  };
 
   // Country Selection & Card Payment Unavailability States
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -605,6 +617,92 @@ export default function Invest() {
         message={paymentMethod === 'wallet' ? "Investment initialized and synchronized with the Tavari Wave Mainnet." : "Institutional deposit submitted. Awaiting network confirmation sequence."}
       />
 
+      {/* Currency Selection Modal Overlay */}
+      {selectedCurrency === null && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-[6px]"
+        >
+          <motion.div 
+            initial={{ scale: 0.95, y: 15 }}
+            animate={{ 
+              scale: 1, 
+              y: [0, -5, 0],
+            }}
+            transition={{
+              y: {
+                duration: 5,
+                repeat: Infinity,
+                repeatType: "reverse",
+                ease: "easeInOut"
+              },
+              scale: { duration: 0.3 }
+            }}
+            className="bg-gradient-to-b from-[#11141c]/95 to-[#07090d]/98 border border-white/10 rounded-[2rem] w-full max-w-sm p-6 space-y-6 shadow-[0_20px_50px_rgba(168,85,247,0.25),inset_0_1px_1px_rgba(255,255,255,0.08),inset_0_-1px_1px_rgba(0,0,0,0.5)] text-center relative overflow-hidden"
+          >
+            {/* Decorative glows */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-secondary/20 blur-[50px] rounded-full pointer-events-none" />
+
+            <div className="space-y-1.5">
+              <h3 className="text-xl md:text-2xl font-black text-white italic font-serif leading-none tracking-tight">
+                Choose Your Currency
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3.5 pt-1">
+              <button
+                onClick={() => {
+                  setSelectedCurrency('ngn');
+                  setSelectedCountry('Nigeria');
+                  setPaymentMethod('bank'); // default to bank transfer for Naira
+                  toast.success("Naira (₦) investment pipeline established.");
+                }}
+                className="p-4 rounded-xl bg-white/[0.02] border border-[#A855F7]/20 hover:border-[#A855F7]/60 hover:bg-[#A855F7]/5 transition-all duration-300 group flex items-center justify-between text-left shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 cursor-pointer"
+              >
+                <div className="flex items-center gap-3 animate-fade-in">
+                  <span className="text-2xl filter drop-shadow-md select-none transform group-hover:scale-110 transition-transform duration-300">
+                    🇳🇬
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-white">
+                      Invest in Naira (₦)
+                    </p>
+                    <p className="text-[8px] font-bold text-aura-muted uppercase tracking-[0.1em] mt-0.5">
+                      Settlement via local bank transfer
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-aura-muted group-hover:text-white transition-colors" />
+              </button>
+
+              <button
+                onClick={() => {
+                  setSelectedCurrency('usd');
+                  toast.success("USD ($) investment pipeline established.");
+                }}
+                className="p-4 rounded-xl bg-white/[0.02] border border-[#A855F7]/20 hover:border-[#A855F7]/60 hover:bg-[#A855F7]/5 transition-all duration-300 group flex items-center justify-between text-left shadow-[0_4px_12px_rgba(0,0,0,0.3)] hover:-translate-y-0.5 cursor-pointer"
+              >
+                <div className="flex items-center gap-3 animate-fade-in">
+                  <span className="text-2xl filter drop-shadow-md select-none transform group-hover:scale-110 transition-transform duration-300">
+                    🇺🇸
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-black uppercase tracking-widest text-white">
+                      Invest in Dollar ($)
+                    </p>
+                    <p className="text-[8px] font-bold text-aura-muted uppercase tracking-[0.1em] mt-0.5">
+                      Global USD settlement rails
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight size={14} className="text-aura-muted group-hover:text-white transition-colors" />
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Premium Background Accents */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/4" />
       <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-secondary/5 blur-[100px] rounded-full pointer-events-none translate-y-1/4 -translate-x-1/4" />
@@ -629,10 +727,66 @@ export default function Invest() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#050608] via-transparent to-black/30" />
               
-              <div className="absolute bottom-6 left-6 right-6 z-10 flex flex-col md:flex-row md:items-end justify-between gap-4 max-w-5xl mx-auto w-full">
+              <div className="absolute bottom-6 left-6 right-6 z-10 flex flex-row items-center justify-between gap-4 max-w-5xl mx-auto w-full">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-extrabold font-serif italic text-white tracking-tight drop-shadow-md">Investment Plans</h1>
                 </div>
+
+                {/* Switch Currency Toggle inside the header */}
+                {selectedCurrency !== null && (
+                  <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-full p-1 pl-3 shadow-lg select-none">
+                    <span className="hidden sm:inline-block text-[9px] font-black uppercase tracking-widest text-aura-muted">Currency:</span>
+                    <div 
+                      onClick={() => {
+                        const currentVal = parseFloat(amountInput);
+                        if (selectedCurrency === 'usd') {
+                          setSelectedCurrency('ngn');
+                          setSelectedCountry('Nigeria');
+                          setPaymentMethod('bank');
+                          if (currentVal && !isNaN(currentVal)) {
+                            setAmountInput((currentVal * exchangeRate).toString());
+                          }
+                          toast.success("Switched to Naira (₦) investment flow.");
+                        } else {
+                          setSelectedCurrency('usd');
+                          setSelectedCountry(null);
+                          setPaymentMethod('bank');
+                          if (currentVal && !isNaN(currentVal)) {
+                            setAmountInput((currentVal / exchangeRate).toString());
+                          }
+                          toast.success("Switched to Dollar ($) investment flow.");
+                        }
+                      }}
+                      className="relative flex items-center justify-between w-20 h-8 rounded-full bg-black/40 border border-white/10 cursor-pointer p-1 overflow-hidden"
+                    >
+                      {/* Animated sliding background pill */}
+                      <motion.div 
+                        className="absolute top-1 bottom-1 w-8 rounded-full bg-primary shadow-md"
+                        layout
+                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        style={{
+                          left: selectedCurrency === 'usd' ? '4px' : 'calc(100% - 36px)'
+                        }}
+                      />
+                      
+                      {/* Dollar indicator */}
+                      <span className={cn(
+                        "z-10 text-xs font-black w-8 text-center transition-colors duration-300",
+                        selectedCurrency === 'usd' ? "text-white" : "text-white/30"
+                      )}>
+                        $
+                      </span>
+
+                      {/* Naira indicator */}
+                      <span className={cn(
+                        "z-10 text-xs font-black w-8 text-center transition-colors duration-300",
+                        selectedCurrency === 'ngn' ? "text-white" : "text-white/30"
+                      )}>
+                        ₦
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -641,7 +795,12 @@ export default function Invest() {
                 /* Selected Amount Display when Preset chosen */
                 <div className="bg-gradient-to-b from-blue-500/10 to-indigo-500/15 border border-blue-500/30 rounded-3xl p-6 text-center space-y-4 shadow-[0_12px_24px_rgba(59,130,246,0.15)] animate-fade-in">
                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400">Selected Investment Amount</p>
-                  <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight">${parseFloat(amountInput).toLocaleString()}</h2>
+                  <h2 className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                    {selectedCurrency === 'ngn'
+                      ? formatNaira(parseFloat(amountInput))
+                      : `$${parseFloat(amountInput).toLocaleString()}`
+                    }
+                  </h2>
                   <button
                     type="button"
                     onClick={() => {
@@ -659,12 +818,18 @@ export default function Invest() {
                   <div className="space-y-3">
                     <div className="grid grid-cols-5 gap-2 sm:gap-3">
                       {[10, 20, 50, 80, 100, 200, 350, 500, 800, 1000, 1500, 2000, 3500, 5000, 8000, 10000, 15000, 25000, 50000, 100000].map((val) => {
-                        const isSelected = parseFloat(amountInput) === val;
+                        const isSelected = selectedCurrency === 'ngn'
+                          ? Math.abs(parseFloat(amountInput) - (val * exchangeRate)) < 0.01
+                          : parseFloat(amountInput) === val;
                         return (
                           <button
                             key={val}
                             onClick={() => {
-                              setAmountInput(val.toString());
+                              if (selectedCurrency === 'ngn') {
+                                setAmountInput((val * exchangeRate).toString());
+                              } else {
+                                setAmountInput(val.toString());
+                              }
                               setIsPresetSelected(true);
                             }}
                             className={cn(
@@ -674,7 +839,10 @@ export default function Invest() {
                                 : "bg-white/[0.03] border-white/10 text-gray-300 shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-white/20 hover:bg-white/[0.06] hover:-translate-y-0.5 active:translate-y-0"
                             )}
                           >
-                            ${val >= 1000 ? `${(val / 1000).toLocaleString()}k` : val}
+                            {selectedCurrency === 'ngn'
+                              ? `₦${(val * exchangeRate) >= 1000000 ? `${((val * exchangeRate) / 1000000).toFixed(1)}M` : `${((val * exchangeRate) / 1000).toFixed(0)}k`}`
+                              : `$${val >= 1000 ? `${(val / 1000).toLocaleString()}k` : val}`
+                            }
                           </button>
                         );
                       })}
@@ -683,9 +851,13 @@ export default function Invest() {
 
                   {/* Manual input block */}
                   <div className="space-y-3">
-                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted ml-1">Enter Amount ($)</label>
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted ml-1">
+                      {selectedCurrency === 'ngn' ? 'Enter Amount (₦)' : 'Enter Amount ($)'}
+                    </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-extrabold text-sm">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-extrabold text-sm">
+                        {selectedCurrency === 'ngn' ? '₦' : '$'}
+                      </span>
                       <input
                         type="number"
                         inputMode="decimal"
@@ -706,12 +878,20 @@ export default function Invest() {
                   {(() => {
                     const parsedVal = parseFloat(amountInput);
                     if (isNaN(parsedVal) || parsedVal <= 0) return null;
-                    const mappedPlan = plans.find((p: any) => parsedVal >= p.min && parsedVal <= p.max);
+                    
+                    const parsedValInUsd = selectedCurrency === 'ngn'
+                      ? parsedVal / exchangeRate
+                      : parsedVal;
+
+                    const mappedPlan = plans.find((p: any) => parsedValInUsd >= p.min && parsedValInUsd <= p.max);
                     if (!mappedPlan) {
                       return (
                         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-center">
                           <p className="text-[10px] font-black text-red-500 uppercase tracking-widest">
-                            Amount outside investment limits ($10 - $10,000,000)
+                            {selectedCurrency === 'ngn'
+                              ? `Amount outside investment limits (${formatNaira(10 * exchangeRate)} - ${formatNaira(10000000 * exchangeRate)})`
+                              : `Amount outside investment limits (${formatCurrency(10)} - ${formatCurrency(10000000)})`
+                            }
                           </p>
                         </div>
                       );
@@ -728,7 +908,12 @@ export default function Invest() {
                         </div>
                         <div className="flex justify-between items-center">
                           <p className="text-[9px] font-black uppercase text-aura-muted tracking-widest">Daily Profit Projection</p>
-                          <p className="text-xs font-black text-white font-sans">{formatCurrency(parsedVal * mappedPlan.roi)}</p>
+                          <p className="text-xs font-black text-white font-sans">
+                            {selectedCurrency === 'ngn'
+                              ? formatNaira(parsedVal * mappedPlan.roi)
+                              : formatCurrency(parsedVal * mappedPlan.roi)
+                            }
+                          </p>
                         </div>
                       </div>
                     );
@@ -744,16 +929,25 @@ export default function Invest() {
                     toast.error("Please enter or select a valid amount.");
                     return;
                   }
-                  const mappedPlan = plans.find((p: any) => parsedVal >= p.min && parsedVal <= p.max);
+                  
+                  const parsedValInUsd = selectedCurrency === 'ngn'
+                    ? parsedVal / exchangeRate
+                    : parsedVal;
+
+                  const mappedPlan = plans.find((p: any) => parsedValInUsd >= p.min && parsedValInUsd <= p.max);
                   if (!mappedPlan) {
-                    toast.error(`Investment amount must be between ${formatCurrency(10)} and ${formatCurrency(10000000)}.`);
+                    if (selectedCurrency === 'ngn') {
+                      toast.error(`Investment amount must be between ${formatNaira(10 * exchangeRate)} and ${formatNaira(10000000 * exchangeRate)}.`);
+                    } else {
+                      toast.error(`Investment amount must be between ${formatCurrency(10)} and ${formatCurrency(10000000)}.`);
+                    }
                     return;
                   }
                   
                   // Setup amount mapping to standard amounts record to preserve sub-logic
                   setAmounts({ [mappedPlan.id]: amountInput });
                   setSelectedPlan(mappedPlan);
-                  setConfirmedAmount(parsedVal);
+                  setConfirmedAmount(parsedValInUsd);
                   setView('summary');
                 }}
                 disabled={!amountInput || isNaN(parseFloat(amountInput)) || parseFloat(amountInput) <= 0}
@@ -793,32 +987,41 @@ export default function Invest() {
                   <ArrowLeft size={14} /> Back to Plans
                 </button>
  
-                <div className="space-y-1">
-                  <h3 className="text-3xl font-black text-white italic font-serif">Confirm Investment</h3>
-                  <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Reviewing your investment details</p>
-                </div>
-
                 <div className="space-y-6">
-                  {/* Investment Amount */}
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-muted">Investment Amount</p>
-                    <p className="text-3xl font-black text-white mt-1">{formatCurrency(confirmedAmount)}</p>
-                  </div>
+                  {/* Slim Premium Combined AI Bot & Amount Card */}
+                  <div className="flex items-center justify-between p-5 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-transparent border border-white/10 rounded-2xl relative overflow-hidden shadow-[0_10px_30px_rgba(0,0,0,0.3)]">
+                    <div className="absolute inset-y-0 right-0 w-32 bg-blue-500/10 blur-xl rounded-full pointer-events-none" />
+                    
+                    {/* LEFT SIDE: Investment Amount */}
+                    <div className="space-y-1 text-left z-10">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-blue-400">Target Allocation</p>
+                      <p className="text-2xl sm:text-3xl font-black text-white font-serif tracking-tight">
+                        {selectedCurrency === 'ngn'
+                          ? formatNaira(confirmedAmount * exchangeRate)
+                          : formatCurrency(confirmedAmount)
+                        }
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                          {selectedPlan.name}
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Large Image of the Free AI Bot */}
-                  <div className="flex flex-col items-center justify-center p-6 bg-white/[0.01] border border-white/5 rounded-3xl relative overflow-hidden">
-                    <div className="absolute inset-0 bg-blue-500/5 blur-[80px] rounded-full pointer-events-none -translate-y-1/2" />
-                    <img 
-                      src="https://i.imgur.com/swuDIvl.png" 
-                      alt="Free AI Bot" 
-                      className="w-32 h-32 md:w-36 md:h-36 object-contain drop-shadow-[0_0_25px_rgba(59,130,246,0.25)] animate-pulse"
-                      style={{ animationDuration: '3s' }}
-                      referrerPolicy="no-referrer"
-                    />
-                    <h4 className="text-sm font-black text-white uppercase tracking-[0.15em] mt-4">Free AI Robot</h4>
-                    <p className="text-[11px] font-semibold text-aura-muted mt-2 text-center max-w-xs leading-relaxed">
-                      Proceed to activate your Free AI Robot.
-                    </p>
+                    {/* RIGHT SIDE: Free AI Bot Image & Small Label */}
+                    <div className="flex items-center gap-3 z-10">
+                      <div className="text-right">
+                        <h4 className="text-[10px] font-black text-white uppercase tracking-[0.15em]">Free AI Robot</h4>
+                      </div>
+                      <img 
+                        src="https://i.imgur.com/swuDIvl.png" 
+                        alt="Free AI Bot" 
+                        className="w-16 h-16 sm:w-18 sm:h-18 object-contain drop-shadow-[0_0_15px_rgba(59,130,246,0.25)] animate-pulse"
+                        style={{ animationDuration: '3.5s' }}
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
                   </div>
                 </div>
  
@@ -847,7 +1050,15 @@ export default function Invest() {
  
                 <button 
                   disabled={!agreedToTerms}
-                  onClick={() => setShowCountryModal(true)}
+                  onClick={() => {
+                    if (selectedCurrency === 'ngn') {
+                      setSelectedCountry('Nigeria');
+                      setPaymentMethod('bank');
+                      setView('payment');
+                    } else {
+                      setShowCountryModal(true);
+                    }
+                  }}
                   className="w-full py-5 bg-primary text-white font-black uppercase tracking-[0.3em] text-[10px] rounded-xl disabled:opacity-20 disabled:grayscale transition-all shadow-lg shadow-primary/20"
                 >
                   Proceed to Payment
@@ -892,7 +1103,7 @@ export default function Invest() {
  
                 <div className="space-y-1">
                   <h3 className="text-3xl font-black text-white italic font-serif">Payment Method</h3>
-                  <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Total cost: <span className="text-white font-black">{formatCurrency(confirmedAmount)}</span></p>
+                  <p className="text-[10px] font-bold text-aura-muted uppercase tracking-widest">Total cost: <span className="text-white font-black">{formatValue(confirmedAmount)}</span></p>
                 </div>
  
                 <div className="flex flex-col gap-4">
@@ -900,11 +1111,14 @@ export default function Invest() {
                      const rawOptions = [
                        { id: 'bank' as const, label: 'Bank Transfer', icon: <RealisticBankIcon />, description: "Direct institutional transfer", badge: "Recommended", badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/20", isRecommended: true },
                        { id: 'crypto' as const, label: 'Crypto Payments', icon: <RealisticBitcoinIcon />, description: "Pay via USDT, BTC, or ERC20" },
-                       { id: 'wallet' as const, label: 'Wallet Balance', icon: <RealisticWalletIcon />, description: `${selectedWallet === 'reward_dollar_balance' ? 'Reward' : selectedWallet.split('_')[0].charAt(0).toUpperCase() + selectedWallet.split('_')[0].slice(1)} balance (${formatCurrency(walletBalanceToShow)})` },
+                       { id: 'wallet' as const, label: 'Wallet Balance', icon: <RealisticWalletIcon />, description: `${selectedWallet === 'reward_dollar_balance' ? 'Reward' : selectedWallet.split('_')[0].charAt(0).toUpperCase() + selectedWallet.split('_')[0].slice(1)} balance (${formatValue(walletBalanceToShow)})` },
                        { id: 'card' as const, label: 'Card Payment', icon: <RealisticCardIcon />, description: "Instant settlement via card integration", isUnavailable: true },
                      ];
 
                      const options = rawOptions.filter(opt => {
+                       if (selectedCurrency === 'ngn') {
+                         return opt.id === 'bank' || opt.id === 'wallet';
+                       }
                        if (opt.id === 'bank') {
                          return selectedCountry === 'Nigeria';
                        }
@@ -951,7 +1165,7 @@ export default function Invest() {
                               <div className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-2xl">
                                 <div>
                                   <p className="text-[8px] font-black text-aura-muted uppercase tracking-widest mb-1">New Allocation</p>
-                                  <p className="text-sm font-black text-white italic font-serif">{formatCurrency(confirmedAmount)}</p>
+                                  <p className="text-sm font-black text-white italic font-serif">{formatValue(confirmedAmount)}</p>
                                 </div>
                                 <button 
                                   onClick={() => {
@@ -964,7 +1178,7 @@ export default function Invest() {
                                     if (appropriatePlan) {
                                       if (appropriatePlan.id !== selectedPlan?.id) {
                                         setSelectedPlan(appropriatePlan);
-                                        toast.success(`Plan updated to ${appropriatePlan.name} for ${formatCurrency(cleanBalance)} allocation.`);
+                                        toast.success(`Plan updated to ${appropriatePlan.name} for ${formatValue(cleanBalance)} allocation.`);
                                       }
                                       setConfirmedAmount(cleanBalance);
                                     } else {
@@ -973,9 +1187,9 @@ export default function Invest() {
                                       const activePlans = (plans || []).filter((p: any) => p.active_status !== false);
                                       if (activePlans.length > 0) {
                                         if (cleanBalance < activePlans[0].min) {
-                                          toast.error(`Minimum investment is ${formatCurrency(activePlans[0].min)}`);
+                                          toast.error(`Minimum investment is ${formatValue(activePlans[0].min)}`);
                                         } else if (cleanBalance > activePlans[activePlans.length - 1].max) {
-                                          toast.error(`Maximum investment is ${formatCurrency(activePlans[activePlans.length - 1].max)}`);
+                                          toast.error(`Maximum investment is ${formatValue(activePlans[activePlans.length - 1].max)}`);
                                         }
                                       }
                                     }
@@ -993,7 +1207,7 @@ export default function Invest() {
                               {selectedPlan && (confirmedAmount < selectedPlan.min || confirmedAmount > selectedPlan.max) && (
                                 <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
                                   <p className="text-[10px] font-black text-red-500 uppercase tracking-widest text-center">
-                                    Allocation outside {selectedPlan.name} limits ({formatCurrency(selectedPlan.min)} - {formatCurrency(selectedPlan.max)})
+                                    Allocation outside {selectedPlan.name} limits ({formatValue(selectedPlan.min)} - {formatValue(selectedPlan.max)})
                                   </p>
                                   <div className="mt-3 grid grid-cols-1 gap-2">
                                     {(plans || []).filter((p: any) => p.active_status !== false).map((p: any) => (

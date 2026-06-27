@@ -400,42 +400,134 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const finalRemaining = isExhausted ? 0 : remainingAssets;
 
             if (totalCredit > 0) {
-              const oldAvailableBalance = currentProfile.available_balance || 0;
-              const newAvailableBalance = oldAvailableBalance + totalCredit;
+              // Check automatic compounding state
+              let autoCompoundEnabled = currentProfile.auto_compound_enabled || false;
+              let isCompoundingActiveNow = false;
+              const nowMs = new Date().getTime();
 
-              transaction.update(docRef, {
-                available_balance: newAvailableBalance,
-                total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
-                remaining_upgraded_assets: finalRemaining,
-                total_invested: finalRemaining,
-                roi_cycle_start: newCycleStart,
-                migration_status: isExhausted ? 'completed' : 'accepted'
-              });
+              if (autoCompoundEnabled && currentProfile.auto_compound_end_date) {
+                const endMs = new Date(currentProfile.auto_compound_end_date).getTime();
+                if (nowMs >= endMs) {
+                  autoCompoundEnabled = false;
+                } else {
+                  isCompoundingActiveNow = true;
+                }
+              }
 
-              const txId = `roi-legacy-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
-              const txRef = doc(db, 'transactions', txId);
-              transaction.set(txRef, {
-                user_id: firebaseUser.uid,
-                type: 'roi_harvest',
-                amount: totalCredit,
-                plan_name: 'Legacy Upgrade Cycle',
-                created_at: new Date().toISOString(),
-                status: 'approved',
-                description: `Legacy Asset Multiplier ROI of 0.5% (Disbursed: $${totalCredit.toFixed(2)}, Remaining Assets: $${finalRemaining.toFixed(2)})`
-              });
+              if (isCompoundingActiveNow) {
+                // Compound Legacy ROI
+                const existingCompounds = currentProfile.withdraw_methods?.compounded_amounts || currentProfile.compounded_amounts || [];
+                const newCompounds = [...existingCompounds, totalCredit];
+                const existingWithdrawMethods = currentProfile.withdraw_methods || {};
+                const withdrawMethodsUpdate = {
+                  ...existingWithdrawMethods,
+                  compounded_amounts: newCompounds,
+                  last_compound_popup_date: new Date().toISOString().split('T')[0]
+                };
 
-              const notifRef = doc(collection(db, 'notifications'));
-              transaction.set(notifRef, {
-                user_id: firebaseUser.uid,
-                type: 'success',
-                title: 'ROI Cycle Deposited',
-                message: `Legacy Upgrade ROI cycle has matured. Added $${totalCredit.toFixed(2)} to your available balance.`,
-                read: false,
-                created_at: new Date().toISOString()
-              });
+                const userUpdates: any = {
+                  total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
+                  remaining_upgraded_assets: finalRemaining,
+                  total_invested: Math.max(0, finalRemaining + totalCredit),
+                  roi_cycle_start: newCycleStart,
+                  withdraw_methods: withdrawMethodsUpdate,
+                  auto_compound_enabled: autoCompoundEnabled,
+                  migration_status: isExhausted ? 'completed' : 'accepted'
+                };
+
+                if (currentProfile.compounded_amounts) {
+                  userUpdates.compounded_amounts = newCompounds;
+                }
+
+                transaction.update(docRef, userUpdates);
+
+                // Write ROI harvest transaction
+                const harvestTxId = `roi-legacy-auto-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
+                const harvestTxRef = doc(db, 'transactions', harvestTxId);
+                transaction.set(harvestTxRef, {
+                  user_id: firebaseUser.uid,
+                  type: 'roi_harvest',
+                  amount: totalCredit,
+                  plan_name: 'Legacy Upgrade Cycle',
+                  created_at: new Date().toISOString(),
+                  status: 'approved',
+                  description: `Legacy Asset Multiplier ROI of 0.5% (Disbursed & Auto-Compounded: $${totalCredit.toFixed(2)}, Remaining Assets: $${finalRemaining.toFixed(2)})`
+                });
+
+                // Write automatic compound transaction
+                const compoundTxId = `roi-comp-legacy-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
+                const compoundTxRef = doc(db, 'transactions', compoundTxId);
+                transaction.set(compoundTxRef, {
+                  user_id: firebaseUser.uid,
+                  type: 'compound',
+                  type_detail: 'compound_available_balance',
+                  amount: totalCredit,
+                  status: 'approved',
+                  created_at: new Date().toISOString(),
+                  description: `Automated Daily Reinvestment of ROI earnings`
+                });
+
+                // Write Notification
+                const notifRef = doc(collection(db, 'notifications'));
+                transaction.set(notifRef, {
+                  user_id: firebaseUser.uid,
+                  type: 'success',
+                  title: 'Auto-Compound Executed',
+                  message: `Automated compounding protocol reinvested ${totalCredit.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} into your assets.`,
+                  read: false,
+                  created_at: new Date().toISOString()
+                });
+              } else {
+                // Standard legacy credit to available balance
+                const oldAvailableBalance = currentProfile.available_balance || 0;
+                const newAvailableBalance = oldAvailableBalance + totalCredit;
+
+                transaction.update(docRef, {
+                  available_balance: newAvailableBalance,
+                  total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
+                  remaining_upgraded_assets: finalRemaining,
+                  total_invested: finalRemaining,
+                  roi_cycle_start: newCycleStart,
+                  auto_compound_enabled: autoCompoundEnabled,
+                  migration_status: isExhausted ? 'completed' : 'accepted'
+                });
+
+                const txId = `roi-legacy-${firebaseUser.uid}-${currentCycleStart}-${currentCompletedCycles}`;
+                const txRef = doc(db, 'transactions', txId);
+                transaction.set(txRef, {
+                  user_id: firebaseUser.uid,
+                  type: 'roi_harvest',
+                  amount: totalCredit,
+                  plan_name: 'Legacy Upgrade Cycle',
+                  created_at: new Date().toISOString(),
+                  status: 'approved',
+                  description: `Legacy Asset Multiplier ROI of 0.5% (Disbursed: $${totalCredit.toFixed(2)}, Remaining Assets: $${finalRemaining.toFixed(2)})`
+                });
+
+                const notifRef = doc(collection(db, 'notifications'));
+                transaction.set(notifRef, {
+                  user_id: firebaseUser.uid,
+                  type: 'success',
+                  title: 'ROI Cycle Deposited',
+                  message: `Legacy Upgrade ROI cycle has matured. Added $${totalCredit.toFixed(2)} to your available balance.`,
+                  read: false,
+                  created_at: new Date().toISOString()
+                });
+              }
             } else {
+              // Even with 0 credit, check for expiration
+              let autoCompoundEnabled = currentProfile.auto_compound_enabled || false;
+              if (autoCompoundEnabled && currentProfile.auto_compound_end_date) {
+                const nowMs = new Date().getTime();
+                const endMs = new Date(currentProfile.auto_compound_end_date).getTime();
+                if (nowMs >= endMs) {
+                  autoCompoundEnabled = false;
+                }
+              }
+
               transaction.update(docRef, {
                 roi_cycle_start: newCycleStart,
+                auto_compound_enabled: autoCompoundEnabled,
                 migration_status: isExhausted ? 'completed' : 'accepted'
               });
             }
@@ -874,6 +966,150 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const runAutoCompoundRecoveryCheck = useCallback(async (firebaseUser: FirebaseUser, profileData: UserProfile) => {
+    const currentWithdrawMethods = profileData.withdraw_methods || {};
+    if (currentWithdrawMethods.auto_compound_recovered_v2) return;
+
+    // Check if autoCompound is currently active
+    const autoCompoundEnabled = profileData.auto_compound_enabled || false;
+    const autoCompoundEndDate = profileData.auto_compound_end_date;
+    const autoCompoundStartDate = profileData.auto_compound_start_date;
+    if (!autoCompoundEnabled || !autoCompoundEndDate || !autoCompoundStartDate) {
+      // Not active auto-compound, just flag as completed so we don't check again
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      await updateDoc(docRef, {
+        withdraw_methods: {
+          ...currentWithdrawMethods,
+          auto_compound_recovered_v2: true
+        }
+      });
+      return;
+    }
+
+    const nowMs = new Date().getTime();
+    const endMs = new Date(autoCompoundEndDate).getTime();
+    if (nowMs >= endMs) {
+      // Auto-compound expired, flag as completed
+      const docRef = doc(db, 'users', firebaseUser.uid);
+      await updateDoc(docRef, {
+        withdraw_methods: {
+          ...currentWithdrawMethods,
+          auto_compound_recovered_v2: true
+        }
+      });
+      return;
+    }
+
+    const docRef = doc(db, 'users', firebaseUser.uid);
+    try {
+      const txQuery = query(collection(db, 'transactions'), where('user_id', '==', firebaseUser.uid));
+      const txSnap = await getDocs(txQuery);
+
+      let totalRoiHarvestedSinceStart = 0;
+      let totalRoiCompoundedSinceStart = 0;
+      const startMs = new Date(autoCompoundStartDate).getTime();
+
+      txSnap.docs.forEach(docSnap => {
+        const tx = docSnap.data();
+        if (tx.status === 'approved' && tx.created_at) {
+          const txMs = new Date(tx.created_at).getTime();
+          if (txMs >= startMs) {
+            if (tx.type === 'roi_harvest') {
+              totalRoiHarvestedSinceStart += tx.amount || 0;
+            } else if (tx.type === 'compound') {
+              totalRoiCompoundedSinceStart += tx.amount || 0;
+            }
+          }
+        }
+      });
+
+      const uncompoundedRoi = Math.max(0, totalRoiHarvestedSinceStart - totalRoiCompoundedSinceStart);
+      const currentAvailable = profileData.available_balance || 0;
+      const moveAmount = Math.max(0, Math.floor(Math.min(uncompoundedRoi, currentAvailable) * 100) / 100);
+
+      if (moveAmount > 0) {
+        await runTransaction(db, async (transaction) => {
+          const uSnap = await transaction.get(docRef);
+          if (!uSnap.exists()) return;
+
+          const uData = uSnap.data() as UserProfile;
+          const uWithdrawMethods = uData.withdraw_methods || {};
+          if (uWithdrawMethods.auto_compound_recovered_v2) return;
+
+          const latestAvailable = uData.available_balance || 0;
+          const latestInvested = uData.total_invested || 0;
+
+          const finalMoveAmount = Math.max(0, Math.floor(Math.min(moveAmount, latestAvailable) * 100) / 100);
+          if (finalMoveAmount <= 0) {
+            transaction.update(docRef, {
+              withdraw_methods: {
+                ...uWithdrawMethods,
+                auto_compound_recovered_v2: true
+              }
+            });
+            return;
+          }
+
+          const existingCompounds = uWithdrawMethods.compounded_amounts || uData.compounded_amounts || [];
+          const newCompounds = [...existingCompounds, finalMoveAmount];
+
+          const newAvailable = Math.max(0, Math.floor((latestAvailable - finalMoveAmount) * 100) / 100);
+          const newInvested = Math.floor((latestInvested + finalMoveAmount) * 100) / 100;
+
+          const userUpdates: any = {
+            available_balance: newAvailable,
+            total_invested: newInvested,
+            withdraw_methods: {
+              ...uWithdrawMethods,
+              compounded_amounts: newCompounds,
+              auto_compound_recovered_v2: true
+            }
+          };
+
+          if (uData.compounded_amounts) {
+            userUpdates.compounded_amounts = newCompounds;
+          }
+
+          transaction.update(docRef, userUpdates);
+
+          // Add transaction compound record
+          const correctionTxId = `roi-auto-recovery-${firebaseUser.uid}-${Date.now()}`;
+          const correctionTxRef = doc(db, 'transactions', correctionTxId);
+          transaction.set(correctionTxRef, {
+            user_id: firebaseUser.uid,
+            type: 'compound',
+            type_detail: 'compound_available_balance',
+            amount: finalMoveAmount,
+            status: 'approved',
+            created_at: new Date().toISOString(),
+            description: `Automated recovery reinvestment of uncompounded ROI earnings`
+          });
+
+          // Write Notification
+          const notifRef = doc(collection(db, 'notifications'));
+          transaction.set(notifRef, {
+            user_id: firebaseUser.uid,
+            type: 'success',
+            title: 'Auto-Compound Corrected',
+            message: `Automated protocol recovered and reinvested ${finalMoveAmount.toLocaleString('en-US', { style: 'currency', currency: 'USD' })} into your assets.`,
+            read: false,
+            created_at: new Date().toISOString()
+          });
+        });
+        console.log(`[Auto-Compound Recovery] Reinvested $${moveAmount} for user: ${firebaseUser.uid}`);
+      } else {
+        await updateDoc(docRef, {
+          withdraw_methods: {
+            ...currentWithdrawMethods,
+            auto_compound_recovered_v2: true
+          }
+        });
+      }
+    } catch (err) {
+      console.error("[Auto-Compound Recovery Error]:", err);
+    }
+  }, []);
+
   const fetchProfileWithRetry = useCallback(async (firebaseUser: FirebaseUser, retryCount = 0): Promise<void> => {
     const isCipher = firebaseUser.email === 'support@tavariwave.network' || 
                      firebaseUser.email === 'contact.cga.usa@gmail.com' || 
@@ -930,6 +1166,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const isMigrated = profileData.withdraw_methods?.compounded_amounts_migrated_v1 || profileData.compounded_amounts_migrated_v1;
           if (!isMigrated) {
             runCompoundingMigrationCorrection(firebaseUser, profileData);
+          }
+
+          // Trigger Auto-Compound Recovery for existing users
+          if (!profileData.withdraw_methods?.auto_compound_recovered_v2) {
+            runAutoCompoundRecoveryCheck(firebaseUser, profileData);
           }
 
           // ROI Background Sync

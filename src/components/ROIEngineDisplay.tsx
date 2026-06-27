@@ -274,7 +274,7 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                 </div>
 
                 {/* Expected Daily Returns directly under the trading robot on all devices */}
-                <span className="text-[8px] lg:text-[11px] font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap">
+                <span className="text-[8px] lg:hidden font-black text-white/40 italic font-serif tracking-tighter whitespace-nowrap">
                   {formatCurrency(yieldSum)}/Day
                 </span>
             </div>

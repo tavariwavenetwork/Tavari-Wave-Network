@@ -53,6 +53,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import MarketTicker from './MarketTicker';
 import Footer from './Footer';
+import WhatsAppCommunitySlider from './WhatsAppCommunitySlider';
 
 // --- SUB-COMPONENTS ---
 // ... (SidebarItem, SidebarSubItem, BottomNavItem remain same)
@@ -2385,28 +2386,10 @@ export default function Layout() {
                 </div>
               </motion.button>
 
-              {/* Right: Floating WhatsApp button */}
-              <motion.a
-                href="https://chat.whatsapp.com/CoNzUZBmDsDC8bV8nB7uIH?s=cl&p=i&ilr=4"
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, x: 60, scale: 0.9 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 60, scale: 0.9 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                className="pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-[0_4px_15px_rgba(37,211,102,0.4)] transition-colors cursor-pointer group"
-                title="Join WhatsApp Group"
-              >
-                {/* WhatsApp Premium Icon */}
-                <svg 
-                  viewBox="0 0 24 24" 
-                  className="w-5.5 h-5.5 fill-current filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
-                >
-                  <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.528 2.017 14.077 1.01 11.45 1.01c-5.436 0-9.86 4.37-9.864 9.8 0 1.639.428 3.24 1.24 4.65l-.382 1.396 1.433-.376.126.075c1.619.982 3.251 1.498 4.654 1.498zM17.15 14c-.284-.142-1.68-.828-1.94-.923-.26-.095-.45-.142-.64.142-.19.285-.736.924-.902 1.114-.167.19-.333.213-.617.071-.284-.142-1.2-.442-2.285-1.41-1.014-.905-1.57-1.785-1.722-1.975-.152-.19-.016-.292.126-.433.127-.127.284-.333.426-.5.143-.166.19-.285.285-.475.094-.19.047-.356-.024-.5-.071-.142-.64-1.542-.877-2.115-.23-.556-.465-.48-.64-.49-.166-.01-.356-.01-.546-.01s-.5.07-.762.356c-.26.285-1 .978-1 2.387s1.023 2.774 1.166 2.964c.142.19 2.012 3.073 4.876 4.308.68.293 1.213.468 1.628.6 1.1-.35 2.1-.969 2.768-1.638.665-.668 1.16-1.544 1.16-2.503 0-.083-.005-.156-.014-.216z"/>
-                </svg>
-              </motion.a>
+              {/* Right: Drag-to-Join Community Slider (Desktop) */}
+              <div className="w-72 shadow-lg rounded-2xl pointer-events-auto">
+                <WhatsAppCommunitySlider />
+              </div>
             </div>
 
             {/* Mobile Bottom Left: Spin & Win Replaced with Spin & Mine */}
@@ -2446,55 +2429,10 @@ export default function Layout() {
               </div>
             </motion.button>
 
-            {/* Mobile Bottom Right: Floating WhatsApp Button (repositioned and enhanced with attention animation) */}
-            <motion.a
-              href="https://chat.whatsapp.com/CoNzUZBmDsDC8bV8nB7uIH?s=cl&p=i&ilr=4"
-              target="_blank"
-              rel="noopener noreferrer"
-              initial={{ opacity: 0, x: 60, scale: 0.9 }}
-              animate={{ 
-                opacity: 1, 
-                scale: [1, 1.08, 0.95, 1.02, 1, 1, 1, 1, 1, 1],
-                rotate: [0, 0, 0, 0, -3, 3, -3, 3, 0, 0],
-                x: [0, 0, 0, 0, -2.5, 2.5, -2.5, 2.5, 0, 0]
-              }}
-              exit={{ opacity: 0, x: 60, scale: 0.9 }}
-              transition={{ 
-                type: "spring", 
-                stiffness: 300, 
-                damping: 25,
-                scale: {
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
-                },
-                rotate: {
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
-                },
-                x: {
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  times: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0]
-                }
-              }}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className="md:hidden fixed right-4 bottom-[92px] z-[110] pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-[0_4px_15px_rgba(37,211,102,0.4)] transition-colors cursor-pointer group"
-              title="Join WhatsApp Group"
-            >
-              {/* WhatsApp Premium Icon */}
-              <svg 
-                viewBox="0 0 24 24" 
-                className="w-5.5 h-5.5 fill-current filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.2)]"
-              >
-                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.5-5.739-1.446L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.528 2.017 14.077 1.01 11.45 1.01c-5.436 0-9.86 4.37-9.864 9.8 0 1.639.428 3.24 1.24 4.65l-.382 1.396 1.433-.376.126.075c1.619.982 3.251 1.498 4.654 1.498zM17.15 14c-.284-.142-1.68-.828-1.94-.923-.26-.095-.45-.142-.64.142-.19.285-.736.924-.902 1.114-.167.19-.333.213-.617.071-.284-.142-1.2-.442-2.285-1.41-1.014-.905-1.57-1.785-1.722-1.975-.152-.19-.016-.292.126-.433.127-.127.284-.333.426-.5.143-.166.19-.285.285-.475.094-.19.047-.356-.024-.5-.071-.142-.64-1.542-.877-2.115-.23-.556-.465-.48-.64-.49-.166-.01-.356-.01-.546-.01s-.5.07-.762.356c-.26.285-1 .978-1 2.387s1.023 2.774 1.166 2.964c.142.19 2.012 3.073 4.876 4.308.68.293 1.213.468 1.628.6 1.1-.35 2.1-.969 2.768-1.638.665-.668 1.16-1.544 1.16-2.503 0-.083-.005-.156-.014-.216z"/>
-              </svg>
-            </motion.a>
+            {/* Mobile Bottom Right: Drag-to-Join Community Slider */}
+            <div className="md:hidden fixed right-4 bottom-[92px] z-[110] pointer-events-auto w-[135px] shadow-lg rounded-2xl">
+              <WhatsAppCommunitySlider />
+            </div>
 
             {/* Choice Modal for Spin & Mine */}
             <AnimatePresence>

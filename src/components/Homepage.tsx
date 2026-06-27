@@ -89,10 +89,15 @@ export default function Homepage() {
   const hasActiveInvestment = investments.some(i => i.status === 'active');
   const availableBalance = profile?.available_balance || 0;
   const rewardBalance = profile?.withdraw_methods?.reward_dollar_balance ?? profile?.reward_dollar_balance ?? 0;
-  const hasEligibleBalance = availableBalance >= 7 || rewardBalance >= 7;
+  const hasEligibleBalance = availableBalance >= 5 || rewardBalance >= 5;
 
   const shouldShowCompoundToday = !lastCompoundDate || lastCompoundDate !== todayDateStr;
-  const isCompoundPopupEligible = user && profile && investmentsLoaded && hasActiveInvestment && shouldShowCompoundToday && hasEligibleBalance;
+  const isAutoCompoundActive = !!(
+    profile?.auto_compound_enabled &&
+    profile?.auto_compound_end_date &&
+    new Date(profile.auto_compound_end_date).getTime() > new Date().getTime()
+  );
+  const isCompoundPopupEligible = user && profile && investmentsLoaded && hasActiveInvestment && shouldShowCompoundToday && hasEligibleBalance && !isAutoCompoundActive;
 
   // Trigger Compound Popup
   useEffect(() => {
@@ -277,10 +282,10 @@ export default function Homepage() {
         const curReward = userData.withdraw_methods?.reward_dollar_balance ?? userData.reward_dollar_balance ?? 0;
 
         const walletsToCompound: ('available' | 'reward')[] = [];
-        if (curAvailable >= 7) {
+        if (curAvailable >= 5) {
           walletsToCompound.push('available');
         }
-        if (curReward >= 7) {
+        if (curReward >= 5) {
           walletsToCompound.push('reward');
         }
 
@@ -296,7 +301,7 @@ export default function Homepage() {
 
         const totalToCompound = availableDeduction + rewardDeduction;
         if (totalToCompound <= 0) {
-          throw new Error("Deduction threshold not met. Minimum amount is $7.");
+          throw new Error("Deduction threshold not met. Minimum amount is $5.");
         }
 
         transferredAmount = totalToCompound;
