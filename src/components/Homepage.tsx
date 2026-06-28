@@ -495,25 +495,25 @@ export default function Homepage() {
         
         {/* CARD 1: FUNDING */}
         <div 
-          className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-emerald-500/50 hover:shadow-[0_22px_50px_rgba(16,185,129,0.08),inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-500 relative overflow-hidden gpu-accelerate"
+          className="bg-gradient-to-b from-[#182033] to-[#0d121d] border border-emerald-500/25 shadow-[0_25px_55px_-12px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.08),0_0_35px_rgba(16,185,129,0.03)] backdrop-blur-md rounded-[28px] lg:rounded-[36px] p-3.5 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-emerald-500/50 hover:shadow-[0_30px_65px_-10px_rgba(16,185,129,0.15),inset_0_1px_2px_rgba(255,255,255,0.15)] hover:-translate-y-2.5 transition-all duration-500 relative overflow-hidden gpu-accelerate"
         >
           {/* Subtle 3D glossy highlight line overlay */}
-          <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-emerald-500/25 to-transparent pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent pointer-events-none z-10" />
           
-          <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/95 rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] relative overflow-hidden group-hover:scale-105 group-hover:border-emerald-500/40 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="w-11 h-11 lg:w-16 lg:h-16 bg-gradient-to-b from-[#1d273d] to-[#0e1422] rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1.5 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.08),0_10px_20px_rgba(0,0,0,0.5)] relative overflow-hidden group-hover:scale-110 group-hover:border-emerald-500/40 transition-all duration-500">
+            <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <ArrowDownLeft 
-              className="w-5 h-5 lg:w-8 lg:h-8 text-emerald-400 filter drop-shadow-[0_4px_10px_rgba(16,185,129,0.3)] transform group-hover:rotate-3 transition-transform duration-500 scale-[1.12]"
+              className="w-5.5 h-5.5 lg:w-8 lg:h-8 text-emerald-400 filter drop-shadow-[0_4px_10px_rgba(16,185,129,0.4)] transform group-hover:rotate-6 transition-transform duration-500 scale-[1.12]"
             />
           </div>
-          <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Funding</h3>
+          <h3 className="text-white/90 text-[9px] lg:text-[11px] font-black uppercase tracking-[0.25em] mb-1 lg:mb-3">Funding</h3>
           <div className="hidden lg:block w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
           <div className="flex-1 flex items-center justify-center w-full min-h-[40px] lg:min-h-[80px]">
             <DynamicBalance value={formatCurrency(profile?.funding_balance || 0)} />
           </div>
           <button 
             onClick={() => navigate('/fund/deposit')}
-            className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-green-500 to-emerald-600 shadow-[0_5px_15px_rgba(16,185,129,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            className="w-full py-1.5 lg:py-3 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-green-500 to-emerald-600 border-b-[3px] border-emerald-800 shadow-[0_8px_18px_rgba(16,185,129,0.3),inset_0_1.5px_0_rgba(255,255,255,0.2)] hover:shadow-[0_12px_24px_rgba(16,185,129,0.4)] hover:brightness-105 active:border-b-0 active:translate-y-[3px] transition-all duration-150 cursor-pointer"
           >
             {t('Deposit')}
           </button>
@@ -521,25 +521,25 @@ export default function Homepage() {
 
         {/* CARD 2: AVAILABLE BALANCE */}
         <div 
-          className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-red-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(239,68,68,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-red-500/50 hover:shadow-[0_22px_50px_rgba(239,68,68,0.08),inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-500 relative overflow-hidden gpu-accelerate"
+          className="bg-gradient-to-b from-[#182033] to-[#0d121d] border border-red-500/25 shadow-[0_25px_55px_-12px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.08),0_0_35px_rgba(239,68,68,0.03)] backdrop-blur-md rounded-[28px] lg:rounded-[36px] p-3.5 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-red-500/50 hover:shadow-[0_30px_65px_-10px_rgba(239,68,68,0.15),inset_0_1px_2px_rgba(255,255,255,0.15)] hover:-translate-y-2.5 transition-all duration-500 relative overflow-hidden gpu-accelerate"
         >
           {/* Subtle 3D glossy highlight line overlay */}
-          <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-red-500/25 to-transparent pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-red-400/40 to-transparent pointer-events-none z-10" />
 
-          <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/95 rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] relative overflow-hidden group-hover:scale-105 group-hover:border-red-500/40 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-tr from-red-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="w-11 h-11 lg:w-16 lg:h-16 bg-gradient-to-b from-[#1d273d] to-[#0e1422] rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1.5 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.08),0_10px_20px_rgba(0,0,0,0.5)] relative overflow-hidden group-hover:scale-110 group-hover:border-red-500/40 transition-all duration-500">
+            <div className="absolute inset-0 bg-gradient-to-tr from-red-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <ArrowUpRight 
-              className="w-5 h-5 lg:w-8 lg:h-8 text-red-400 filter drop-shadow-[0_4px_10px_rgba(239,68,68,0.3)] transform group-hover:-rotate-3 transition-transform duration-500 scale-[1.12]"
+              className="w-5.5 h-5.5 lg:w-8 lg:h-8 text-red-400 filter drop-shadow-[0_4px_10px_rgba(239,68,68,0.4)] transform group-hover:-rotate-6 transition-transform duration-500 scale-[1.12]"
             />
           </div>
-          <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Available</h3>
+          <h3 className="text-white/90 text-[9px] lg:text-[11px] font-black uppercase tracking-[0.25em] mb-1 lg:mb-3">Available</h3>
           <div className="hidden lg:block w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
           <div className="flex-1 flex items-center justify-center w-full min-h-[40px] lg:min-h-[80px]">
             <DynamicBalance value={formatCurrency(profile?.available_balance || 0)} />
           </div>
           <button 
             onClick={() => navigate('/fund/withdraw')}
-            className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-red-500 to-red-600 shadow-[0_5px_15px_rgba(239,68,68,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
+            className="w-full py-1.5 lg:py-3 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-red-500 to-red-600 border-b-[3px] border-red-800 shadow-[0_8px_18px_rgba(239,68,68,0.3),inset_0_1.5px_0_rgba(255,255,255,0.2)] hover:shadow-[0_12px_24px_rgba(239,68,68,0.4)] hover:brightness-105 active:border-b-0 active:translate-y-[3px] transition-all duration-150 cursor-pointer"
           >
             Withdraw
           </button>
@@ -547,7 +547,7 @@ export default function Homepage() {
 
         {/* CARD 3: TOTAL ASSETS */}
         <div 
-          className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-blue-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(59,130,246,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-3 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-blue-500/50 hover:shadow-[0_22px_50px_rgba(59,130,246,0.08),inset_0_1px_1px_rgba(255,255,255,0.08)] transition-all duration-500 relative overflow-hidden gpu-accelerate"
+          className="bg-gradient-to-b from-[#182033] to-[#0d121d] border border-blue-500/25 shadow-[0_25px_55px_-12px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.08),0_0_35px_rgba(59,130,246,0.03)] backdrop-blur-md rounded-[28px] lg:rounded-[36px] p-3.5 lg:p-7 aspect-square lg:aspect-auto flex flex-col items-center justify-center text-center group hover:border-blue-500/50 hover:shadow-[0_30px_65px_-10px_rgba(59,130,246,0.15),inset_0_1px_2px_rgba(255,255,255,0.15)] hover:-translate-y-2.5 transition-all duration-500 relative overflow-hidden gpu-accelerate"
         >
           {profile && !['AI 1.8', 'AI 2.0', 'AI 2.5', 'AI 3.0'].includes(profile.active_robot || '') && investments.some(i => i.status === 'active') && (profile.total_invested || 0) > 0 && (
             <>
@@ -581,22 +581,22 @@ export default function Homepage() {
           )}
 
           {/* Subtle 3D glossy highlight line overlay */}
-          <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-blue-500/25 to-transparent pointer-events-none" />
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-blue-400/40 to-transparent pointer-events-none z-10" />
 
-          <div className="w-10 h-10 lg:w-16 lg:h-16 bg-[#11141b]/95 rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.05),0_10px_20px_rgba(0,0,0,0.4)] relative overflow-hidden group-hover:scale-105 group-hover:border-blue-500/40 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          <div className="w-11 h-11 lg:w-16 lg:h-16 bg-gradient-to-b from-[#1d273d] to-[#0e1422] rounded-xl lg:rounded-2xl border border-white/10 flex items-center justify-center mb-1.5 lg:mb-6 shadow-[inset_0_2px_4px_rgba(255,255,255,0.08),0_10px_20px_rgba(0,0,0,0.5)] relative overflow-hidden group-hover:scale-110 group-hover:border-blue-500/40 transition-all duration-500">
+            <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <TrendingUp 
-              className="w-5 h-5 lg:w-8 lg:h-8 text-blue-400 filter drop-shadow-[0_4px_10px_rgba(59,130,246,0.3)] transform group-hover:scale-110 transition-transform duration-500 scale-[1.12]"
+              className="w-5.5 h-5.5 lg:w-8 lg:h-8 text-blue-400 filter drop-shadow-[0_4px_10px_rgba(59,130,246,0.4)] transform group-hover:scale-110 transition-transform duration-500 scale-[1.12]"
             />
           </div>
-          <h3 className="text-white text-[8px] lg:text-[10px] font-black uppercase tracking-[0.2em] mb-1 lg:mb-3">Assets</h3>
+          <h3 className="text-white/90 text-[9px] lg:text-[11px] font-black uppercase tracking-[0.25em] mb-1 lg:mb-3">Assets</h3>
           <div className="hidden lg:block w-full h-px bg-gradient-to-r from-transparent via-white/10 to-transparent mb-6" />
           <div className="flex-1 flex items-center justify-center w-full min-h-[40px] lg:min-h-[80px]">
             <DynamicBalance value={formatCurrency(profile?.total_invested || 0)} />
           </div>
           <button 
             onClick={() => navigate('/invest')}
-            className="w-full py-1.5 lg:py-2.5 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-500 to-indigo-600 shadow-[0_5px_15px_rgba(59,130,246,0.3)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center min-h-[32px] lg:min-h-[56px] cursor-pointer"
+            className="w-full py-1.5 lg:py-3 rounded-lg lg:rounded-2xl text-[9px] lg:text-[14px] font-black uppercase tracking-widest text-white bg-gradient-to-r from-blue-500 via-[#4F46E5] to-indigo-600 border-b-[3px] border-indigo-800 shadow-[0_8px_18px_rgba(59,130,246,0.3),inset_0_1.5px_0_rgba(255,255,255,0.2)] hover:shadow-[0_12px_24px_rgba(59,130,246,0.4)] hover:brightness-105 active:border-b-0 active:translate-y-[3px] transition-all duration-150 flex items-center justify-center min-h-[32px] lg:min-h-[56px] cursor-pointer"
           >
             <RotatingButtonText texts={['You Invest', 'We Trade', 'You Earn']} />
           </button>
@@ -614,7 +614,7 @@ export default function Homepage() {
       {/* Footer Status hidden per user request */}
 
       {/* Platform Guide Preview Card */}
-      <div className="w-full max-w-5xl mx-auto px-1 mt-6">
+      <div className="w-full max-w-5xl mx-auto px-1 mt-[500px]">
         <div className="bg-gradient-to-r from-[#11141b]/50 to-[#0c0d13]/80 border border-white/5 hover:border-aura-lime/20 rounded-[32px] p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden backdrop-blur-xl shadow-2xl transition-all duration-300">
           <div className="absolute top-0 right-0 w-64 h-64 bg-aura-lime/[0.02] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none" />
           <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/[0.01] rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none" />

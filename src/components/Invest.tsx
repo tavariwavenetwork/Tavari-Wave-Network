@@ -727,70 +727,83 @@ export default function Invest() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[#050608] via-transparent to-black/30" />
               
-              <div className="absolute bottom-6 left-6 right-6 z-10 flex flex-row items-center justify-between gap-4 max-w-5xl mx-auto w-full">
+              <div className="absolute bottom-6 left-4 right-4 sm:left-6 sm:right-6 z-10 flex flex-row items-center justify-between gap-3 max-w-5xl mx-auto">
                 <div>
-                  <h1 className="text-2xl sm:text-3xl font-extrabold font-serif italic text-white tracking-tight drop-shadow-md">Investment Plans</h1>
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold font-serif italic text-white tracking-tight drop-shadow-md">Investment Plans</h1>
                 </div>
 
                 {/* Switch Currency Toggle inside the header */}
                 {selectedCurrency !== null && (
-                  <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md border border-white/10 rounded-full p-1 pl-3 shadow-lg select-none">
-                    <span className="hidden sm:inline-block text-[9px] font-black uppercase tracking-widest text-aura-muted">Currency:</span>
-                    <div 
-                      onClick={() => {
-                        const currentVal = parseFloat(amountInput);
-                        if (selectedCurrency === 'usd') {
-                          setSelectedCurrency('ngn');
-                          setSelectedCountry('Nigeria');
-                          setPaymentMethod('bank');
-                          if (currentVal && !isNaN(currentVal)) {
-                            setAmountInput((currentVal * exchangeRate).toString());
-                          }
-                          toast.success("Switched to Naira (₦) investment flow.");
-                        } else {
-                          setSelectedCurrency('usd');
-                          setSelectedCountry(null);
-                          setPaymentMethod('bank');
-                          if (currentVal && !isNaN(currentVal)) {
-                            setAmountInput((currentVal / exchangeRate).toString());
-                          }
-                          toast.success("Switched to Dollar ($) investment flow.");
-                        }
-                      }}
-                      className="relative flex items-center justify-between w-20 h-8 rounded-full bg-black/40 border border-white/10 cursor-pointer p-1 overflow-hidden"
-                    >
+                  <div className="flex items-center bg-black/70 backdrop-blur-md border border-white/15 rounded-xl p-0.5 shadow-2xl select-none scale-90 sm:scale-100 origin-right shrink-0">
+                    <div className="relative flex items-center h-8 rounded-lg bg-white/5 p-0.5 border border-white/5 overflow-hidden">
                       {/* Animated sliding background pill */}
                       <motion.div 
-                        className="absolute top-1 bottom-1 w-8 rounded-full bg-primary shadow-md"
-                        layout
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                        className="absolute top-0.5 bottom-0.5 rounded-md bg-[#A855F7] shadow-lg shadow-[#A855F7]/40"
+                        layoutId="activeCurrencyPill"
+                        transition={{ type: "spring", stiffness: 350, damping: 25 }}
                         style={{
-                          left: selectedCurrency === 'usd' ? '4px' : 'calc(100% - 36px)'
+                          width: '56px',
+                          left: selectedCurrency === 'usd' ? '2px' : '58px'
                         }}
                       />
                       
-                      {/* Dollar indicator */}
-                      <span className={cn(
-                        "z-10 text-xs font-black w-8 text-center transition-colors duration-300",
-                        selectedCurrency === 'usd' ? "text-white" : "text-white/30"
-                      )}>
-                        $
-                      </span>
+                      {/* USD Button */}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (selectedCurrency !== 'usd') {
+                            const currentVal = parseFloat(amountInput);
+                            setSelectedCurrency('usd');
+                            setSelectedCountry(null);
+                            setPaymentMethod('bank');
+                            if (currentVal && !isNaN(currentVal)) {
+                              setAmountInput((currentVal / exchangeRate).toString());
+                            }
+                          }
+                        }}
+                        className={cn(
+                          "relative z-10 w-[56px] text-center text-[10px] font-black uppercase tracking-wider h-full transition-colors duration-300 cursor-pointer",
+                          selectedCurrency === 'usd' ? "text-white" : "text-white/45 hover:text-white"
+                        )}
+                      >
+                        $ USD
+                      </button>
 
-                      {/* Naira indicator */}
-                      <span className={cn(
-                        "z-10 text-xs font-black w-8 text-center transition-colors duration-300",
-                        selectedCurrency === 'ngn' ? "text-white" : "text-white/30"
-                      )}>
-                        ₦
-                      </span>
+                      {/* NGN Button */}
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if (selectedCurrency !== 'ngn') {
+                            const currentVal = parseFloat(amountInput);
+                            setSelectedCurrency('ngn');
+                            setSelectedCountry('Nigeria');
+                            setPaymentMethod('bank');
+                            if (currentVal && !isNaN(currentVal)) {
+                              setAmountInput((currentVal * exchangeRate).toString());
+                            }
+                          }
+                        }}
+                        className={cn(
+                          "relative z-10 w-[56px] text-center text-[10px] font-black uppercase tracking-wider h-full transition-colors duration-300 cursor-pointer",
+                          selectedCurrency === 'ngn' ? "text-white" : "text-white/45 hover:text-white"
+                        )}
+                      >
+                        ₦ NGN
+                      </button>
                     </div>
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="max-w-xl mx-auto px-4 space-y-6">
+            <motion.div 
+              key={selectedCurrency || 'default'}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3, ease: "easeInOut" }}
+              className="max-w-xl mx-auto px-4 space-y-6"
+            >
               {isPresetSelected ? (
                 /* Selected Amount Display when Preset chosen */
                 <div className="bg-gradient-to-b from-blue-500/10 to-indigo-500/15 border border-blue-500/30 rounded-3xl p-6 text-center space-y-4 shadow-[0_12px_24px_rgba(59,130,246,0.15)] animate-fade-in">
@@ -815,8 +828,8 @@ export default function Invest() {
               ) : (
                 /* Standard Selection UI with Preset Grid & Manual Input */
                 <>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-5 gap-2 sm:gap-3">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2.5 sm:gap-4">
                       {[10, 20, 50, 80, 100, 200, 350, 500, 800, 1000, 1500, 2000, 3500, 5000, 8000, 10000, 15000, 25000, 50000, 100000].map((val) => {
                         const isSelected = selectedCurrency === 'ngn'
                           ? Math.abs(parseFloat(amountInput) - (val * exchangeRate)) < 0.01
@@ -833,10 +846,10 @@ export default function Invest() {
                               setIsPresetSelected(true);
                             }}
                             className={cn(
-                              "h-11 sm:h-14 rounded-xl sm:rounded-2xl text-center flex items-center justify-center transition-all duration-300 cursor-pointer select-none border text-[9px] xs:text-[10px] sm:text-xs font-bold",
+                              "h-12 sm:h-16 rounded-xl sm:rounded-2xl text-center flex items-center justify-center transition-all duration-300 cursor-pointer select-none border text-[10px] xs:text-[11px] sm:text-[13px] md:text-sm font-black tracking-tight",
                               isSelected
-                                ? "bg-gradient-to-b from-blue-500/20 to-indigo-500/30 border-blue-500/50 text-white font-black shadow-[0_8px_20px_rgba(59,130,246,0.35),inset_0_1px_0_rgba(255,255,255,0.15)] -translate-y-0.5"
-                                : "bg-white/[0.03] border-white/10 text-gray-300 shadow-[0_4px_12px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-white/20 hover:bg-white/[0.06] hover:-translate-y-0.5 active:translate-y-0"
+                                ? "bg-gradient-to-b from-[#A855F7]/30 to-[#4F46E5]/40 border-blue-400/50 text-white shadow-[0_10px_25px_rgba(168,85,247,0.3),inset_0_1px_1px_rgba(255,255,255,0.2),inset_0_-1px_1px_rgba(0,0,0,0.4)] -translate-y-1"
+                                : "bg-[#242d3d] border-[#313b52] text-white hover:bg-[#2b3548] hover:border-white/20 shadow-[0_6px_14px_rgba(0,0,0,0.4),inset_0_1px_1px_rgba(255,255,255,0.08),inset_0_-1px_1px_rgba(0,0,0,0.5)] hover:-translate-y-1 active:translate-y-0"
                             )}
                           >
                             {selectedCurrency === 'ngn'
@@ -965,7 +978,7 @@ export default function Invest() {
                   Booster
                 </Link>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
         )}
 

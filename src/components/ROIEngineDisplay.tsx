@@ -126,14 +126,14 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
     }
     return (
         <div 
-        className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] p-4 lg:p-8 flex flex-col items-center justify-center text-center aspect-square lg:aspect-auto lg:min-h-full relative overflow-visible group gpu-accelerate"
+        className="bg-gradient-to-b from-[#182033] to-[#0d121d] border border-emerald-500/25 shadow-[0_25px_55px_-12px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.08),0_0_35px_rgba(16,185,129,0.03)] backdrop-blur-md rounded-[28px] lg:rounded-[36px] p-4 lg:p-8 flex flex-col items-center justify-center text-center aspect-square lg:aspect-auto lg:min-h-full relative overflow-visible group hover:border-emerald-500/50 hover:shadow-[0_30px_65px_-10px_rgba(16,185,129,0.15),inset_0_1px_2px_rgba(255,255,255,0.15)] hover:-translate-y-2.5 transition-all duration-500 gpu-accelerate"
         >
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#10b981]/40 to-transparent pointer-events-none z-10" />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/[0.01]" />
         
         {/* Disabled robot animation container with faint red overlay/glow styled border */}
         <div className="relative mb-4 lg:mb-8 z-10 group/bot overflow-visible">
-          <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-red-500/20 flex items-center justify-center overflow-hidden shadow-inner shadow-[0_0_15px_rgba(239,68,68,0.15)] bg-gradient-to-br from-[#1c1212]/95 to-[#11141b]/95">
+          <div className="w-12 h-12 lg:w-20 lg:h-20 bg-[#11141b]/95 rounded-xl lg:rounded-[24px] border border-red-500/25 flex items-center justify-center overflow-hidden shadow-inner shadow-[0_0_15px_rgba(239,68,68,0.15)] bg-gradient-to-br from-[#1c1212]/95 to-[#11141b]/95">
             <div className="w-11 h-11 lg:w-18 lg:h-18 relative flex items-center justify-center scale-[1.9]">
               <img 
                 src="https://i.imgur.com/swuDIvl.png" 
@@ -141,19 +141,19 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
                 referrerPolicy="no-referrer"
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-20 brightness-[0.4] grayscale contrast-75"
+                className="w-full h-full object-contain filter drop-shadow-[0_5px_10px_rgba(0,0,0,0.6)] opacity-25 brightness-[0.4] grayscale contrast-75"
               />
             </div>
           </div>
           {/* Robot Not Activated text sitting across top border edge */}
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[6px] lg:text-[8px] font-black uppercase text-red-550 text-red-500 whitespace-nowrap bg-[#0e111a] px-1.5 py-0.5 rounded border border-red-500/20 tracking-wider">
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[6px] lg:text-[8px] font-black uppercase text-red-500 whitespace-nowrap bg-[#121724] px-1.5 py-0.5 rounded border border-red-500/25 tracking-wider shadow-sm">
             Robot Not Activated
           </div>
         </div>
         
         <div className="relative z-10 space-y-2 lg:space-y-4 px-2">
             <h3 className="text-[10px] lg:text-xl font-black text-white uppercase tracking-[0.2em] italic font-serif leading-tight">Engine Offline</h3>
-            <p className="text-[7px] lg:text-[10px] font-bold text-aura-muted uppercase tracking-[0.1em] leading-relaxed max-w-[120px] lg:max-w-[200px] mx-auto opacity-60">
+            <p className="text-[7px] lg:text-[10px] font-bold text-aura-muted uppercase tracking-[0.1em] leading-relaxed max-w-[120px] lg:max-w-[200px] mx-auto opacity-70">
             Activate pool to start earning
             </p>
         </div>
@@ -232,10 +232,10 @@ export const ROIEngineStats = React.memo(({ investments, profile, user, variant 
   // DEFAULT (Home variant)
   return (
     <div 
-        className="bg-gradient-to-b from-[#0e111a]/80 to-[#08090d]/95 border border-emerald-500/20 shadow-[0_20px_45px_rgba(0,0,0,0.65),inset_0_1px_1px_rgba(255,255,255,0.05),0_0_30px_rgba(16,185,129,0.02)] backdrop-blur-md rounded-[24px] lg:rounded-[32px] overflow-visible flex flex-col relative group aspect-square lg:aspect-auto gpu-accelerate"
+        className="bg-gradient-to-b from-[#182033] to-[#0d121d] border border-emerald-500/25 shadow-[0_25px_55px_-12px_rgba(0,0,0,0.85),inset_0_1px_2px_rgba(255,255,255,0.08),0_0_35px_rgba(16,185,129,0.03)] backdrop-blur-md rounded-[28px] lg:rounded-[36px] overflow-visible flex flex-col relative group aspect-square lg:aspect-auto hover:border-emerald-500/50 hover:shadow-[0_30px_65px_-10px_rgba(16,185,129,0.15),inset_0_1px_2px_rgba(255,255,255,0.15)] hover:-translate-y-2.5 transition-all duration-500 gpu-accelerate"
     >
         {/* Subtle 3D glossy highlight line overlay */}
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-gradient-to-r from-transparent via-[#10b981]/25 to-transparent pointer-events-none z-20" />
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[#10b981]/40 to-transparent pointer-events-none z-20" />
         
         <div className="absolute inset-0 lg:relative lg:h-32 overflow-visible">
             <div className="absolute inset-0 flex items-center lg:items-end justify-between px-1 lg:px-2 gap-1 opacity-20 lg:opacity-30 translate-y-4 lg:translate-y-0">

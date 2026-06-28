@@ -2386,8 +2386,8 @@ export default function Layout() {
                 </div>
               </motion.button>
 
-              {/* Right: Drag-to-Join Community Slider (Desktop) */}
-              <div className="w-72 shadow-lg rounded-2xl pointer-events-auto">
+              {/* Right: Floating WhatsApp Business Button (Desktop) */}
+              <div className="pointer-events-auto">
                 <WhatsAppCommunitySlider />
               </div>
             </div>
@@ -2429,8 +2429,8 @@ export default function Layout() {
               </div>
             </motion.button>
 
-            {/* Mobile Bottom Right: Drag-to-Join Community Slider */}
-            <div className="md:hidden fixed right-4 bottom-[92px] z-[110] pointer-events-auto w-[135px] shadow-lg rounded-2xl">
+            {/* Mobile Bottom Right: Floating WhatsApp Business Button */}
+            <div className="md:hidden fixed right-4 bottom-[92px] z-[110] pointer-events-auto">
               <WhatsAppCommunitySlider />
             </div>
 
