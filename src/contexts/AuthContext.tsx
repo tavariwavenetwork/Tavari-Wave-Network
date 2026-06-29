@@ -178,32 +178,20 @@ export function calculateExpectedDailyRoi(
   profile?: any,
   globalRoiConfig?: any
 ): number {
-  if (profile?.migration_status === 'accepted') {
-    const remaining = profile.remaining_upgraded_assets ?? 0;
-    const rate = getEffectiveRoiRate(profile, remaining, plans, globalRoiConfig);
-    return Math.floor((remaining * rate) * 100) / 100;
-  }
+  if (!profile) return 0;
 
-  if (activeInvestments.length === 0) return 0;
+  const isMigratedLegacy = profile.migration_status === 'accepted';
+  const assetsBalance = isMigratedLegacy 
+    ? (profile.remaining_upgraded_assets ?? 0) 
+    : (profile.total_invested ?? 0);
 
-  let originalRoi = 0;
-  activeInvestments.forEach((inv) => {
-    const amount = inv.amount;
-    const roiRate = getEffectiveRoiRate(profile, amount, plans, globalRoiConfig);
-    originalRoi += amount * roiRate;
-  });
+  if (assetsBalance <= 0) return 0;
 
-  let compoundedRoi = 0;
-  const compounds = compoundedAmounts || [];
-  compounds.forEach(compAmount => {
-    if (compAmount > 0) {
-      const roiRate = getEffectiveRoiRate(profile, compAmount, plans, globalRoiConfig);
-      compoundedRoi += compAmount * roiRate;
-    }
-  });
+  const roiRate = getEffectiveRoiRate(profile, assetsBalance, plans, globalRoiConfig);
+  const profit = assetsBalance * roiRate;
 
   // Truncate to exactly two decimal places, never round upward
-  return Math.floor((originalRoi + compoundedRoi) * 100) / 100;
+  return Math.floor(profit * 100) / 100;
 }
 
 export enum OperationType {
@@ -387,9 +375,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
 
+            // Fetch global ROI config centrally inside transaction
+            const roiConfigDoc = await transaction.get(doc(db, 'settings', 'roi_config'));
+            const txGlobalRoiConfig = roiConfigDoc.exists() ? roiConfigDoc.data() : null;
+
+            const roiRate = getEffectiveRoiRate(currentProfile, remainingAssets, plansRef.current, txGlobalRoiConfig);
+
             for (let cycle = 0; cycle < currentCompletedCycles; cycle++) {
               if (remainingAssets <= 0) break;
-              const cycleProfit = Math.floor((remainingAssets * 0.005) * 100) / 100;
+              const cycleProfit = Math.floor((remainingAssets * roiRate) * 100) / 100;
               const actualProfit = Math.min(cycleProfit, remainingAssets);
               totalCredit += actualProfit;
               remainingAssets = Math.max(0, remainingAssets - actualProfit);
@@ -584,8 +578,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const roiConfigDoc = await transaction.get(doc(db, 'settings', 'roi_config'));
           const txGlobalRoiConfig = roiConfigDoc.exists() ? roiConfigDoc.data() : null;
 
+          // Determine automatic compounding state
+          let autoCompoundEnabled = currentProfile.auto_compound_enabled || false;
+          let isCompoundingActiveNow = false;
+          const nowMs = new Date().getTime();
+
+          if (autoCompoundEnabled && currentProfile.auto_compound_end_date) {
+            const endMs = new Date(currentProfile.auto_compound_end_date).getTime();
+            if (nowMs >= endMs) {
+              autoCompoundEnabled = false;
+            } else {
+              isCompoundingActiveNow = true;
+            }
+          }
+
+          const assetsBalance = currentProfile.total_invested || 0;
+          const roiRate = getEffectiveRoiRate(currentProfile, assetsBalance, plansRef.current, txGlobalRoiConfig);
+
           let totalCredit = 0;
-          let stdInvestmentsProfit = 0;
+          let currentAssets = assetsBalance;
+          for (let cycle = 0; cycle < currentCompletedCycles; cycle++) {
+            if (currentAssets <= 0) break;
+            const cycleProfit = Math.floor((currentAssets * roiRate) * 100) / 100;
+            totalCredit += cycleProfit;
+            if (isCompoundingActiveNow) {
+              currentAssets += cycleProfit;
+            }
+          }
+          // Clamp totalCredit itself to exactly two decimal places
+          totalCredit = Math.floor(totalCredit * 100) / 100;
+
           const investmentUpdates: { id: string, docRef: any, data: any }[] = [];
 
           for (const invDoc of invSnap.docs) {
@@ -594,77 +616,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (invSnapInTx.exists()) {
               const invData = invSnapInTx.data();
               if (invData.status === 'active') {
-                const roiRate = getEffectiveRoiRate(currentProfile, invData.amount, plansRef.current, txGlobalRoiConfig);
-                let currentAmount = invData.amount || 0;
-                let accumulatedProfit = 0;
+                const invRoiRate = getEffectiveRoiRate(currentProfile, invData.amount, plansRef.current, txGlobalRoiConfig);
+                const invProfitPerCycle = invData.amount * invRoiRate;
+                const invAccumulatedProfit = currentCompletedCycles * (Math.floor(invProfitPerCycle * 100) / 100);
 
-                for (let cycle = 0; cycle < currentCompletedCycles; cycle++) {
-                  if (currentAmount <= 0) break;
-                  const profitPerCycle = currentAmount * roiRate;
-                  const cycleProfit = Math.floor(profitPerCycle * 100) / 100;
-                  const actualProfit = Math.min(cycleProfit, currentAmount);
-                  accumulatedProfit += actualProfit;
-                  currentAmount = Math.max(0, currentAmount - actualProfit);
-                }
-
-                if (accumulatedProfit > 0) {
-                  totalCredit += accumulatedProfit;
-                  stdInvestmentsProfit += accumulatedProfit;
-                  const isExhausted = currentAmount <= 1e-9;
-
-                  investmentUpdates.push({
-                    id: invDoc.id,
-                    docRef: invRef,
-                    data: {
-                      amount: currentAmount,
-                      total_earned: Math.floor(((invData.total_earned || 0) + accumulatedProfit) * 100) / 100,
-                      last_sync: new Date().toISOString(),
-                      dailyRoi: roiRate,
-                      status: isExhausted ? 'completed' : 'active'
-                    }
-                  });
-                }
+                investmentUpdates.push({
+                  id: invDoc.id,
+                  docRef: invRef,
+                  data: {
+                    total_earned: Math.floor(((invData.total_earned || 0) + invAccumulatedProfit) * 100) / 100,
+                    last_sync: new Date().toISOString(),
+                    dailyRoi: invRoiRate
+                  }
+                });
               }
             }
           }
 
-          const compounds = currentProfile.withdraw_methods?.compounded_amounts || currentProfile.compounded_amounts || [];
-          let compoundsProfit = 0;
-          compounds.forEach((compAmount: number) => {
-            if (compAmount > 0) {
-              const roiRate = getEffectiveRoiRate(currentProfile, compAmount, plansRef.current, txGlobalRoiConfig);
-              const profitPerCycle = compAmount * roiRate;
-              const rawCompProfit = currentCompletedCycles * profitPerCycle;
-              compoundsProfit += Math.floor(rawCompProfit * 100) / 100;
-            }
-          });
-          totalCredit += compoundsProfit;
-          // Clamp totalCredit itself to exactly two decimal places
-          totalCredit = Math.floor(totalCredit * 100) / 100;
-
           if (totalCredit > 0) {
             const newCycleStart = new Date(currentCycleStart + (currentCompletedCycles * totalDuration)).toISOString();
-            
-            // Check automatic compounding state
-            let autoCompoundEnabled = currentProfile.auto_compound_enabled || false;
-            let isCompoundingActiveNow = false;
-            const nowMs = new Date().getTime();
-
-            if (autoCompoundEnabled && currentProfile.auto_compound_end_date) {
-              const endMs = new Date(currentProfile.auto_compound_end_date).getTime();
-              if (nowMs >= endMs) {
-                autoCompoundEnabled = false;
-              } else {
-                isCompoundingActiveNow = true;
-              }
-            }
-
             const oldAvailableBalance = currentProfile.available_balance || 0;
 
             if (isCompoundingActiveNow) {
               // Automated Daily Compounding behavior
-              // 1. Deduct target amount from balance (net effect is 0 change in available balance)
-              // 2. Increase total assets (total_invested) and append to compounded_amounts
               const existingCompounds = currentProfile.withdraw_methods?.compounded_amounts || currentProfile.compounded_amounts || [];
               const newCompounds = [...existingCompounds, totalCredit];
               const existingWithdrawMethods = currentProfile.withdraw_methods || {};
@@ -676,7 +650,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
               const userUpdates: any = {
                 total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
-                total_invested: Math.max(0, (currentProfile.total_invested || 0) - stdInvestmentsProfit + totalCredit),
+                total_invested: Math.max(0, (currentProfile.total_invested || 0) + totalCredit),
                 roi_cycle_start: newCycleStart,
                 withdraw_methods: withdrawMethodsUpdate,
                 auto_compound_enabled: autoCompoundEnabled
@@ -736,7 +710,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               transaction.update(docRef, {
                 available_balance: newAvailableBalance,
                 total_earnings: (currentProfile.total_earnings || 0) + totalCredit,
-                total_invested: Math.max(0, (currentProfile.total_invested || 0) - stdInvestmentsProfit),
                 roi_cycle_start: newCycleStart,
                 auto_compound_enabled: autoCompoundEnabled
               });

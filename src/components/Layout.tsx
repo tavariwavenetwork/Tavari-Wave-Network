@@ -133,9 +133,13 @@ interface NavItemProps {
   glowColor?: string;
   isProfile?: boolean;
   profilePhoto?: string;
+  isInvest?: boolean;
 }
 
-function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, isProfile, profilePhoto }: NavItemProps) {
+function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, isProfile, profilePhoto, isInvest }: NavItemProps) {
+  // Brand green color constant
+  const activeGreen = "#10b981";
+
   return (
     <motion.button 
       onClick={onClick}
@@ -147,10 +151,10 @@ function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, is
         {active && (
           <motion.div
             layoutId={`glow-${gradientId}`}
-            className="absolute inset-[15%] rounded-2xl opacity-10 blur-md -z-10 pointer-events-none"
-            style={{ backgroundColor: glowColor }}
+            className="absolute inset-[10%] rounded-2xl opacity-15 blur-md -z-10 pointer-events-none"
+            style={{ backgroundColor: activeGreen }}
             initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 0.12, scale: 1 }}
+            animate={{ opacity: 0.15, scale: 1 }}
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
           />
@@ -160,24 +164,24 @@ function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, is
       {/* Floating Icon Wrapper */}
       <motion.div 
         animate={{ 
-          y: active ? -4 : 0,
-          scale: active ? 1.08 : 1
+          y: active ? -3 : 0,
+          scale: active ? 1.05 : 1
         }}
         transition={{ type: "spring", stiffness: 350, damping: 25 }}
         className={cn(
-          "relative p-2 rounded-xl flex items-center justify-center transition-all duration-300",
+          "relative p-2.5 rounded-xl flex items-center justify-center transition-all duration-300",
           active 
-            ? "bg-white/[0.04] border border-white/10 shadow-[0_4px_12px_rgba(0,0,0,0.35)]" 
+            ? "bg-[#10b981]/10 border border-[#10b981]/35 shadow-[0_6px_20px_rgba(16,185,129,0.25),inset_0_1px_1px_rgba(255,255,255,0.08)]" 
             : "bg-transparent border border-transparent"
         )}
         style={{
-          boxShadow: active ? `0 4px 15px -3px ${glowColor}30, 0 0 10px -1px ${glowColor}20` : 'none'
+          boxShadow: active ? `0 6px 18px -3px rgba(16,185,129,0.3), 0 0 10px -1px rgba(16,185,129,0.15), inset 0 1px 1px rgba(255,255,255,0.08)` : 'none'
         }}
       >
         {isProfile ? (
           <div className={cn(
-            "w-5 h-5 rounded-full overflow-hidden border transition-all duration-300 relative flex-shrink-0",
-            active ? "border-[#CCFF00]" : "border-white/20"
+            "w-6 h-6 rounded-full overflow-hidden border transition-all duration-300 relative flex-shrink-0 shadow-inner",
+            active ? "border-[#10b981] scale-110 shadow-[0_0_8px_rgba(16,185,129,0.6)]" : "border-white/50"
           )}>
             <img 
               src={profilePhoto || `https://api.dicebear.com/7.x/avataaars/svg?seed=nexus`} 
@@ -187,11 +191,10 @@ function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, is
           </div>
         ) : React.isValidElement(icon)
           ? React.cloneElement(icon as React.ReactElement, { 
-              size: 20,
-              stroke: active && gradientId ? `url(#${gradientId})` : "currentColor",
+              size: 21,
               className: cn(
                 "transition-all duration-300", 
-                active ? "text-white animate-pulse" : "text-white/40"
+                active ? "text-[#10b981] drop-shadow-[0_0_6px_rgba(16,185,129,0.5)] animate-pulse" : "text-white/80 hover:text-white"
               )
             })
           : icon}
@@ -200,18 +203,18 @@ function BottomNavItem({ icon, label, active, onClick, gradientId, glowColor, is
         {active && (
           <motion.div
             layoutId={`dot-${gradientId}`}
-            className="absolute -bottom-1 w-1 h-1 rounded-full pointer-events-none"
-            style={{ backgroundColor: glowColor }}
+            className="absolute -bottom-1 w-1.5 h-1.5 rounded-full pointer-events-none shadow-[0_0_8px_rgba(16,185,129,0.8)]"
+            style={{ backgroundColor: activeGreen }}
           />
         )}
       </motion.div>
 
       {/* Label */}
       <span className={cn(
-        "text-[9px] font-semibold transition-all duration-300 tracking-wide mt-1 select-none", 
+        "text-[10px] font-bold transition-all duration-300 tracking-wide mt-1 select-none", 
         active 
-          ? "text-white opacity-100 font-extrabold" 
-          : "text-white/45 opacity-100 hover:text-white"
+          ? "text-[#10b981] font-extrabold opacity-100 drop-shadow-[0_0_4px_rgba(16,185,129,0.25)]" 
+          : "text-white/80 opacity-100 hover:text-white"
       )}>
         {label}
       </span>
@@ -1215,10 +1218,10 @@ export default function Layout() {
 
       {/* --- MOBILE BOTTOM NAV --- */}
       <nav className={cn(
-        "lg:hidden fixed bottom-0 left-0 right-0 h-20 w-full z-[100] flex items-center px-2 backdrop-blur-2xl border-t border-x-0 border-b-0 rounded-none shadow-[0_-8px_30px_rgba(0,0,0,0.65)]",
+        "lg:hidden fixed bottom-5 left-4 right-4 h-19 z-[100] flex items-center px-3 backdrop-blur-2xl border rounded-[24px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.95),inset_0_1.5px_2px_rgba(255,255,255,0.12),0_0_35px_rgba(0,0,0,0.4)] transition-all duration-300",
         isDark 
-          ? "bg-[#0b0d14]/75 border-white/[0.08] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]" 
-          : "bg-white/85 border-[#a855f7]/15",
+          ? "bg-[#0f1526]/92 border-white/12" 
+          : "bg-white/95 border-[#a855f7]/25 shadow-[0_20px_45px_rgba(168,85,247,0.12)]",
         (isDistractionFree || location.pathname === '/spin' || location.pathname === '/token' || location.pathname.startsWith('/token/') || location.pathname === '/rewards' || location.pathname.startsWith('/rewards/')) && "hidden"
       )}>
         {/* SVG definitions for realistic icon linear gradients */}
@@ -1275,6 +1278,7 @@ export default function Layout() {
             onClick={() => handleNavigation('/invest')} 
             gradientId="investIconGrad"
             glowColor="#06b6d4"
+            isInvest={true}
           />
           <BottomNavItem 
             icon={<Coins />} 
@@ -1312,18 +1316,8 @@ export default function Layout() {
             style={{ 
               width: `calc(${100 / 6}% - 12px)`,
               left: `calc(${((['home', 'fund', 'invest', 'token', 'rewards', 'profile'].indexOf(activeTab === 'dashboard' ? 'home' : activeTab) >= 0 ? ['home', 'fund', 'invest', 'token', 'rewards', 'profile'].indexOf(activeTab === 'dashboard' ? 'home' : activeTab) : 0) * (100 / 6))}% + 6px)`,
-              backgroundColor: 
-                activeTab === 'home' ? '#ff9f0a' :
-                activeTab === 'fund' ? '#10b981' :
-                activeTab === 'invest' ? '#06b6d4' :
-                activeTab === 'token' ? '#f59e0b' :
-                activeTab === 'rewards' ? '#a855f7' : '#CCFF00',
-              boxShadow: 
-                activeTab === 'home' ? '0 0 10px #ff9f0a' :
-                activeTab === 'fund' ? '0 0 10px #10b981' :
-                activeTab === 'invest' ? '0 0 10px #06b6d4' :
-                activeTab === 'token' ? '0 0 10px #f59e0b' :
-                activeTab === 'rewards' ? '0 0 10px #a855f7' : '0 0 10px rgb(204,255,0)'
+              backgroundColor: '#10b981',
+              boxShadow: '0 0 10px #10b981'
             }}
           />
         </div>
