@@ -856,6 +856,7 @@ export default function CipherAdmin() {
   const [maintenanceMessage, setMaintenanceMessage] = useState<string>("We are updating our nodes. Normal services will resume shortly.");
   const [maintenanceEta, setMaintenanceEta] = useState<string>("");
   const [withdrawalSystemBusy, setWithdrawalSystemBusy] = useState<boolean>(false);
+  const [enableWalletUpgradePayment, setEnableWalletUpgradePayment] = useState<boolean>(true);
   
   // UI History System
   const [uiVersions, setUiVersions] = useState<any[]>([]);
@@ -1319,6 +1320,7 @@ export default function CipherAdmin() {
           setMaintenanceMessage(data.maintenance_message || "We are updating our nodes. Normal services will resume shortly.");
           setMaintenanceEta(data.maintenance_eta || "");
           setWithdrawalSystemBusy(!!data.withdrawal_system_busy);
+          setEnableWalletUpgradePayment(data.enable_wallet_upgrade_payment !== undefined ? !!data.enable_wallet_upgrade_payment : true);
         }
       },
       (err) => console.error("System settings sync failed:", err.message)
@@ -2252,6 +2254,19 @@ export default function CipherAdmin() {
     }
   };
 
+  const updateEnableWalletUpgradePayment = async (enabled: boolean) => {
+    try {
+      await setDoc(doc(db, 'settings', 'system'), { 
+        enable_wallet_upgrade_payment: enabled,
+        last_updated: new Date().toISOString()
+      }, { merge: true });
+      toast.success(`Wallet payment for AI Bot upgrades ${enabled ? 'enabled' : 'disabled'} globally`);
+    } catch (error) {
+      console.error("WALLET STATUS UPDATE ERROR:", error);
+      toast.error("Failed to update wallet upgrade payment status");
+    }
+  };
+
   // --- ADVERTS OPERATIONS ---
   const handleSaveAdvert = async () => {
     if (!advTitle.trim() || !advMessage.trim()) {
@@ -3105,6 +3120,42 @@ export default function CipherAdmin() {
 
         {activeTab === 'caimarketplace' && (
           <div className="space-y-8 animate-fade-in">
+            {/* AI Marketplace Page Settings */}
+            <div className="p-8 bg-white/5 border border-white/5 rounded-[40px] space-y-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Wallet size={16} className="text-aura-lime" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-lime">
+                      AI Marketplace Page Settings
+                    </span>
+                  </div>
+                  <h3 className="text-sm font-black uppercase tracking-wider text-white">
+                    Wallet Upgrade Payment
+                  </h3>
+                  <p className="text-xs text-aura-muted font-bold uppercase tracking-wider leading-relaxed">
+                    Enable or disable wallet payments for AI Bot upgrades across the application.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const nextVal = !enableWalletUpgradePayment;
+                    setEnableWalletUpgradePayment(nextVal);
+                    await updateEnableWalletUpgradePayment(nextVal);
+                  }}
+                  className={cn(
+                    "px-6 py-2.5 rounded-xl text-[10px] uppercase font-black tracking-widest transition-all cursor-pointer select-none",
+                    enableWalletUpgradePayment 
+                      ? "bg-aura-lime text-aura-black shadow-[0_4px_12px_rgba(163,230,53,0.3)] hover:bg-lime-400" 
+                      : "bg-white/5 text-aura-muted border border-white/10 hover:bg-white/10"
+                  )}
+                >
+                  {enableWalletUpgradePayment ? "ON" : "OFF"}
+                </button>
+              </div>
+            </div>
+
             <div className="flex bg-white/5 p-1 rounded-2xl w-fit border border-white/5">
                {['all', 'pending', 'approved', 'rejected'].map((f) => (
                  <button 

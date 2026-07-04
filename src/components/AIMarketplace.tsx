@@ -203,6 +203,9 @@ export default function AIMarketplace() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [exchangeRate, setExchangeRate] = useState<number>(1400);
+  const [paymentMode, setPaymentMode] = useState<'transfer' | 'wallet'>('transfer');
+  const [selectedWalletSource, setSelectedWalletSource] = useState<'available_balance' | 'funding_balance' | null>(null);
+  const [enableWalletUpgradePayment, setEnableWalletUpgradePayment] = useState<boolean>(false);
   const [detectedCountry, setDetectedCountry] = useState<string | null>(() => {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone.toLowerCase();
@@ -211,13 +214,16 @@ export default function AIMarketplace() {
     return 'Nigeria';
   });
 
-  // Load system exchange rate
+  // Load system exchange rate and wallet payment settings
   useEffect(() => {
     const unsubscribe = onSnapshot(doc(db, 'settings', 'system'), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         setExchangeRate(data.usd_to_ngn_rate || 1400);
+        setEnableWalletUpgradePayment(data.enable_wallet_upgrade_payment !== undefined ? !!data.enable_wallet_upgrade_payment : true);
       }
+    }, (err) => {
+      console.error("Failed to load settings snapshot:", err);
     });
     return () => unsubscribe();
   }, []);
@@ -263,6 +269,20 @@ export default function AIMarketplace() {
     setSelectedRobot(robot);
     setTransactionId('');
     setCurrentView('pay');
+    
+    // Determine default eligible wallet based on selected robot price
+    const avail = profile?.available_balance || 0;
+    const fund = profile?.funding_balance || 0;
+    const price = robot.upgradePrice;
+    if (avail >= price) {
+      setSelectedWalletSource('available_balance');
+    } else if (fund >= price) {
+      setSelectedWalletSource('funding_balance');
+    } else {
+      setSelectedWalletSource(null);
+    }
+    // Default mode is always transfer
+    setPaymentMode('transfer');
   };
 
   const handleActivate = async (robot: Robot) => {
@@ -340,8 +360,92 @@ Thank you.`;
     }
   };
 
+  const handleWalletPayment = async () => {
+    if (!user || !profile || !selectedRobot || !selectedWalletSource) return;
+
+    if (!enableWalletUpgradePayment) {
+      toast.error("Wallet payment for AI Bot upgrades is currently disabled.");
+      return;
+    }
+
+    const price = selectedRobot.upgradePrice;
+    const sourceWallet = selectedWalletSource;
+    const currentBalance = profile[sourceWallet] || 0;
+
+    if (currentBalance < price) {
+      toast.error(`Insufficient ${sourceWallet === 'available_balance' ? 'Available Balance' : 'Deposit Balance'} for this upgrade.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { runTransaction, doc, collection } = await import('firebase/firestore');
+      await runTransaction(db, async (transaction) => {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists()) throw new Error("User document not found.");
+
+        const userData = userSnap.data();
+        const freshBalance = userData[sourceWallet] || 0;
+        if (freshBalance < price) {
+          throw new Error(`Insufficient ${sourceWallet === 'available_balance' ? 'Available Balance' : 'Deposit Balance'} for this upgrade.`);
+        }
+
+        // 1. Deduct funds from the selected wallet
+        const userUpdates: any = {
+          [sourceWallet]: freshBalance - price
+        };
+
+        // 2. Unlock the robot immediately (since wallet payment is auto-approved)
+        const unlocked = userData.unlocked_robots || [];
+        const robotName = selectedRobot.name;
+        const updatedUnlocked = unlocked.includes(robotName) ? unlocked : [...unlocked, robotName];
+        userUpdates.unlocked_robots = updatedUnlocked;
+
+        transaction.update(userRef, userUpdates);
+
+        // 3. Create normal transaction history entry marked as 'Approved' / 'Active'
+        const txRef = doc(collection(db, 'transactions'));
+        transaction.set(txRef, {
+          user_id: user.uid,
+          user_name: userData.username || userData.name || user.email || 'Anonymous',
+          type: 'ai_upgrade',
+          robot_name: selectedRobot.name,
+          selected_bot: selectedRobot.name,
+          amount: price,
+          transaction_id: `wallet_${sourceWallet}_${Date.now()}`,
+          tx_id: `wallet_${sourceWallet}_${Date.now()}`,
+          status: 'Active',
+          created_at: new Date().toISOString()
+        });
+
+        // 4. Create a notification
+        const notifRef = doc(collection(db, 'notifications'));
+        transaction.set(notifRef, {
+          user_id: user.uid,
+          title: 'AI Trading Robot Unlocked! 🤖',
+          message: `Your payment of $${price} from your ${sourceWallet === 'available_balance' ? 'Available Balance' : 'Deposit Balance'} has been processed. ${robotName} has been unlocked immediately.`,
+          type: 'success',
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      });
+
+      toast.success(`${selectedRobot.name} unlocked successfully using wallet funds!`);
+      setCurrentView('success');
+    } catch (error: any) {
+      console.error("Wallet upgrade failed:", error);
+      toast.error(error.message || "Failed to complete wallet payment. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const unlockedRobots = profile?.unlocked_robots || [];
   const activeRobotName = profile?.active_robot;
+  const avail = profile?.available_balance || 0;
+  const fund = profile?.funding_balance || 0;
+  const showWalletOption = selectedRobot ? (enableWalletUpgradePayment && (avail >= selectedRobot.upgradePrice || fund >= selectedRobot.upgradePrice)) : false;
 
   return (
     <div className="min-h-screen text-white relative overflow-hidden bg-[#06080c]">
@@ -408,7 +512,7 @@ Thank you.`;
       <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-6 sm:mt-12 pb-24 relative z-10">
         <AnimatePresence mode="wait">
           {/* VIEW 1: MARKETPLACE */}
-          {currentView === 'marketplace' && (
+          {(currentView === 'marketplace' || currentView === 'pay' || currentView === 'success') && (
             <motion.div
               key="marketplace"
               initial={{ opacity: 0, y: 15 }}
@@ -543,42 +647,108 @@ Thank you.`;
               </div>
             </motion.div>
           )}
+        </AnimatePresence>
+      </div>
 
-          {/* VIEW 2: DEDICATED PAYMENT SCREEN */}
-          {currentView === 'pay' && selectedRobot && (
+      {/* STYLE INJECTION TO HIDE NAVBARS AND PREVENT BACKGROUND SCROLLING */}
+      {(currentView === 'pay' || currentView === 'success') && (
+        <style>{`
+          /* Hide Top Navbar */
+          nav.sticky.top-4, .sticky.top-4 {
+            display: none !important;
+          }
+          /* Hide Mobile Bottom Nav */
+          nav.lg\\:hidden.fixed.bottom-5, nav.bottom-5 {
+            display: none !important;
+          }
+          /* Prevent background page scrolling */
+          body {
+            overflow: hidden !important;
+          }
+        `}</style>
+      )}
+
+      {/* PREMIUM RESPONSIVE DIALOG (MODAL OVERLAY) */}
+      <AnimatePresence>
+        {(currentView === 'pay' || currentView === 'success') && selectedRobot && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-y-auto">
+            {/* Elegant backdrop with dark overlay and blur */}
             <motion.div
-              key="payment"
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.96 }}
-              transition={{ duration: 0.3 }}
-              className="max-w-2xl mx-auto"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (currentView === 'pay') {
+                  setCurrentView('marketplace');
+                  setSelectedRobot(null);
+                }
+              }}
+              className="fixed inset-0 bg-[#020305]/92 backdrop-blur-md cursor-pointer z-[1000]"
+            />
+
+            {/* Modal Card */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-lg sm:max-w-xl md:max-w-2xl bg-gradient-to-b from-[#0e111a]/98 via-[#090b11]/98 to-[#040507]/98 border border-white/10 rounded-[32px] p-5 sm:p-8 md:p-10 shadow-[0_30px_70px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.05)] z-[1001] max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col gap-6"
             >
-              {/* Back button */}
-              <button 
-                onClick={() => { setCurrentView('marketplace'); setSelectedRobot(null); }}
-                className="flex items-center gap-2 text-aura-muted hover:text-white transition-all text-xs font-black uppercase tracking-widest mb-6 cursor-pointer"
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setCurrentView('marketplace');
+                  setSelectedRobot(null);
+                }}
+                className="absolute top-5 right-5 sm:top-6 sm:right-6 p-2 text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-all cursor-pointer z-20"
               >
-                <ChevronLeft size={16} /> Back to Robots
+                <X size={18} />
               </button>
 
-              <div className="bg-gradient-to-b from-[#0c0e14]/98 to-[#06080c]/98 border border-white/10 rounded-[32px] p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.9)] relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+              {currentView === 'pay' ? (
+                <>
+                  <div className="border-b border-white/5 pb-4">
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-aura-lime mb-1 block">
+                      AI UPGRADE PORTAL
+                    </span>
+                    <h2 className="text-xl sm:text-2xl font-black uppercase tracking-wider text-white">
+                      {paymentMode === 'wallet' ? 'Secure Wallet Upgrade' : (isNigeria ? 'Secure Bank Transfer' : 'Secure Crypto Asset')}
+                    </h2>
+                  </div>
 
-                <h2 className="text-xl sm:text-2xl font-black uppercase tracking-widest text-center border-b border-white/5 pb-4 mb-6">
-                  {isNigeria ? 'Secure Bank Transfer Portal' : 'Secure Crypto Asset Portal'}
-                </h2>
+                  {showWalletOption && (
+                    <div className="flex bg-white/[0.03] border border-white/5 p-1 rounded-2xl max-w-sm mx-auto w-full">
+                      <button
+                        onClick={() => setPaymentMode('transfer')}
+                        className={cn(
+                          "flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer select-none",
+                          paymentMode === 'transfer'
+                            ? "bg-gradient-to-r from-[#202738] to-[#121824] text-white border border-white/10 shadow-lg"
+                            : "text-aura-muted hover:text-white"
+                        )}
+                      >
+                        Transfer
+                      </button>
+                      <button
+                        onClick={() => setPaymentMode('wallet')}
+                        className={cn(
+                          "flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer select-none",
+                          paymentMode === 'wallet'
+                            ? "bg-gradient-to-r from-[#202738] to-[#121824] text-white border border-white/10 shadow-lg"
+                            : "text-aura-muted hover:text-white"
+                        )}
+                      >
+                        Wallet
+                      </button>
+                    </div>
+                  )}
 
-                <div className="space-y-6">
-                  {/* SECTION A: Selected AI Bot */}
-                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4">
-                    <p className="text-[10px] text-aura-muted uppercase tracking-widest font-black mb-3">
-                      SECTION A: SELECTED AI BOT
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-white/5 rounded-xl border border-white/10 p-1">
+                  {/* Content Reorganization */}
+                  <div className="space-y-5">
+                    {/* SECTION A: SELECTED AI BOT */}
+                    <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-14 h-14 bg-white/5 rounded-2xl border border-white/10 p-1.5 shrink-0 flex items-center justify-center">
                           <img 
                             src={selectedRobot.image} 
                             alt={selectedRobot.name} 
@@ -586,249 +756,365 @@ Thank you.`;
                             referrerPolicy="no-referrer"
                           />
                         </div>
-                        <div>
-                          <p className="text-sm font-black text-white">{selectedRobot.name}</p>
+                        <div className="space-y-0.5">
+                          <span className="text-[8px] font-black uppercase tracking-wider text-aura-lime bg-aura-lime/10 border border-aura-lime/20 px-2 py-0.5 rounded-md">
+                            Selected Bot
+                          </span>
+                          <p className="text-base font-black text-white mt-1">{selectedRobot.name}</p>
                           <p className="text-[10px] text-aura-muted font-mono">{selectedRobot.version}</p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs font-black text-emerald-400">{selectedRobot.roi} Daily ROI</p>
-                        <span className="inline-block mt-1 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded">
-                          LOCKED
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECTION B: Amount To Pay */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-aura-muted uppercase tracking-widest font-black ml-2 block">
-                      SECTION B: AMOUNT TO PAY
-                    </label>
-                    <div className="relative">
-                      <input 
-                        type="text" 
-                        readOnly 
-                        value={
-                          isNigeria 
-                            ? `${formatCurrency(selectedRobot.upgradePrice)} (₦${(selectedRobot.upgradePrice * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-                            : formatCurrency(selectedRobot.upgradePrice)
-                        }
-                        className="w-full bg-[#030406]/90 border border-white/10 rounded-2xl py-4 px-5 text-sm sm:text-base font-bold text-gray-300 outline-none select-none cursor-not-allowed"
-                      />
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-mono text-aura-muted uppercase tracking-widest">
-                        READ-ONLY
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* SECTION D: Bank Transfer Details / Crypto Details */}
-                  {isNigeria ? (
-                    /* NIGERIAN USER BANK DETAILS */
-                    <div className="bg-gradient-to-b from-emerald-950/20 to-transparent border border-emerald-500/20 rounded-2xl p-5 space-y-4">
-                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                        <span className="text-[10px] text-aura-muted uppercase tracking-widest font-black">
-                          SECTION D: BANK TRANSFER DETAILS
-                        </span>
-                        <span className="text-[7px] font-black uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 px-2 py-0.5 rounded">
-                          ACTIVE INSTANT BRIDGE
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-0.5">
-                          <p className="text-[9px] text-aura-muted uppercase tracking-widest font-bold">Bank Name</p>
-                          <p className="text-sm font-black text-white">OPay Bank</p>
+                      <div className="text-left sm:text-right w-full sm:w-auto border-t sm:border-t-0 border-white/5 pt-3 sm:pt-0 flex sm:flex-col justify-between sm:justify-center items-center sm:items-end">
+                        <div className="sm:hidden text-[9px] text-aura-muted font-black uppercase tracking-widest">Expected Yield</div>
+                        <div>
+                          <p className="text-sm font-black text-emerald-400">{selectedRobot.roi} Daily ROI</p>
+                          <span className="inline-block mt-0.5 text-[8px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded">
+                            LOCKED
+                          </span>
                         </div>
+                      </div>
+                    </div>
 
-                        <div className="space-y-0.5">
-                          <p className="text-[9px] text-aura-muted uppercase tracking-widest font-bold">Account Name</p>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-black text-white truncate max-w-[150px]">TAVARI WAVE NETWORK</p>
-                            <button 
-                              onClick={() => handleCopy('TAVARI WAVE NETWORK', 'accName')}
-                              className="p-1 text-gray-400 hover:text-white hover:bg-white/5 rounded transition-all cursor-pointer"
-                            >
-                              {copiedField === 'accName' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                            </button>
+                    {/* SECTION B: AMOUNT TO PAY */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] text-aura-muted uppercase tracking-widest font-black ml-1 block">
+                        Amount to Pay
+                      </label>
+                      <div className="relative">
+                        <input 
+                          type="text" 
+                          readOnly 
+                          value={
+                            isNigeria 
+                              ? `${formatCurrency(selectedRobot.upgradePrice)} (₦${(selectedRobot.upgradePrice * exchangeRate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+                              : formatCurrency(selectedRobot.upgradePrice)
+                          }
+                          className="w-full bg-[#030406]/90 border border-white/10 rounded-2xl py-4 px-5 text-sm sm:text-base font-bold text-gray-300 outline-none select-all cursor-default"
+                        />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-mono text-aura-muted uppercase tracking-widest select-none pointer-events-none">
+                          READ-ONLY
+                        </div>
+                      </div>
+                    </div>
+
+                    {paymentMode === 'transfer' ? (
+                      <>
+                        {isNigeria ? (
+                          /* BANK DETAILS */
+                          <div className="bg-gradient-to-b from-emerald-950/10 to-transparent border border-emerald-500/20 rounded-2xl p-5 space-y-4">
+                            <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
+                              <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-black flex items-center gap-1.5">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                </span>
+                                Bank Transfer Details
+                              </span>
+                              <span className="text-[7.5px] font-black uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                                Active Instant Bridge
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div className="space-y-0.5">
+                                <p className="text-[9px] text-aura-muted uppercase tracking-widest font-bold">Bank Name</p>
+                                <p className="text-sm font-black text-white">OPay Bank</p>
+                              </div>
+
+                              <div className="space-y-0.5">
+                                <p className="text-[9px] text-aura-muted uppercase tracking-widest font-bold">Account Name</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-black text-white truncate max-w-[150px]">TAVARI WAVE NETWORK</p>
+                                  <button 
+                                    onClick={() => handleCopy('TAVARI WAVE NETWORK', 'accName')}
+                                    className="p-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all cursor-pointer"
+                                  >
+                                    {copiedField === 'accName' ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="col-span-1 sm:col-span-2 space-y-1 bg-black/40 p-4 rounded-xl border border-white/5">
+                                <p className="text-[9px] text-aura-muted uppercase tracking-widest font-bold">Account Number</p>
+                                <div className="flex justify-between items-center gap-2">
+                                  <code className="text-lg sm:text-xl font-mono font-black text-emerald-400 tracking-wider">6550002094</code>
+                                  <button 
+                                    onClick={() => handleCopy('6550002094', 'accNum')}
+                                    className="px-3.5 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-[9px] text-emerald-400 font-black uppercase tracking-widest rounded-lg border border-emerald-500/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                                  >
+                                    {copiedField === 'accNum' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                                    {copiedField === 'accNum' ? 'Copied' : 'Copy'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          /* CRYPTO WALLET DETAILS */
+                          <div className="space-y-4 bg-gradient-to-b from-purple-950/10 to-transparent border border-purple-500/20 rounded-2xl p-5">
+                            <div className="flex justify-between items-center pb-2.5 border-b border-white/5">
+                              <span className="text-[10px] text-purple-400 uppercase tracking-widest font-black flex items-center gap-1.5">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-purple-500"></span>
+                                </span>
+                                Crypto Wallet Destination
+                              </span>
+                              <span className="text-[7.5px] font-black uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
+                                Global Digital Bridge
+                              </span>
+                            </div>
 
-                        <div className="col-span-1 sm:col-span-2 space-y-0.5 bg-black/40 p-3 rounded-xl border border-white/5">
-                          <p className="text-[9px] text-aura-muted uppercase tracking-widest font-bold">Account Number</p>
-                          <div className="flex justify-between items-center">
-                            <code className="text-lg font-mono font-black text-emerald-400 tracking-wider">6550002094</code>
-                            <button 
-                              onClick={() => handleCopy('6550002094', 'accNum')}
-                              className="px-3 py-1.5 bg-white/5 hover:bg-white/10 text-[9px] font-black uppercase tracking-widest rounded-lg border border-white/10 transition-all flex items-center gap-1.5 cursor-pointer"
-                            >
-                              {copiedField === 'accNum' ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
-                              {copiedField === 'accNum' ? 'Copied' : 'Copy'}
-                            </button>
+                            {/* Crypto Toggles */}
+                            <div className="grid grid-cols-3 gap-2">
+                              {(['usdt', 'erc20', 'btc'] as const).map(t => (
+                                <button 
+                                  key={t} 
+                                  onClick={() => setSelectedCrypto(t)}
+                                  className={cn(
+                                    "py-2 rounded-xl text-[9px] font-black uppercase border transition-all cursor-pointer",
+                                    selectedCrypto === t 
+                                      ? "bg-purple-500/20 border-purple-500 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
+                                      : "bg-white/5 border-white/5 text-aura-muted hover:bg-white/10"
+                                  )}
+                                >
+                                  {t === 'usdt' ? 'USDT (TRC20)' : t.toUpperCase()}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Display QR & Wallet Address */}
+                            <div className="flex flex-col sm:flex-row items-center gap-5 pt-1">
+                              <div className="p-3 bg-white rounded-2xl shadow-lg border border-white/25 shrink-0 flex items-center justify-center">
+                                <QRCodeCanvas value={CRYPTO_ADDRESSES[selectedCrypto]} size={90} />
+                              </div>
+
+                              <div className="flex-1 w-full space-y-2">
+                                <p className="text-[9px] text-aura-muted uppercase tracking-widest font-black">
+                                  Wallet Address ({selectedCrypto === 'usdt' ? 'TRC20' : selectedCrypto === 'erc20' ? 'ERC20' : 'BTC'})
+                                </p>
+                                <div className="bg-[#030406]/90 border border-white/10 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-inner overflow-hidden">
+                                  <code className="text-[10px] font-mono text-purple-400 truncate tracking-wide select-all">
+                                    {CRYPTO_ADDRESSES[selectedCrypto]}
+                                  </code>
+                                  <button 
+                                    onClick={() => handleCopy(CRYPTO_ADDRESSES[selectedCrypto], 'wallet')} 
+                                    className="flex-shrink-0 p-2 bg-white/5 border border-white/10 hover:bg-purple-500/25 rounded-xl text-gray-300 hover:text-white transition-all active:scale-95 cursor-pointer"
+                                  >
+                                    {copiedField === 'wallet' ? <Check size={12} className="text-purple-400" /> : <Copy size={12} />}
+                                  </button>
+                                </div>
+                                <p className="text-[8px] text-aura-muted uppercase font-bold tracking-widest leading-relaxed">
+                                  * Send exact equivalent amount. Review gas or network fees before sending.
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    /* INTERNATIONAL CRYPTO DETAILS */
-                    <div className="space-y-4 bg-gradient-to-b from-purple-950/20 to-transparent border border-purple-500/10 rounded-2xl p-5">
-                      <div className="flex justify-between items-center pb-2 border-b border-white/5">
-                        <span className="text-[10px] text-aura-muted uppercase tracking-widest font-black">
-                          SECTION D: CRYPTO WALLET
-                        </span>
-                        <span className="text-[7px] font-black uppercase bg-purple-500/15 text-purple-400 border border-purple-500/25 px-2 py-0.5 rounded">
-                          GLOBAL DIGITAL BRIDGE
-                        </span>
-                      </div>
+                        )}
 
-                      {/* Crypto Toggles */}
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['usdt', 'erc20', 'btc'] as const).map(t => (
-                          <button 
-                            key={t} 
-                            onClick={() => setSelectedCrypto(t)}
+                        {/* TRANSACTION ID INPUT */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] text-aura-muted uppercase tracking-widest font-black ml-1 block">
+                            Transaction ID / Ref
+                          </label>
+                          <input 
+                            type="text" 
+                            value={transactionId}
+                            onChange={(e) => setTransactionId(e.target.value)}
+                            placeholder="Enter Transaction ID or Reference Hash"
+                            className="w-full bg-[#030406]/90 border border-white/10 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30 rounded-2xl py-3.5 px-4 text-xs sm:text-sm font-bold text-white outline-none transition-all placeholder-white/20 shadow-inner"
+                          />
+                        </div>
+
+                        {/* DUAL BUTTON ACTIONS FOR TRANSFER */}
+                        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentView('marketplace');
+                              setSelectedRobot(null);
+                            }}
+                            className="w-full sm:w-1/3 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl border border-white/10 transition-all cursor-pointer text-center select-none active:scale-95"
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            disabled={!transactionId || isSubmitting}
+                            onClick={handleSubmitPayment}
                             className={cn(
-                              "py-2.5 rounded-xl text-[9px] font-black uppercase border transition-all cursor-pointer",
-                              selectedCrypto === t 
-                                ? "bg-purple-500/20 border-purple-500 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
-                                : "bg-white/5 border-white/5 text-aura-muted hover:bg-white/10"
+                              "w-full sm:flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl disabled:opacity-20 cursor-pointer text-slate-950 flex items-center justify-center gap-2 select-none active:scale-95",
+                              isNigeria ? "bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/10" : "bg-purple-500 hover:bg-purple-400 shadow-purple-500/10"
                             )}
                           >
-                            {t === 'usdt' ? 'USDT (TRC20)' : t.toUpperCase()}
+                            {isSubmitting ? (
+                              <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <ShieldCheck size={14} />
+                            )}
+                            I Have Made Payment
                           </button>
-                        ))}
-                      </div>
-
-                      {/* Display QR & Wallet Address */}
-                      <div className="flex flex-col sm:flex-row items-center gap-5 pt-2">
-                        <div className="p-3 bg-white rounded-2xl shadow-lg border border-white/25 shrink-0 flex items-center justify-center">
-                          <QRCodeCanvas value={CRYPTO_ADDRESSES[selectedCrypto]} size={100} />
                         </div>
-
-                        <div className="flex-1 w-full space-y-2">
-                          <p className="text-[9px] text-aura-muted uppercase tracking-widest font-black">
-                            Wallet Address ({selectedCrypto === 'usdt' ? 'TRC20' : selectedCrypto === 'erc25' ? 'ERC20' : 'BTC'})
-                          </p>
-                          <div className="bg-[#030406]/90 border border-white/10 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-inner overflow-hidden">
-                            <code className="text-[10px] font-mono text-purple-400 truncate tracking-wide select-all">
-                              {CRYPTO_ADDRESSES[selectedCrypto]}
-                            </code>
-                            <button 
-                              onClick={() => handleCopy(CRYPTO_ADDRESSES[selectedCrypto], 'wallet')} 
-                              className="flex-shrink-0 p-2 bg-white/5 border border-white/10 hover:bg-purple-500/25 rounded-xl text-gray-300 hover:text-white transition-all active:scale-95 cursor-pointer"
-                            >
-                              {copiedField === 'wallet' ? <Check size={12} className="text-purple-400" /> : <Copy size={12} />}
-                            </button>
-                          </div>
-                          <p className="text-[8px] text-aura-muted uppercase font-bold tracking-widest">
-                            * Send exactly equivalent amount. Review your gas fee or platform fee before executing.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* SECTION C: Transaction ID */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] text-aura-muted uppercase tracking-widest font-black ml-2 block">
-                      SECTION C: TRANSACTION ID
-                    </label>
-                    <input 
-                      type="text" 
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder="Enter Transaction ID"
-                      className="w-full bg-[#030406]/90 border border-white/10 focus:border-cyan-500/50 rounded-2xl py-4 px-5 text-sm sm:text-base font-bold text-white outline-none transition-all placeholder-white/20 shadow-inner"
-                    />
-                  </div>
-
-                  {/* SECTION E: Confirmation */}
-                  <button
-                    disabled={!transactionId || isSubmitting}
-                    onClick={handleSubmitPayment}
-                    className={cn(
-                      "w-full py-5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl disabled:opacity-20 cursor-pointer text-slate-950 flex items-center justify-center gap-2",
-                      isNigeria ? "bg-emerald-500 hover:bg-emerald-400 shadow-emerald-500/10" : "bg-purple-500 hover:bg-purple-400 shadow-purple-500/10"
-                    )}
-                  >
-                    {isSubmitting ? (
-                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      </>
                     ) : (
-                      <ShieldCheck size={14} />
+                      <>
+                        {/* WALLET SELECTION */}
+                        <div className="space-y-3">
+                          <label className="text-[10px] text-aura-muted uppercase tracking-widest font-black ml-1 block">
+                            Select Wallet Source
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {selectedRobot && avail >= selectedRobot.upgradePrice && (
+                              <button
+                                onClick={() => setSelectedWalletSource('available_balance')}
+                                className={cn(
+                                  "p-4 sm:p-5 rounded-2xl border text-left transition-all relative overflow-hidden group cursor-pointer flex flex-col justify-between gap-2.5",
+                                  selectedWalletSource === 'available_balance'
+                                    ? "bg-gradient-to-b from-[#15122e] to-transparent border-purple-500/40 shadow-[0_10px_25px_rgba(168,85,247,0.15)]"
+                                    : "bg-white/[0.02] border-white/5 hover:border-white/10"
+                                )}
+                              >
+                                <div className="flex justify-between items-center w-full">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-aura-muted">
+                                    Available Balance
+                                  </span>
+                                  {selectedWalletSource === 'available_balance' && (
+                                    <Check size={12} className="text-purple-400" />
+                                  )}
+                                </div>
+                                <span className="text-lg sm:text-xl font-black text-white font-mono">
+                                  {formatCurrency(avail)}
+                                </span>
+                              </button>
+                            )}
+
+                            {selectedRobot && fund >= selectedRobot.upgradePrice && (
+                              <button
+                                onClick={() => setSelectedWalletSource('funding_balance')}
+                                className={cn(
+                                  "p-4 sm:p-5 rounded-2xl border text-left transition-all relative overflow-hidden group cursor-pointer flex flex-col justify-between gap-2.5",
+                                  selectedWalletSource === 'funding_balance'
+                                    ? "bg-gradient-to-b from-[#15122e] to-transparent border-purple-500/40 shadow-[0_10px_25px_rgba(168,85,247,0.15)]"
+                                    : "bg-white/[0.02] border-white/5 hover:border-white/10"
+                                )}
+                              >
+                                <div className="flex justify-between items-center w-full">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-aura-muted">
+                                    Deposit Balance
+                                  </span>
+                                  {selectedWalletSource === 'funding_balance' && (
+                                    <Check size={12} className="text-purple-400" />
+                                  )}
+                                </div>
+                                <span className="text-lg sm:text-xl font-black text-white font-mono">
+                                  {formatCurrency(fund)}
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* DUAL BUTTON ACTIONS FOR WALLET */}
+                        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCurrentView('marketplace');
+                              setSelectedRobot(null);
+                            }}
+                            className="w-full sm:w-1/3 py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl border border-white/10 transition-all cursor-pointer text-center select-none active:scale-95"
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            disabled={!selectedWalletSource || isSubmitting || (profile?.[selectedWalletSource] || 0) < selectedRobot.upgradePrice}
+                            onClick={handleWalletPayment}
+                            className={cn(
+                              "w-full sm:flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl disabled:opacity-20 cursor-pointer text-slate-950 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-emerald-500/10 active:scale-95 select-none"
+                            )}
+                          >
+                            {isSubmitting ? (
+                              <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <ShieldCheck size={14} />
+                            )}
+                            {!selectedWalletSource
+                              ? "Select a Wallet Source"
+                              : (profile?.[selectedWalletSource] || 0) < selectedRobot.upgradePrice
+                              ? "Insufficient Balance"
+                              : `Confirm Payment`
+                            }
+                          </button>
+                        </div>
+                      </>
                     )}
-                    I Have Made Payment
-                  </button>
+                  </div>
+                </>
+              ) : (
+                /* VIEW 3: SUCCESS SCREEN */
+                <div className="space-y-6 text-center py-4">
+                  <div className="flex justify-center">
+                    <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] animate-pulse">
+                      <CheckCircle size={36} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h2 className="text-xl sm:text-2xl font-black uppercase tracking-widest text-emerald-400">
+                      {paymentMode === 'wallet' ? 'Upgrade Successful' : 'Payment Submitted'}
+                    </h2>
+                    <p className="text-xs text-aura-muted leading-relaxed max-w-sm mx-auto uppercase font-bold tracking-wider">
+                      {paymentMode === 'wallet' 
+                        ? 'Your AI Bot Upgrade has been processed and activated. Your new robot is unlocked and ready for activation.'
+                        : 'Your AI Bot Upgrade request has been received and is currently under review. Activation will become available immediately after approval.'}
+                    </p>
+                  </div>
+
+                  {/* Info Block */}
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-3.5 text-left max-w-sm mx-auto font-mono text-[11px]">
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <span className="text-aura-muted uppercase font-bold">AI VERSION:</span>
+                      <span className="text-white font-black">{selectedRobot.name} ({selectedRobot.version})</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/5 pb-2">
+                      <span className="text-aura-muted uppercase font-bold">AMOUNT:</span>
+                      <span className="text-white font-black">{formatCurrency(selectedRobot.upgradePrice)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-aura-muted uppercase font-bold">STATUS:</span>
+                      <span className={cn(
+                        "font-black uppercase tracking-widest",
+                        paymentMode === 'wallet' ? "text-emerald-400" : "text-amber-500 font-black uppercase tracking-widest animate-pulse"
+                      )}>
+                        {paymentMode === 'wallet' ? 'COMPLETED / ACTIVE' : 'PENDING REVIEW'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Two buttons */}
+                  <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto pt-2">
+                    <button
+                      onClick={handleContactSupport}
+                      className="py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[9px] rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <MessageSquare size={13} />
+                      Contact Support
+                    </button>
+
+                    <button
+                      onClick={handleOkClick}
+                      className="py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase tracking-widest text-[9px] rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer active:scale-95"
+                    >
+                      OK
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
-          )}
-
-          {/* VIEW 3: SUCCESS SCREEN */}
-          {currentView === 'success' && selectedRobot && (
-            <motion.div
-              key="success"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.3 }}
-              className="max-w-xl mx-auto text-center"
-            >
-              <div className="bg-gradient-to-b from-[#0c0e14]/98 to-[#06080c]/98 border border-white/10 rounded-[32px] p-8 sm:p-10 shadow-[0_25px_60px_rgba(0,0,0,0.95)] space-y-6 sm:space-y-8 relative overflow-hidden">
-                <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-                <div className="flex justify-center">
-                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] animate-pulse">
-                    <CheckCircle size={36} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h2 className="text-xl sm:text-2xl font-black uppercase tracking-widest text-emerald-400">
-                    Payment Submitted Successfully
-                  </h2>
-                  <p className="text-xs text-aura-muted leading-relaxed max-w-sm mx-auto uppercase font-bold tracking-wider">
-                    Your AI Bot Upgrade request has been received and is currently under review. Activation will become available immediately after approval.
-                  </p>
-                </div>
-
-                {/* Info Block */}
-                <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5 space-y-3.5 text-left max-w-sm mx-auto font-mono text-[11px]">
-                  <div className="flex justify-between border-b border-white/5 pb-2">
-                    <span className="text-aura-muted uppercase font-bold">AI VERSION:</span>
-                    <span className="text-white font-black">{selectedRobot.name} ({selectedRobot.version})</span>
-                  </div>
-                  <div className="flex justify-between border-b border-white/5 pb-2">
-                    <span className="text-aura-muted uppercase font-bold">AMOUNT:</span>
-                    <span className="text-white font-black">{formatCurrency(selectedRobot.upgradePrice)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-aura-muted uppercase font-bold">STATUS:</span>
-                    <span className="text-amber-500 font-black uppercase tracking-widest animate-pulse">PENDING REVIEW</span>
-                  </div>
-                </div>
-
-                {/* Two buttons */}
-                <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-                  <button
-                    onClick={handleContactSupport}
-                    className="py-4 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-[9px] rounded-xl border border-white/10 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                  >
-                    <MessageSquare size={13} />
-                    Contact Support
-                  </button>
-
-                  <button
-                    onClick={handleOkClick}
-                    className="py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black uppercase tracking-widest text-[9px] rounded-xl transition-all shadow-lg shadow-emerald-500/10 cursor-pointer active:scale-95"
-                  >
-                    OK
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modern Premium Modal Popup for Learn More */}
       <AnimatePresence>
