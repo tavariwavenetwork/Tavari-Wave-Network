@@ -2396,7 +2396,7 @@ export default function Layout() {
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="md:hidden fixed left-4 bottom-[92px] z-[110] pointer-events-auto flex items-center gap-2.5 p-2 pr-4 bg-[#090b10]/95 backdrop-blur-md border border-primary/25 rounded-full shadow-[0_8px_32px_rgba(59,130,246,0.25)] text-left cursor-pointer group hover:border-primary/50 transition-colors"
+              className="md:hidden fixed left-4 bottom-[128px] z-[110] pointer-events-auto flex items-center gap-2.5 p-2 pr-4 bg-[#090b10]/95 backdrop-blur-md border border-primary/25 rounded-full shadow-[0_8px_32px_rgba(59,130,246,0.25)] text-left cursor-pointer group hover:border-primary/50 transition-colors"
             >
               <div className="relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gradient-to-br from-primary/10 to-indigo-500/10 border border-primary/30">
                 {/* Dynamic spinning wheel background */}
@@ -2424,7 +2424,7 @@ export default function Layout() {
             </motion.button>
 
             {/* Mobile Bottom Right: Floating WhatsApp Business Button */}
-            <div className="md:hidden fixed right-4 bottom-[92px] z-[110] pointer-events-auto">
+            <div className="md:hidden fixed right-4 bottom-[128px] z-[110] pointer-events-auto">
               <WhatsAppCommunitySlider />
             </div>
 

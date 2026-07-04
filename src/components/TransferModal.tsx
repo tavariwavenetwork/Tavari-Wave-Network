@@ -57,6 +57,12 @@ const WALLET_NAMES: Record<WalletType, string> = {
   reward_dollar_balance: 'Reward Wallet'
 };
 
+const RECEIVER_WALLET_NAMES: Record<string, string> = {
+  funding_balance: 'Funding Wallet',
+  available_balance: 'Available Balance',
+  total_invested: 'Assets'
+};
+
 export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
   const { user, profile } = useAuth();
   const getProfileWalletBalance = (key: WalletType) => {
@@ -74,6 +80,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
   const [toWallet, setToWallet] = useState<WalletType>('available_balance');
   const [targetUserId, setTargetUserId] = useState('');
   const [targetUser, setTargetUser] = useState<any>(null);
+  const [toReceiverWallet, setToReceiverWallet] = useState<'funding_balance' | 'available_balance' | 'total_invested' | ''>('');
   const [searchError, setSearchError] = useState(false);
   const [amount, setAmount] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -151,6 +158,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             } else {
               setTargetUser(foundUser);
               setSearchError(false);
+              setToReceiverWallet('');
             }
           } else {
             setTargetUser(null);
@@ -181,6 +189,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
       setAmount('');
       setTargetUserId('');
       setTargetUser(null);
+      setToReceiverWallet('');
       setSearchError(false);
     }
   }, [isOpen]);
@@ -196,6 +205,11 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
 
     if (type === 'internal' && fromWallet === toWallet) {
       toast.error("Select different wallets");
+      return;
+    }
+
+    if (type === 'user' && !toReceiverWallet) {
+      toast.error("Please select a destination wallet");
       return;
     }
 
@@ -296,8 +310,12 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             });
           }
 
+          if (!toReceiverWallet) {
+            throw new Error("Receiver destination wallet must be selected");
+          }
+
           transaction.update(receiverRef, {
-            funding_balance: increment(amountNum)
+            [toReceiverWallet]: increment(amountNum)
           });
 
           // Save to beneficiaries subcollection
@@ -317,9 +335,13 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             type_detail: 'internal_transfer',
             amount: amountNum,
             sender_id: user!.uid,
+            sender_wallet: fromWallet,
+            from_wallet: fromWallet,
             receiver_id: targetUser.id,
             receiver_public_id: targetUser.public_id,
             receiver_name: targetUser.name,
+            receiver_destination_wallet: toReceiverWallet,
+            to_wallet: toReceiverWallet,
             status: 'completed',
             created_at: new Date().toISOString()
           });
@@ -333,16 +355,21 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             sender_id: user!.uid,
             sender_public_id: profile?.public_id,
             sender_name: profile?.name,
+            destination_wallet: toReceiverWallet,
+            to_wallet: toReceiverWallet,
             status: 'completed',
             created_at: new Date().toISOString()
           });
+
+          const targetWalletName = RECEIVER_WALLET_NAMES[toReceiverWallet] || 'your wallet';
+          const senderWalletName = WALLET_NAMES[fromWallet] || 'your wallet';
 
           const notifRef = doc(collection(db, 'notifications'));
           transaction.set(notifRef, {
             user_id: targetUser.id,
             sender_id: user!.uid,
             title: 'Transfer Received',
-            message: `You received ${formatCurrency(amountNum)} from ${profile?.name}`,
+            message: `You received ${formatCurrency(amountNum)} from ${profile?.name} into your ${targetWalletName}`,
             type: 'success',
             read: false,
             created_at: new Date().toISOString()
@@ -352,7 +379,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
           transaction.set(senderNotifRef, {
             user_id: user!.uid,
             title: 'Transfer Sent',
-            message: `Successfully sent ${formatCurrency(amountNum)} to ${targetUser.name}`,
+            message: `Successfully sent ${formatCurrency(amountNum)} from your ${senderWalletName} to ${targetUser.name}'s ${targetWalletName}`,
             type: 'success',
             read: false,
             created_at: new Date().toISOString()
@@ -389,6 +416,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
         transfer_type: type,
         from_wallet: fromWallet,
         to_wallet: toWallet,
+        receiver_destination_wallet: toReceiverWallet,
         amount: amount,
         timestamp: new Date().toISOString()
       };
@@ -619,6 +647,20 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                       </div>
 
                       <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Destination Wallet</label>
+                        <select 
+                          value={toReceiverWallet}
+                          onChange={(e) => setToReceiverWallet(e.target.value as any)}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-500"
+                        >
+                          <option value="">-- Select Destination Wallet --</option>
+                          <option value="funding_balance">Funding Wallet</option>
+                          <option value="available_balance">Available Balance</option>
+                          <option value="total_invested">Assets</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
                         <div className="flex justify-between items-center px-1">
                           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount to Transfer</label>
                           <div className="flex items-center gap-1">
@@ -668,7 +710,7 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
             </div>
 
             <button 
-              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > getProfileWalletBalance(fromWallet) || (type === 'user' && !targetUser)}
+              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > getProfileWalletBalance(fromWallet) || (type === 'user' && (!targetUser || !toReceiverWallet))}
               onClick={() => setShowPinModal(true)}
               className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold uppercase tracking-[0.2em] text-xs shadow-xl shadow-blue-600/20 disabled:grayscale disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-[0.98] mt-4"
             >
@@ -702,6 +744,33 @@ export default function TransferModal({ isOpen, onClose }: TransferModalProps) {
                 <span className="text-[9px] font-bold text-slate-400 uppercase">Amount</span>
                 <span className="text-xs font-black text-slate-800 tracking-tight">{formatCurrency(parseFloat(amount) || 0)}</span>
               </div>
+              {type === 'internal' ? (
+                <>
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2 pt-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">From</span>
+                    <span className="text-xs font-bold text-slate-700">{WALLET_NAMES[fromWallet]}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2 pt-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">To</span>
+                    <span className="text-xs font-bold text-slate-700">{WALLET_NAMES[toWallet]}</span>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2 pt-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">From</span>
+                    <span className="text-xs font-bold text-slate-700">{WALLET_NAMES[fromWallet]}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2 pt-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">Recipient</span>
+                    <span className="text-xs font-bold text-slate-700">{targetUser?.name} ({targetUser?.public_id})</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-slate-200 pb-2 pt-1">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase">Destination Wallet</span>
+                    <span className="text-xs font-bold text-slate-700">{RECEIVER_WALLET_NAMES[toReceiverWallet] || toReceiverWallet}</span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between items-center pt-1">
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Status</span>
                 <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Completed</span>

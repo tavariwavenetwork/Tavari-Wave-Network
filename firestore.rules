@@ -72,9 +72,7 @@ service cloud.firestore {
     }
 
     function isAdditiveUpdate(field, incoming_data, existing_data) {
-      return !incoming_data.keys().hasAny([field]) || 
-             !existing_data.keys().hasAny([field]) || 
-             incoming_data[field] >= existing_data[field];
+      return incoming_data.get(field, 0) >= existing_data.get(field, 0);
     }
 
     function isSafeIncomingUpdate(incoming_data, existing_data) {
@@ -82,6 +80,7 @@ service cloud.firestore {
              isAdditiveUpdate('available_balance', incoming_data, existing_data) &&
              isAdditiveUpdate('referral_earnings', incoming_data, existing_data) &&
              isAdditiveUpdate('active_referrals', incoming_data, existing_data) &&
+             isAdditiveUpdate('total_invested', incoming_data, existing_data) &&
              isAdditiveUpdate('referrals_count', incoming_data, existing_data);
     }
 
@@ -123,7 +122,7 @@ service cloud.firestore {
                         ])) ||
                        (isSignedIn() && existing().get('referred_by', '') == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['last_rebook'])) ||
                        (isSignedIn() && !isOwner(userId) && 
-                        incoming().diff(existing()).affectedKeys().hasOnly(['funding_balance', 'available_balance', 'referral_earnings', 'active_referrals', 'referrals_count']) && 
+                        incoming().diff(existing()).affectedKeys().hasOnly(['funding_balance', 'available_balance', 'referral_earnings', 'active_referrals', 'referrals_count', 'total_invested']) && 
                         isSafeIncomingUpdate(incoming(), existing())
                        )
                       );

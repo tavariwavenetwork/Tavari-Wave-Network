@@ -481,10 +481,10 @@ export default function Homepage() {
   const activeCount = investments.filter(i => i.status === 'active').length;
 
   return (
-    <div className="w-full flex flex-col items-center -mt-8 px-3 lg:px-0">
+    <div className="w-full flex flex-col items-center -mt-10 md:-mt-8 px-3 lg:px-0">
       
       {/* Live Social Proof Activity Feed */}
-      <div className="py-5 lg:py-7 w-full flex justify-center">
+      <div className="py-1 md:py-5 lg:py-7 w-full flex justify-center">
         <LiveActivityNotification />
       </div>
 
